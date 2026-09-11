@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { formatBytes } from "@/lib/format";
-import { ProgressBar } from "./ui";
+import { FileTypeIcon } from "./icons";
+import { ProgressBar, type Tone } from "./ui";
 
 const ROW_HEIGHT = 60;
 const OVERSCAN = 8;
@@ -50,43 +51,43 @@ export function FileList({ count, renderRow }: { count: number; renderRow: (inde
   );
 }
 
-type Tone = "muted" | "ok" | "err" | "accent";
-const tones: Record<Tone, string> = { muted: "text-muted", ok: "text-ok", err: "text-err", accent: "text-accent" };
-
 export function FileRow({
   path,
   size,
-  status,
-  tone = "muted",
+  badge,
   progress,
+  progressTone = "accent",
   actions,
 }: {
   path: string;
   size: number;
-  status?: string;
-  tone?: Tone;
+  badge?: ReactNode;
   progress?: number;
+  progressTone?: Tone;
   actions?: ReactNode;
 }) {
   const slash = path.lastIndexOf("/");
   const name = path.slice(slash + 1);
   const dir = slash > 0 ? path.slice(0, slash) : "";
   return (
-    <div className="flex h-full items-center gap-2 border-b border-line">
+    <div className="flex h-full items-center gap-3 border-b border-line">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-hover text-muted">
+        <FileTypeIcon path={path} className="size-4.5" />
+      </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm">{name}</p>
-        <p className="mt-0.5 flex gap-2 text-xs text-muted">
+        <p className="truncate text-sm font-medium">{name}</p>
+        <p className="mt-0.5 flex min-w-0 gap-1.5 text-xs text-muted">
           <span className="shrink-0 tabular-nums">{formatBytes(size)}</span>
-          {dir && <span className="truncate">{dir}</span>}
-          {status && <span className={`ml-auto shrink-0 truncate tabular-nums ${tones[tone]}`}>{status}</span>}
+          {dir && <span className="truncate">· {dir}</span>}
         </p>
         {progress !== undefined && (
           <div className="mt-1.5">
-            <ProgressBar value={progress} thin />
+            <ProgressBar value={progress} tone={progressTone} thin />
           </div>
         )}
       </div>
-      {actions && <div className="flex shrink-0">{actions}</div>}
+      {badge && <div className="flex max-w-[45%] min-w-0 shrink-0 justify-end">{badge}</div>}
+      {actions && <div className="-mr-2 flex shrink-0">{actions}</div>}
     </div>
   );
 }

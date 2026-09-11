@@ -5,9 +5,10 @@ import { normalizeCode } from "@/lib/format";
 import { useMounted, useOnline } from "@/lib/hooks";
 import { navigate, usePath } from "@/lib/router";
 import Home from "./Home";
-import { LogoIcon } from "./icons";
+import { AlertIcon, BackIcon, LogoIcon } from "./icons";
+import Toaster from "./Toaster";
 import TransferView from "./TransferView";
-import { Message } from "./ui";
+import { Badge, IconButton, Message } from "./ui";
 
 export default function App() {
   const mounted = useMounted();
@@ -25,12 +26,17 @@ export default function App() {
   if (mounted) {
     if (code) view = <TransferView key={code} code={code} />;
     else if (path === "/") view = <Home />;
-    else view = <Message title="Nothing here">Check the link or code and try again.</Message>;
+    else view = <Message icon={<AlertIcon />} title="Nothing here">Check the link or code and try again.</Message>;
   }
 
   return (
     <div className="safe-area mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
-      <header className="flex h-12 items-center justify-between">
+      <header className="flex h-12 items-center gap-1">
+        {path !== "/" && (
+          <IconButton label="Back to home" className="-ml-2" onClick={() => navigate("/")}>
+            <BackIcon />
+          </IconButton>
+        )}
         {/* Views are routed by lib/router, not Next's router, so running uploads survive navigation. */}
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a
@@ -39,16 +45,23 @@ export default function App() {
             e.preventDefault();
             navigate("/");
           }}
-          className="-ml-1 flex items-center gap-2 rounded-lg p-1 text-lg font-semibold tracking-tight"
+          className="flex items-center gap-2 rounded-lg p-1 text-lg font-semibold tracking-tight"
         >
           <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-accent-fg">
             <LogoIcon className="size-5" />
           </span>
           Flux
         </a>
-        {!online && <span className="rounded-full border border-line px-3 py-1 text-xs text-muted">Offline</span>}
+        {!online && (
+          <span className="ml-auto">
+            <Badge tone="warn" icon={<AlertIcon className="size-3" />}>
+              Offline
+            </Badge>
+          </span>
+        )}
       </header>
       <main className="flex-1 pt-4">{view}</main>
+      <Toaster />
     </div>
   );
 }

@@ -10,6 +10,7 @@
   --accent: #5a57f0;
   --accent-fg: #ffffff;
   --ok: #15803d;
+  --warn: #b45309;
   --err: #dc2626;
 }
 
@@ -24,6 +25,7 @@
     --accent: #7c79ff;
     --accent-fg: #ffffff;
     --ok: #4ade80;
+    --warn: #fbbf24;
     --err: #f87171;
   }
 }
@@ -38,6 +40,7 @@
   --color-accent: var(--accent);
   --color-accent-fg: var(--accent-fg);
   --color-ok: var(--ok);
+  --color-warn: var(--warn);
   --color-err: var(--err);
 }
 
@@ -56,6 +59,18 @@ button,
 a,
 input {
   touch-action: manipulation;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 @utility safe-area {

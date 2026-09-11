@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type InputHTMLAttributes } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
 import { errorMessage, listPublic, type PublicTransfer } from "@/lib/api";
 import { fromDataTransfer, fromFileList, type Picked } from "@/lib/files";
 import { formatBytes, formatCode, formatRemaining, normalizeCode, plural } from "@/lib/format";
@@ -8,14 +8,18 @@ import { useNow } from "@/lib/hooks";
 import { listOwned } from "@/lib/owned";
 import { navigate } from "@/lib/router";
 import { send } from "@/lib/session";
-import { ArrowIcon, FolderIcon, UploadIcon } from "./icons";
-import { Button, Card } from "./ui";
+import { AlertIcon, ArrowIcon, ClockIcon, DownloadIcon, FileTypeIcon, FolderIcon, GlobeIcon, LockIcon, UploadIcon } from "./icons";
+import { Badge, Button, Card, Field, SectionTitle, Segmented, Spinner } from "./ui";
 
 const EXPIRY = [
-  ["1 hour", 3600],
-  ["1 day", 86_400],
-  ["7 days", 604_800],
-] as const;
+  { label: "1 hour", value: 3600 },
+  { label: "1 day", value: 86_400 },
+  { label: "7 days", value: 604_800 },
+];
+const VISIBILITY = [
+  { label: "Private", value: "private", icon: <LockIcon className="size-4" /> },
+  { label: "Public", value: "public", icon: <GlobeIcon className="size-4" /> },
+];
 const EXPIRY_KEY = "flux.expiry";
 const PUBLIC_POLL_MS = 15_000;
 const folderInputProps = { webkitdirectory: "" } as InputHTMLAttributes<HTMLInputElement>;
@@ -23,7 +27,7 @@ const folderInputProps = { webkitdirectory: "" } as InputHTMLAttributes<HTMLInpu
 function storedExpiry(): number {
   try {
     const value = Number(localStorage.getItem(EXPIRY_KEY));
-    return EXPIRY.some(([, s]) => s === value) ? value : 86_400;
+    return EXPIRY.some((e) => e.value === value) ? value : 86_400;
   } catch {
     return 86_400;
   }
@@ -100,71 +104,77 @@ export default function Home() {
     } catch {}
   }
 
-  function togglePublic() {
-    options.current.isPublic = !isPublic;
-    setIsPublic(!isPublic);
+  function chooseVisibility(value: string) {
+    options.current.isPublic = value === "public";
+    setIsPublic(value === "public");
   }
 
+  const pick = (kind: "files" | "folder") => (e: { stopPropagation(): void }) => {
+    e.stopPropagation();
+    (kind === "files" ? fileInput : folderInput).current?.click();
+  };
+
   return (
-    <div className="space-y-8">
-      <section>
-        <button
-          type="button"
-          disabled={!!busy}
-          onClick={() => fileInput.current?.click()}
-          className={`flex h-56 w-full flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed px-6 text-center transition sm:h-64 ${
-            dragging ? "border-accent bg-accent/10" : "border-line bg-surface hover:border-accent/60"
+    <div className="space-y-4">
+      {dragging && (
+        <div className="pointer-events-none fixed inset-0 z-40 bg-bg/80 p-4 backdrop-blur-sm">
+          <div className="flex size-full flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-accent text-accent">
+            <UploadIcon className="size-10" />
+            <p className="text-lg font-semibold">Drop to send</p>
+          </div>
+        </div>
+      )}
+
+      <Card>
+        <SectionTitle icon={<UploadIcon className="size-4.5" />}>Send</SectionTitle>
+        <div
+          onClick={() => !busy && fileInput.current?.click()}
+          className={`flex min-h-48 cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-6 text-center transition ${
+            busy ? "cursor-default border-line" : "border-line hover:border-accent/60 hover:bg-hover/50"
           }`}
         >
-          <span className="flex size-14 items-center justify-center rounded-2xl bg-accent/10 text-accent">
-            <UploadIcon className="size-7" />
-          </span>
-          <span className="text-lg font-semibold">{busy ?? (dragging ? "Drop to send" : "Send files")}</span>
-          {!busy && (
-            <span className="text-sm text-muted">
-              {canPickFolder ? "Drop files or folders here, or click to choose" : "Tap to choose files"}
-            </span>
-          )}
-        </button>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-muted">Expires after</span>
-              <div className="flex rounded-xl border border-line bg-surface p-0.5" role="radiogroup" aria-label="Expiry">
-                {EXPIRY.map(([label, seconds]) => (
-                  <button
-                    key={seconds}
-                    type="button"
-                    role="radio"
-                    aria-checked={expiresIn === seconds}
-                    onClick={() => chooseExpiry(seconds)}
-                    className={`min-h-10 rounded-[10px] px-3 transition ${
-                      expiresIn === seconds ? "bg-accent text-accent-fg" : "text-muted hover:text-fg"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+          {busy ? (
+            <>
+              <Spinner className="size-7 text-accent" />
+              <p className="font-medium">{busy}</p>
+            </>
+          ) : (
+            <>
+              <div>
+                <p className="font-semibold">{canPickFolder ? "Drop files or folders here" : "Send photos, videos or any files"}</p>
+                <p className="mt-1 text-sm text-muted">Any size, any number of files</p>
               </div>
-            </div>
-            <button type="button" role="switch" aria-checked={isPublic} onClick={togglePublic} className="flex min-h-10 items-center gap-2">
-              <span className={`relative h-6 w-10 rounded-full transition ${isPublic ? "bg-accent" : "bg-line"}`}>
-                <span
-                  className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-all ${isPublic ? "left-[18px]" : "left-0.5"}`}
-                />
-              </span>
-              <span className={isPublic ? "" : "text-muted"}>Public</span>
-            </button>
-          </div>
-          {canPickFolder && (
-            <Button disabled={!!busy} onClick={() => folderInput.current?.click()}>
-              <FolderIcon className="size-4" />
-              Send a folder
-            </Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button variant="primary" onClick={pick("files")}>
+                  <UploadIcon className="size-4" />
+                  Choose files
+                </Button>
+                {canPickFolder && (
+                  <Button onClick={pick("folder")}>
+                    <FolderIcon className="size-4" />
+                    Choose folder
+                  </Button>
+                )}
+              </div>
+            </>
           )}
         </div>
-        {isPublic && <p className="mt-2 text-sm text-muted">Listed below for anyone who opens Flux. No code needed.</p>}
-        {error && <p className="mt-3 text-sm text-err">{error}</p>}
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <Field label="Who can open it" hint={isPublic ? "Listed on this page for anyone who opens Flux." : "Only people with the code or link."}>
+            <Segmented label="Visibility" value={isPublic ? "public" : "private"} options={VISIBILITY} onChange={chooseVisibility} />
+          </Field>
+          <Field label="Delete after" hint="Files are removed automatically.">
+            <Segmented label="Expiry" value={expiresIn} options={EXPIRY} onChange={chooseExpiry} />
+          </Field>
+        </div>
+
+        {error && (
+          <p className="mt-4 flex items-center gap-2 rounded-xl bg-err/10 p-3 text-sm text-err">
+            <AlertIcon className="size-4 shrink-0" />
+            {error}
+          </p>
+        )}
         <input
           ref={fileInput}
           type="file"
@@ -185,27 +195,32 @@ export default function Home() {
             e.target.value = "";
           }}
         />
-      </section>
+      </Card>
 
-      <PublicList />
-      <ReceiveForm />
+      <Card>
+        <SectionTitle icon={<DownloadIcon className="size-4.5" />}>Receive</SectionTitle>
+        <ReceiveForm />
+        <PublicList />
+      </Card>
+
       <OwnedList />
     </div>
   );
 }
 
-function TransferRow({ code, title, detail, trailing, mono = false }: { code: string; title: string; detail: string; trailing: string; mono?: boolean }) {
+function TransferRow({ code, icon, title, detail, badge, mono = false }: { code: string; icon: ReactNode; title: string; detail: string; badge?: ReactNode; mono?: boolean }) {
   return (
     <button
       type="button"
       onClick={() => navigate(`/${formatCode(code)}`)}
-      className="flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left transition first:rounded-t-2xl last:rounded-b-2xl hover:bg-hover"
+      className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-xl px-2 py-2.5 text-left transition hover:bg-hover"
     >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-hover text-muted">{icon}</span>
       <span className="min-w-0 flex-1">
-        <span className={`block truncate font-medium ${mono ? "font-mono" : ""}`}>{title}</span>
-        <span className="block truncate text-sm text-muted">{detail}</span>
+        <span className={`block truncate text-sm font-medium ${mono ? "font-mono" : ""}`}>{title}</span>
+        <span className="block truncate text-xs text-muted">{detail}</span>
       </span>
-      <span className="hidden shrink-0 text-xs text-muted sm:inline">{trailing}</span>
+      {badge && <span className="shrink-0">{badge}</span>}
       <ArrowIcon className="size-4 shrink-0 text-muted" />
     </button>
   );
@@ -249,24 +264,27 @@ function PublicList() {
 
   if (!list) return null;
   return (
-    <section>
-      <h2 className="mb-2 text-sm font-medium text-muted">Public</h2>
+    <div className="mt-6">
+      <p className="mb-2 flex items-center gap-2 text-sm font-medium">
+        <GlobeIcon className="size-4 text-muted" />
+        Public files
+        {list.length > 0 && <Badge>{list.length}</Badge>}
+      </p>
       {list.length ? (
-        <Card className="divide-y divide-line !p-0">
-          {list.map((t) => (
-            <TransferRow
-              key={t.code}
-              code={t.code}
-              title={t.title}
-              detail={`${plural(t.files, "file")} · ${formatBytes(t.size)}${t.complete ? "" : " · uploading"}`}
-              trailing={formatRemaining(t.expiresAt, now)}
-            />
-          ))}
-        </Card>
+        list.map((t) => (
+          <TransferRow
+            key={t.code}
+            code={t.code}
+            icon={t.files > 1 ? <FolderIcon className="size-4.5" /> : <FileTypeIcon path={t.title} className="size-4.5" />}
+            title={t.title}
+            detail={`${plural(t.files, "file")} · ${formatBytes(t.size)} · ${formatRemaining(t.expiresAt, now)}`}
+            badge={!t.complete && <Badge tone="accent" icon={<Spinner className="size-3" />}>Uploading</Badge>}
+          />
+        ))
       ) : (
-        <p className="text-sm text-muted">Nothing is shared publicly right now.</p>
+        <p className="rounded-xl border border-dashed border-line p-4 text-center text-sm text-muted">Nothing is shared publicly right now.</p>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -282,31 +300,38 @@ function ReceiveForm() {
   }
 
   return (
-    <section>
-      <h2 className="mb-2 text-sm font-medium text-muted">Receive with a code</h2>
-      <form onSubmit={submit} className="flex gap-2">
-        <input
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value);
-            setInvalid(false);
-          }}
-          placeholder="Enter code, e.g. abcd-efgh"
-          aria-label="Transfer code"
-          aria-invalid={invalid}
-          autoCapitalize="off"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          enterKeyHint="go"
-          className="min-h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface px-4 font-mono text-base outline-none placeholder:font-sans placeholder:text-muted focus:border-accent aria-invalid:border-err"
-        />
-        <Button type="submit" variant="primary" className="min-h-12 px-5" aria-label="Open transfer">
-          <ArrowIcon />
-        </Button>
-      </form>
-      {invalid && <p className="mt-2 text-sm text-err">Codes look like abcd-efgh.</p>}
-    </section>
+    <form onSubmit={submit}>
+      <Field label="Have a code?">
+        <div className="flex gap-2">
+          <input
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setInvalid(false);
+            }}
+            placeholder="abcd-efgh"
+            aria-label="Transfer code"
+            aria-invalid={invalid}
+            autoCapitalize="off"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="go"
+            className="min-h-12 min-w-0 flex-1 rounded-xl border border-line bg-bg px-4 font-mono text-base tracking-wider outline-none placeholder:text-muted/60 focus:border-accent aria-invalid:border-err"
+          />
+          <Button type="submit" variant="primary" className="min-h-12 px-5">
+            Open
+            <ArrowIcon className="size-4" />
+          </Button>
+        </div>
+      </Field>
+      {invalid && (
+        <p className="mt-2 flex items-center gap-1.5 text-sm text-err">
+          <AlertIcon className="size-4" />
+          Codes look like abcd-efgh.
+        </p>
+      )}
+    </form>
   );
 }
 
@@ -314,20 +339,18 @@ function OwnedList() {
   const [owned] = useState(listOwned);
   if (!owned.length) return null;
   return (
-    <section>
-      <h2 className="mb-2 text-sm font-medium text-muted">Your transfers</h2>
-      <Card className="divide-y divide-line !p-0">
-        {owned.map(([code, o]) => (
-          <TransferRow
-            key={code}
-            code={code}
-            mono
-            title={formatCode(code)}
-            detail={`${plural(o.count, "file")} · ${formatBytes(o.size)}${o.public ? " · public" : ""}`}
-            trailing={formatRemaining(o.expiresAt)}
-          />
-        ))}
-      </Card>
-    </section>
+    <Card>
+      <SectionTitle icon={<ClockIcon className="size-4.5" />}>Your transfers</SectionTitle>
+      {owned.map(([code, o]) => (
+        <TransferRow
+          key={code}
+          code={code}
+          mono
+          icon={o.public ? <GlobeIcon className="size-4.5" /> : <LockIcon className="size-4.5" />}
+          title={formatCode(code)}
+          detail={`${plural(o.count, "file")} · ${formatBytes(o.size)} · ${formatRemaining(o.expiresAt)}`}
+        />
+      ))}
+    </Card>
   );
 }

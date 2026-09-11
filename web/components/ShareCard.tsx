@@ -5,8 +5,9 @@ import { encode } from "uqr";
 import { formatCode, formatRemaining } from "@/lib/format";
 import { useNow } from "@/lib/hooks";
 import { getOwned } from "@/lib/owned";
-import { LinkIcon, QrIcon } from "./icons";
-import { Button, Card } from "./ui";
+import { toast } from "@/lib/toast";
+import { ClockIcon, CopyIcon, GlobeIcon, LinkIcon, LockIcon, QrIcon } from "./icons";
+import { Badge, Button, Card, IconButton } from "./ui";
 
 async function copyText(text: string) {
   if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
@@ -37,55 +38,58 @@ function QrCode({ text }: { text: string }) {
 
 export function ShareCard({ code, expiresAt }: { code: string; expiresAt?: string }) {
   const now = useNow(60_000);
-  const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const [showQr, setShowQr] = useState(false);
   const isPublic = useMemo(() => getOwned(code)?.public, [code]);
   const formatted = formatCode(code);
   const link = `${window.location.origin}/${formatted}`;
   const canShare = typeof navigator.share === "function" && window.matchMedia("(pointer: coarse)").matches;
 
-  async function copy(what: "code" | "link") {
-    await copyText(what === "code" ? formatted : link).catch(() => {});
-    setCopied(what);
-    window.setTimeout(() => setCopied(null), 1500);
+  async function copy(text: string, what: string) {
+    try {
+      await copyText(text);
+      toast(`${what} copied`);
+    } catch {
+      toast(`Couldn't copy the ${what.toLowerCase()}`, "err");
+    }
   }
 
   function shareLink() {
     if (canShare) navigator.share({ title: "Flux transfer", url: link }).catch(() => {});
-    else void copy("link");
+    else void copy(link, "Link");
   }
 
   return (
-    <Card className="flex items-center gap-4">
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium tracking-wider text-muted uppercase">Transfer code</p>
-        <button
-          type="button"
-          onClick={() => copy("code")}
-          className="mt-1 block font-mono text-3xl font-semibold tracking-wider sm:text-4xl"
-          aria-label={`Copy code ${formatted}`}
-        >
-          {copied === "code" ? <span className="text-accent">copied</span> : formatted}
-        </button>
-        {expiresAt && (
-          <p className="mt-1 text-xs text-muted">
-            {formatRemaining(expiresAt, now)}
-            {isPublic && " · Public, listed for everyone"}
-          </p>
-        )}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button onClick={shareLink}>
-            <LinkIcon className="size-4" />
-            {copied === "link" ? "Link copied" : canShare ? "Share link" : "Copy link"}
-          </Button>
-          <Button className="sm:hidden" onClick={() => setShowQr((v) => !v)} aria-pressed={showQr}>
-            <QrIcon className="size-4" />
-            QR
-          </Button>
-        </div>
+    <Card>
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="mr-auto text-sm font-semibold">Share</h2>
+        <Badge tone={isPublic ? "accent" : "muted"} icon={isPublic ? <GlobeIcon className="size-3" /> : <LockIcon className="size-3" />}>
+          {isPublic ? "Public" : "Private"}
+        </Badge>
+        {expiresAt && <Badge icon={<ClockIcon className="size-3" />}>{formatRemaining(expiresAt, now)}</Badge>}
       </div>
-      <div className={`${showQr ? "block" : "hidden"} size-28 shrink-0 sm:block sm:size-36`}>
-        <QrCode text={link} />
+      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 rounded-xl border border-line bg-bg py-1 pr-1 pl-4">
+            <span className="flex-1 font-mono text-2xl font-semibold tracking-widest sm:text-3xl">{formatted}</span>
+            <IconButton label="Copy code" onClick={() => copy(formatted, "Code")}>
+              <CopyIcon className="size-5" />
+            </IconButton>
+          </div>
+          <p className="mt-2 text-sm text-muted">Enter this code on the other device, scan the QR code, or send the link.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="primary" onClick={shareLink}>
+              <LinkIcon className="size-4" />
+              {canShare ? "Share link" : "Copy link"}
+            </Button>
+            <Button className="sm:hidden" onClick={() => setShowQr((v) => !v)} aria-pressed={showQr}>
+              <QrIcon className="size-4" />
+              {showQr ? "Hide QR code" : "Show QR code"}
+            </Button>
+          </div>
+        </div>
+        <div className={`${showQr ? "block" : "hidden"} mx-auto size-52 shrink-0 sm:block sm:size-36`}>
+          <QrCode text={link} />
+        </div>
       </div>
     </Card>
   );

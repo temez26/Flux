@@ -11,12 +11,26 @@ import { Receiver, type ReceiveItem } from "@/lib/receive";
 import { navigate } from "@/lib/router";
 import { memorySink, saveMethod, streamSink, type SaveMethod } from "@/lib/save";
 import { end, live, resume, type Session } from "@/lib/session";
+import { toast } from "@/lib/toast";
 import type { Item } from "@/lib/upload";
 import { singleTarget, zipTarget } from "@/lib/zip";
 import { FileList, FileRow } from "./FileList";
-import { CheckIcon, CloseIcon, DownloadIcon, PauseIcon, PlayIcon, RetryIcon, UploadIcon } from "./icons";
+import {
+  AlertIcon,
+  CheckIcon,
+  ClockIcon,
+  CloseIcon,
+  DownloadIcon,
+  FileTypeIcon,
+  FolderIcon,
+  PauseIcon,
+  PlayIcon,
+  RetryIcon,
+  UploadIcon,
+  ZapIcon,
+} from "./icons";
 import { ShareCard } from "./ShareCard";
-import { Button, Card, ConfirmButton, Message, ProgressBar, buttonClass, iconButtonClass } from "./ui";
+import { Badge, Button, Card, ConfirmButton, IconButton, Message, ProgressBar, Spinner, StatusCard, buttonClass, type StatusProps } from "./ui";
 
 export default function TransferView({ code }: { code: string }) {
   const [session, setSession] = useState(() => live.get(code));
@@ -33,8 +47,22 @@ export default function TransferView({ code }: { code: string }) {
   }, [meta, code]);
 
   if (session) return <SenderPanel session={session} expiresAt={owned?.expiresAt} />;
-  if (meta === undefined) return <Message title={offline ? "Can't reach the Flux server" : "Loading…"} />;
-  if (meta === null) return <Message title="Transfer not found">It may have expired or been deleted.</Message>;
+  if (meta === undefined) {
+    return offline ? (
+      <Message icon={<AlertIcon />} title="Can't reach the Flux server">
+        Check your connection. This page retries automatically.
+      </Message>
+    ) : (
+      <Message icon={<Spinner className="size-5" />} title="Loading…" />
+    );
+  }
+  if (meta === null) {
+    return (
+      <Message icon={<ClockIcon />} title="Transfer not found">
+        It may have expired or been deleted.
+      </Message>
+    );
+  }
   if (owned) return <OwnerPanel meta={meta} token={owned.token} onResume={setSession} />;
   return <ReceiverPanel meta={meta} />;
 }
@@ -43,10 +71,12 @@ async function removeTransfer(code: string, token: string) {
   end(code);
   removeOwned(code);
   navigate("/", true);
+  toast("Transfer deleted");
   await deleteTransfer(code, token).catch(() => {});
 }
 
 const percent = (part: number, whole: number) => (whole ? Math.floor((part / whole) * 100) : 100);
+const small = "size-3";
 
 /** In long lists the files in flight are rarely on screen, so they are pinned above the list. */
 function inFlight<T extends { status: string }>(items: T[], finished: boolean): T[] {
@@ -67,20 +97,35 @@ function Pinned({ title, children }: { title: string; children: ReactNode[] }) {
   );
 }
 
-function DirectBadge() {
+function ListTitle({ count }: { count: number }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-ok/10 px-2.5 py-1 text-xs font-medium text-ok">
-      <span className="size-1.5 rounded-full bg-ok" />
-      Direct connection
-    </span>
+    <h2 className="flex items-center gap-2 pt-2 text-sm font-medium">
+      Files <Badge>{count.toLocaleString()}</Badge>
+    </h2>
   );
+}
+
+function senderStatus(session: Session): StatusProps {
+  const { uploader } = session;
+  const { counts, finished, reconnecting } = uploader.snapshot;
+  if (finished && counts.failed) {
+    return { tone: "err", icon: <AlertIcon />, title: `${plural(counts.failed, "file")} failed`, subtitle: "Retry them, or cancel them to share the rest." };
+  }
+  if (finished) return { tone: "ok", icon: <CheckIcon />, title: "Ready to receive", subtitle: "Every file is uploaded and verified." };
+  if (session.delivered && uploader.paused) {
+    return { tone: "ok", icon: <ZapIcon />, title: "Delivered directly", subtitle: "The receiver has everything. Resume to also keep a copy on the server." };
+  }
+  if (uploader.held) return { tone: "accent", icon: <ZapIcon />, title: "Sending directly", subtitle: "A receiver is downloading straight from this device." };
+  if (uploader.paused) return { tone: "warn", icon: <PauseIcon />, title: "Paused", subtitle: "Resume to continue uploading." };
+  if (reconnecting) return { tone: "warn", icon: <Spinner className="size-5" />, title: "Reconnecting…", subtitle: "The connection dropped. Retrying automatically." };
+  return { tone: "accent", icon: <Spinner className="size-5" />, title: "Uploading", subtitle: "Keep this page open until it finishes." };
 }
 
 function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: string }) {
   const { uploader, host } = session;
   useSyncExternalStore(uploader.subscribe, uploader.getVersion, uploader.getVersion);
   useSyncExternalStore(host.subscribe, host.getVersion, host.getVersion);
-  const { total, sent, counts, speed, finished, reconnecting } = uploader.snapshot;
+  const { total, sent, counts, speed, finished } = uploader.snapshot;
   const running = !finished && !uploader.paused;
   const serving = host.receivers > 0;
   useWakeLock(running || serving);
@@ -88,84 +133,70 @@ function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: str
 
   const files = uploader.items.length - counts.canceled;
   const delivered = session.delivered && uploader.paused && !finished;
-  const title = finished
-    ? counts.failed
-      ? `${plural(counts.failed, "file")} failed`
-      : "Uploaded · ready to receive"
-    : delivered
-      ? "Delivered directly"
-      : uploader.held
-        ? "Sending directly…"
-        : uploader.paused
-          ? "Paused"
-          : reconnecting
-            ? "Reconnecting…"
-            : "Uploading…";
+  const stats: [string, string][] = [
+    ["Files", `${counts.done.toLocaleString()} / ${files.toLocaleString()}`],
+    ["Uploaded", `${formatBytes(sent)} / ${formatBytes(total)}`],
+  ];
+  if (running && !uploader.held) {
+    stats.push(["Speed", speed > 0 ? `${formatBytes(speed)}/s` : "–"], ["Time left", speed > 0 ? formatDuration((total - sent) / speed) : "–"]);
+  }
 
   return (
     <div className="space-y-4">
       <ShareCard code={uploader.code} expiresAt={expiresAt} />
-      <Card>
-        <div className="flex items-baseline justify-between gap-3">
-          <h1 className="flex items-center gap-2 font-semibold">
-            {(finished && !counts.failed) || delivered ? <CheckIcon className="size-5 text-ok" /> : null}
-            {title}
-          </h1>
-          <span className="text-sm text-muted tabular-nums">{percent(sent, total)}%</span>
-        </div>
-        <div className="mt-3">
-          <ProgressBar value={total ? sent / total : 1} />
-        </div>
-        <p className="mt-2 text-sm text-muted tabular-nums">
-          {counts.done.toLocaleString()} of {plural(files, "file")} on the server · {formatBytes(sent)} of {formatBytes(total)}
-          {running && !uploader.held && speed > 0 && ` · ${formatBytes(speed)}/s · ${formatDuration((total - sent) / speed)} left`}
-        </p>
-        {serving && (
-          <p className="mt-2 flex items-center gap-2 text-sm text-ok">
-            <span className="size-2 rounded-full bg-ok" />
-            Receiver connected directly{host.sent > 0 && ` · ${formatBytes(host.sent)} sent`}
-          </p>
-        )}
-        {delivered && (
-          <p className="mt-2 text-sm text-muted">Server upload paused. Resume it to also keep a copy there for others.</p>
-        )}
-        <div className="mt-4 flex flex-wrap gap-2">
-          {!finished && (
-            <Button onClick={() => (uploader.paused ? uploader.resume() : uploader.pause())}>
-              {uploader.paused ? <PlayIcon className="size-4" /> : <PauseIcon className="size-4" />}
-              {uploader.paused ? "Resume" : "Pause"}
-            </Button>
-          )}
-          {counts.failed > 0 && (
-            <Button onClick={() => uploader.retry()}>
-              <RetryIcon className="size-4" />
-              Retry failed
-            </Button>
-          )}
+      <StatusCard
+        {...senderStatus(session)}
+        percent={percent(sent, total)}
+        progress={total ? sent / total : 1}
+        stats={stats}
+        actions={
+          <>
+            {!finished && (
+              <Button onClick={() => (uploader.paused ? uploader.resume() : uploader.pause())}>
+                {uploader.paused ? <PlayIcon className="size-4" /> : <PauseIcon className="size-4" />}
+                {uploader.paused ? "Resume" : "Pause"}
+              </Button>
+            )}
+            {counts.failed > 0 && (
+              <Button variant="primary" onClick={() => uploader.retry()}>
+                <RetryIcon className="size-4" />
+                Retry failed
+              </Button>
+            )}
+          </>
+        }
+        danger={
           <ConfirmButton onConfirm={() => removeTransfer(uploader.code, uploader.token)}>
             {finished || delivered ? "Delete transfer" : "Cancel transfer"}
           </ConfirmButton>
-        </div>
-      </Card>
+        }
+      >
+        {serving && (
+          <div className="mt-4">
+            <Badge tone="ok" icon={<ZapIcon className={small} />}>
+              Receiver connected directly{host.sent > 0 ? ` · ${formatBytes(host.sent)} sent` : ""}
+            </Badge>
+          </div>
+        )}
+      </StatusCard>
       <Pinned title="Now uploading">
         {inFlight(uploader.items, finished).map((item) => (
-          <UploadRow key={item.idx} item={item} uploader={session.uploader} />
+          <UploadRow key={item.idx} item={item} uploader={uploader} />
         ))}
       </Pinned>
-      <FileList
-        count={uploader.items.length}
-        renderRow={(i) => <UploadRow item={uploader.items[i]} uploader={uploader} />}
-      />
+      <ListTitle count={uploader.items.length} />
+      <FileList count={uploader.items.length} renderRow={(i) => <UploadRow item={uploader.items[i]} uploader={uploader} />} />
     </div>
   );
 }
 
 function UploadRow({ item, uploader }: { item: Item; uploader: Session["uploader"] }) {
   const pct = item.size ? item.sent / item.size : 0;
+  const label = `${Math.floor(pct * 100)}%`;
   const cancel = (
-    <button type="button" className={iconButtonClass} onClick={() => uploader.cancel(item.idx)} aria-label={`Cancel ${item.path}`}>
+    <IconButton label={`Cancel ${item.path}`} onClick={() => uploader.cancel(item.idx)}>
       <CloseIcon className="size-4" />
-    </button>
+    </IconButton>
   );
   switch (item.status) {
     case "active":
@@ -173,30 +204,68 @@ function UploadRow({ item, uploader }: { item: Item; uploader: Session["uploader
         <FileRow
           path={item.path}
           size={item.size}
-          status={item.reconnecting ? "Reconnecting…" : `${Math.floor(pct * 100)}%`}
-          tone="accent"
+          badge={
+            item.reconnecting ? (
+              <Badge tone="warn" icon={<Spinner className={small} />}>
+                Reconnecting
+              </Badge>
+            ) : (
+              <Badge tone="accent" icon={<Spinner className={small} />}>
+                {label}
+              </Badge>
+            )
+          }
           progress={pct}
+          progressTone={item.reconnecting ? "warn" : "accent"}
           actions={cancel}
         />
       );
     case "pending":
-      return <FileRow path={item.path} size={item.size} status={item.sent ? `Paused at ${Math.floor(pct * 100)}%` : "Waiting"} actions={cancel} />;
+      return (
+        <FileRow
+          path={item.path}
+          size={item.size}
+          badge={
+            item.sent ? (
+              <Badge tone="warn" icon={<PauseIcon className={small} />}>
+                Paused {label}
+              </Badge>
+            ) : (
+              <Badge icon={<ClockIcon className={small} />}>Waiting</Badge>
+            )
+          }
+          actions={cancel}
+        />
+      );
     case "done":
-      return <FileRow path={item.path} size={item.size} status="Uploaded" tone="ok" />;
+      return (
+        <FileRow
+          path={item.path}
+          size={item.size}
+          badge={
+            <Badge tone="ok" icon={<CheckIcon className={small} />}>
+              Uploaded
+            </Badge>
+          }
+        />
+      );
     case "canceled":
-      return <FileRow path={item.path} size={item.size} status="Canceled" />;
+      return <FileRow path={item.path} size={item.size} badge={<Badge>Canceled</Badge>} />;
     case "failed":
       return (
         <FileRow
           path={item.path}
           size={item.size}
-          status={item.error}
-          tone="err"
+          badge={
+            <Badge tone="err" icon={<AlertIcon className={small} />}>
+              {item.error ?? "Failed"}
+            </Badge>
+          }
           actions={
             <>
-              <button type="button" className={iconButtonClass} onClick={() => uploader.retry(item.idx)} aria-label={`Retry ${item.path}`}>
+              <IconButton label={`Retry ${item.path}`} onClick={() => uploader.retry(item.idx)}>
                 <RetryIcon className="size-4" />
-              </button>
+              </IconButton>
               {cancel}
             </>
           }
@@ -223,11 +292,16 @@ function MetaRow({ file, code, downloadable }: { file: FileMeta; code: string; d
       <FileRow
         path={file.path}
         size={file.size}
-        status={downloadable ? undefined : "Uploaded"}
-        tone="ok"
+        badge={
+          !downloadable && (
+            <Badge tone="ok" icon={<CheckIcon className={small} />}>
+              Uploaded
+            </Badge>
+          )
+        }
         actions={
           downloadable && (
-            <a href={fileUrl(code, file.idx)} download className={iconButtonClass} aria-label={`Download ${basename(file.path)}`}>
+            <a href={fileUrl(code, file.idx)} download className={buttonClass("ghost", "min-h-10 px-3 text-accent")} aria-label={`Download ${basename(file.path)}`}>
               <DownloadIcon className="size-4" />
             </a>
           )
@@ -237,9 +311,18 @@ function MetaRow({ file, code, downloadable }: { file: FileMeta; code: string; d
   }
   const pct = file.size ? file.received / file.size : 0;
   return file.received > 0 ? (
-    <FileRow path={file.path} size={file.size} status={`Uploading ${Math.floor(pct * 100)}%`} tone="accent" progress={pct} />
+    <FileRow
+      path={file.path}
+      size={file.size}
+      badge={
+        <Badge tone="accent" icon={<Spinner className={small} />}>
+          Uploading {Math.floor(pct * 100)}%
+        </Badge>
+      }
+      progress={pct}
+    />
   ) : (
-    <FileRow path={file.path} size={file.size} status="Waiting for sender" />
+    <FileRow path={file.path} size={file.size} badge={<Badge icon={<ClockIcon className={small} />}>Waiting</Badge>} />
   );
 }
 
@@ -252,8 +335,33 @@ function checksumsUrl(meta: TransferMeta): string {
 const subscribeNothing = () => () => {};
 const versionZero = () => 0;
 
-function ReceiverPanel({ meta }: { meta: TransferMeta }) {
+function TransferHeading({ meta, badges }: { meta: TransferMeta; badges?: ReactNode }) {
   const now = useNow(60_000);
+  const { size } = summarize(meta.files);
+  const single = meta.files.length === 1 ? meta.files[0] : null;
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge>
+          <span className="font-mono">{formatCode(meta.code)}</span>
+        </Badge>
+        <Badge icon={<ClockIcon className={small} />}>{formatRemaining(meta.expiresAt, now)}</Badge>
+        {badges}
+      </div>
+      <div className="mt-4 flex items-center gap-3">
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+          {single ? <FileTypeIcon path={single.path} className="size-6" /> : <FolderIcon className="size-6" />}
+        </span>
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-semibold">{single ? basename(single.path) : plural(meta.files.length, "file")}</h1>
+          <p className="text-sm text-muted">{formatBytes(size)}</p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   const { size, received, complete, ready } = summarize(meta.files);
   const [initial] = useState({ ready, size });
   const [method, setMethod] = useState<SaveMethod | null>(null);
@@ -284,7 +392,6 @@ function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   if (receiver) return <ReceivingPanel receiver={receiver} meta={meta} />;
 
   const single = meta.files.length === 1 ? meta.files[0] : null;
-  const title = single ? basename(single.path) : plural(meta.files.length, "file");
   const directOpen = direct?.state === "open";
   const viaDirect = directOpen && !ready;
 
@@ -304,46 +411,53 @@ function ReceiverPanel({ meta }: { meta: TransferMeta }) {
 
   const label = (
     <>
-      <DownloadIcon className="size-4" />
+      <DownloadIcon className="size-5" />
       {single ? "Download" : "Download all"}
     </>
   );
+  const primary = "w-full min-h-12 text-base sm:w-auto sm:min-w-52";
 
   return (
     <div className="space-y-4">
       <Card>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs font-medium tracking-wider text-muted uppercase">{formatCode(meta.code)}</p>
-          {directOpen && <DirectBadge />}
-        </div>
-        <h1 className="mt-1 text-xl font-semibold break-all">{title}</h1>
-        <p className="mt-1 text-sm text-muted">
-          {formatBytes(size)} · {formatRemaining(meta.expiresAt, now)}
-        </p>
+        <TransferHeading
+          meta={meta}
+          badges={
+            directOpen && (
+              <Badge tone="ok" icon={<ZapIcon className={small} />}>
+                Direct connection
+              </Badge>
+            )
+          }
+        />
+
+        {viaDirect && (
+          <p className="mt-4 flex items-start gap-2 rounded-xl bg-ok/10 p-3 text-sm text-ok">
+            <ZapIcon className="mt-0.5 size-4 shrink-0" />
+            The sender is online, so files come straight from their device.
+          </p>
+        )}
         {!ready && !viaDirect && (
-          <div className="mt-4">
-            <div className="mb-2 flex justify-between text-sm text-muted tabular-nums">
-              <span>
-                Waiting for the sender · {complete.toLocaleString()} of {plural(meta.files.length, "file")} ready
-              </span>
-              <span>{percent(received, size)}%</span>
+          <div className="mt-4 rounded-xl bg-hover p-3">
+            <div className="mb-2 flex items-center gap-2 text-sm">
+              <Spinner className="size-4 text-accent" />
+              <span className="flex-1">Waiting for the sender to finish uploading</span>
+              <span className="font-medium tabular-nums">{percent(received, size)}%</span>
             </div>
             <ProgressBar value={size ? received / size : 0} />
+            <p className="mt-2 text-xs text-muted">
+              {complete.toLocaleString()} of {plural(meta.files.length, "file")} ready. Uploaded files can already be downloaded below.
+            </p>
           </div>
         )}
-        {viaDirect && <p className="mt-3 text-sm text-muted">The sender is online. Files come straight from their device.</p>}
-        <div className="mt-4 flex flex-wrap gap-2">
+
+        <div className="mt-5 flex flex-wrap items-center gap-2">
           {viaDirect ? (
-            <Button variant="primary" className="min-w-40" onClick={startDirect}>
+            <Button variant="primary" className={primary} onClick={startDirect}>
               {label}
             </Button>
           ) : (
-            <a
-              href={single ? fileUrl(meta.code, single.idx) : zipUrl(meta.code)}
-              download
-              aria-disabled={!ready}
-              className={buttonClass("primary", "min-w-40")}
-            >
+            <a href={single ? fileUrl(meta.code, single.idx) : zipUrl(meta.code)} download aria-disabled={!ready} className={buttonClass("primary", primary)}>
               {label}
             </a>
           )}
@@ -354,80 +468,86 @@ function ReceiverPanel({ meta }: { meta: TransferMeta }) {
                 e.currentTarget.href = checksumsUrl(meta);
               }}
               download={`flux-${meta.code}.b3`}
-              className={buttonClass("secondary")}
+              className={buttonClass("ghost")}
             >
               Checksums
             </a>
           )}
         </div>
-        {error && <p className="mt-3 text-sm text-err">{error}</p>}
-        {!single && (ready || viaDirect) && (
-          <p className="mt-3 text-xs text-muted">Downloads as a .zip. Uploaded files can also be downloaded one by one below.</p>
+        {error && (
+          <p className="mt-3 flex items-center gap-2 text-sm text-err">
+            <AlertIcon className="size-4 shrink-0" />
+            {error}
+          </p>
         )}
+        {!single && (ready || viaDirect) && <p className="mt-3 text-xs text-muted">Everything downloads as one .zip file.</p>}
       </Card>
       {!single && (
-        <FileList count={meta.files.length} renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable />} />
+        <>
+          <ListTitle count={meta.files.length} />
+          <FileList count={meta.files.length} renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable />} />
+        </>
       )}
     </div>
   );
 }
 
+function receivingStatus(receiver: Receiver): StatusProps {
+  const { finished, paused, error } = receiver;
+  if (finished && !error) return { tone: "ok", icon: <CheckIcon />, title: "Download complete", subtitle: "Saved to your downloads. Every file was verified." };
+  if (error === "Canceled") return { tone: "muted", icon: <CloseIcon />, title: "Download canceled" };
+  if (error) return { tone: "err", icon: <AlertIcon />, title: "Download failed", subtitle: error };
+  if (paused) return { tone: "warn", icon: <PauseIcon />, title: "Paused", subtitle: "Resume to continue." };
+  return { tone: "accent", icon: <Spinner className="size-5" />, title: "Downloading", subtitle: "Keep this page open until it finishes." };
+}
+
 function ReceivingPanel({ receiver, meta }: { receiver: Receiver; meta: TransferMeta }) {
   useSyncExternalStore(receiver.subscribe, receiver.getVersion, receiver.getVersion);
   const { total, received, done, speed } = receiver.snapshot;
-  const { finished, paused, error } = receiver;
+  const { finished, paused } = receiver;
   const running = !finished && !paused;
   useWakeLock(running);
   useLeaveGuard(!finished);
 
-  const title = finished
-    ? error
-      ? error === "Canceled"
-        ? "Download canceled"
-        : "Download failed"
-      : "Downloaded · verified"
-    : paused
-      ? "Paused"
-      : "Downloading…";
+  const stats: [string, string][] = [
+    ["Files", `${done.toLocaleString()} / ${receiver.items.length.toLocaleString()}`],
+    ["Received", `${formatBytes(received)} / ${formatBytes(total)}`],
+  ];
+  if (running) {
+    stats.push(["Speed", speed > 0 ? `${formatBytes(speed)}/s` : "–"], ["Time left", speed > 0 ? formatDuration((total - received) / speed) : "–"]);
+  }
 
   return (
     <div className="space-y-4">
-      <Card>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs font-medium tracking-wider text-muted uppercase">{formatCode(meta.code)}</p>
-          {receiver.items.some((item) => item.source === "direct") && <DirectBadge />}
-        </div>
-        <div className="mt-1 flex items-baseline justify-between gap-3">
-          <h1 className="flex items-center gap-2 font-semibold">
-            {finished && !error && <CheckIcon className="size-5 text-ok" />}
-            {title}
-          </h1>
-          <span className="text-sm text-muted tabular-nums">{percent(received, total)}%</span>
-        </div>
-        <div className="mt-3">
-          <ProgressBar value={total ? received / total : 1} />
-        </div>
-        <p className="mt-2 text-sm text-muted tabular-nums">
-          {done.toLocaleString()} of {plural(receiver.items.length, "file")} · {formatBytes(received)} of {formatBytes(total)}
-          {running && speed > 0 && ` · ${formatBytes(speed)}/s · ${formatDuration((total - received) / speed)} left`}
-        </p>
-        {finished && !error && <p className="mt-2 text-sm text-muted">Saved to your downloads.</p>}
-        {error && error !== "Canceled" && <p className="mt-2 text-sm text-err">{error}</p>}
-        {!finished && (
-          <div className="mt-4 flex flex-wrap gap-2">
+      <StatusCard
+        {...receivingStatus(receiver)}
+        percent={percent(received, total)}
+        progress={total ? received / total : 1}
+        stats={stats}
+        actions={
+          !finished && (
             <Button onClick={() => (paused ? receiver.resume() : receiver.pause())}>
               {paused ? <PlayIcon className="size-4" /> : <PauseIcon className="size-4" />}
               {paused ? "Resume" : "Pause"}
             </Button>
-            <ConfirmButton onConfirm={() => receiver.cancel()}>Cancel</ConfirmButton>
+          )
+        }
+        danger={!finished && <ConfirmButton onConfirm={() => receiver.cancel()}>Cancel</ConfirmButton>}
+      >
+        {receiver.items.some((item) => item.source === "direct") && (
+          <div className="mt-4">
+            <Badge tone="ok" icon={<ZapIcon className={small} />}>
+              Direct from the sender · {formatCode(meta.code)}
+            </Badge>
           </div>
         )}
-      </Card>
+      </StatusCard>
       <Pinned title="Now receiving">
         {inFlight(receiver.items, finished).map((item) => (
           <ReceiveRow key={item.idx} item={item} />
         ))}
       </Pinned>
+      <ListTitle count={receiver.items.length} />
       <FileList count={receiver.items.length} renderRow={(i) => <ReceiveRow item={receiver.items[i]} />} />
     </div>
   );
@@ -441,24 +561,68 @@ function ReceiveRow({ item }: { item: ReceiveItem }) {
         <FileRow
           path={item.path}
           size={item.size}
-          status={item.reconnecting ? "Reconnecting…" : `${Math.floor(pct * 100)}% · ${item.source}`}
-          tone="accent"
+          badge={
+            item.reconnecting ? (
+              <Badge tone="warn" icon={<Spinner className={small} />}>
+                Reconnecting
+              </Badge>
+            ) : (
+              <Badge tone="accent" icon={item.source === "direct" ? <ZapIcon className={small} /> : <Spinner className={small} />}>
+                {Math.floor(pct * 100)}%
+              </Badge>
+            )
+          }
           progress={pct}
+          progressTone={item.reconnecting ? "warn" : "accent"}
         />
       );
     case "pending":
-      return <FileRow path={item.path} size={item.size} status={item.received ? "Waiting for sender" : "Waiting"} />;
+      return (
+        <FileRow
+          path={item.path}
+          size={item.size}
+          badge={
+            item.received ? (
+              <Badge tone="warn" icon={<ClockIcon className={small} />}>
+                Waiting for sender
+              </Badge>
+            ) : (
+              <Badge icon={<ClockIcon className={small} />}>Waiting</Badge>
+            )
+          }
+        />
+      );
     case "done":
-      return <FileRow path={item.path} size={item.size} status="Received" tone="ok" />;
+      return (
+        <FileRow
+          path={item.path}
+          size={item.size}
+          badge={
+            <Badge tone="ok" icon={<CheckIcon className={small} />}>
+              Received
+            </Badge>
+          }
+        />
+      );
     case "failed":
-      return <FileRow path={item.path} size={item.size} status={item.error ?? "Not received"} tone="err" />;
+      return (
+        <FileRow
+          path={item.path}
+          size={item.size}
+          badge={
+            <Badge tone="err" icon={<AlertIcon className={small} />}>
+              {item.error ?? "Not received"}
+            </Badge>
+          }
+        />
+      );
   }
 }
 
 const folderInputProps = { webkitdirectory: "" } as InputHTMLAttributes<HTMLInputElement>;
 
 function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: string; onResume: (s: Session) => void }) {
-  const { complete, ready } = summarize(meta.files);
+  const { complete, ready, size, received } = summarize(meta.files);
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
   const canPickFolder = window.matchMedia("(pointer: fine)").matches;
@@ -468,33 +632,43 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
     if (picked.length) onResume(resume(meta, token, picked));
   }
 
+  const status: StatusProps = ready
+    ? { tone: "ok", icon: <CheckIcon />, title: "Ready to receive", subtitle: "Every file is uploaded and verified." }
+    : { tone: "warn", icon: <AlertIcon />, title: "Upload interrupted", subtitle: "Add the same files again to continue where it stopped." };
+
   return (
     <div className="space-y-4">
       <ShareCard code={meta.code} expiresAt={meta.expiresAt} />
-      <Card>
-        <h1 className="flex items-center gap-2 font-semibold">
-          {ready && <CheckIcon className="size-5 text-ok" />}
-          {ready ? "Uploaded · ready to receive" : "Upload interrupted"}
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          {complete.toLocaleString()} of {plural(meta.files.length, "file")} uploaded.
-          {!ready && " Add the same files again to continue where it stopped."}
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {!ready && (
+      <StatusCard
+        {...status}
+        percent={percent(received, size)}
+        progress={size ? received / size : 1}
+        stats={[
+          ["Files", `${complete.toLocaleString()} / ${meta.files.length.toLocaleString()}`],
+          ["Uploaded", `${formatBytes(received)} / ${formatBytes(size)}`],
+        ]}
+        actions={
+          !ready && (
             <>
               <Button variant="primary" onClick={() => fileInput.current?.click()}>
                 <UploadIcon className="size-4" />
                 Add files
               </Button>
-              {canPickFolder && <Button onClick={() => folderInput.current?.click()}>Add folder</Button>}
+              {canPickFolder && (
+                <Button onClick={() => folderInput.current?.click()}>
+                  <FolderIcon className="size-4" />
+                  Add folder
+                </Button>
+              )}
             </>
-          )}
-          <ConfirmButton onConfirm={() => removeTransfer(meta.code, token)}>Delete transfer</ConfirmButton>
-        </div>
+          )
+        }
+        danger={<ConfirmButton onConfirm={() => removeTransfer(meta.code, token)}>Delete transfer</ConfirmButton>}
+      >
         <input ref={fileInput} type="file" multiple hidden onChange={(e) => pick(e.target.files)} />
         <input ref={folderInput} type="file" hidden {...folderInputProps} onChange={(e) => pick(e.target.files)} />
-      </Card>
+      </StatusCard>
+      <ListTitle count={meta.files.length} />
       <FileList count={meta.files.length} renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable={false} />} />
     </div>
   );
