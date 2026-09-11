@@ -36,15 +36,17 @@ function start(code: string, token: string, entries: Entry[]): Session {
   return session;
 }
 
-export async function send(picked: Picked[], expiresIn: number): Promise<string> {
+export async function send(picked: Picked[], expiresIn: number, isPublic: boolean): Promise<string> {
   const files = uniquePaths(picked);
   const created = await createTransfer(
     files.map(({ path, file }) => ({ path, size: file.size, type: file.type, modified: file.lastModified || null })),
     expiresIn,
+    isPublic,
   );
   saveOwned(created.code, {
     token: created.token,
     expiresAt: created.expiresAt,
+    public: isPublic,
     count: files.length,
     size: files.reduce((sum, p) => sum + p.file.size, 0),
     createdAt: Date.now(),

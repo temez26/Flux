@@ -21,6 +21,7 @@ const CODE_LEN: usize = 8;
 const EXPIRY_CHOICES: [i64; 3] = [3600, 86_400, 604_800];
 const MAX_FILES: usize = 100_000;
 const MAX_PATH_LEN: usize = 1024;
+const PUBLIC_LIST_LIMIT: i64 = 100;
 
 #[derive(sqlx::FromRow)]
 pub struct Transfer {
@@ -86,6 +87,20 @@ fn valid_path(path: &str) -> bool {
         && path.split('/').all(|s| !s.is_empty() && s != "." && s != "..")
 }
 
+/// A human name for the transfer: the dropped folder's name, or the first file's name.
+fn title(files: &[NewFile]) -> String {
+    let first = files[0].path.as_str();
+    let top = first.split('/').next().unwrap_or(first);
+    let one_folder = files.len() > 1
+        && first.contains('/')
+        && files.iter().all(|f| f.path.split('/').next() == Some(top));
+    if one_folder {
+        top.to_owned()
+    } else {
+        first.rsplit('/').next().unwrap_or(first).to_owned()
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NewFile {
@@ -101,6 +116,8 @@ pub struct NewFile {
 pub struct NewTransfer {
     files: Vec<NewFile>,
     expires_in: i64,
+    #[serde(default)]
+    public: bool,
 }
 
 #[derive(Serialize)]
@@ -134,19 +151,23 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
     let token = hex(&rand::random::<[u8; 32]>());
     let token_hash = blake3::hash(token.as_bytes());
     let expires_at = Utc::now() + chrono::Duration::seconds(req.expires_in);
+    let title = title(&req.files);
 
     let mut tx = state.db.begin().await?;
     let mut code = None;
     for _ in 0..8 {
         let candidate = random_code();
         let inserted = sqlx::query(
-            "INSERT INTO transfers (id, code, token_hash, expires_at) VALUES ($1, $2, $3, $4)
+            "INSERT INTO transfers (id, code, token_hash, expires_at, public, title)
+             VALUES ($1, $2, $3, $4, $5, $6)
              ON CONFLICT (code) DO NOTHING",
         )
         .bind(id)
         .bind(&candidate)
         .bind(token_hash.as_bytes().as_slice())
         .bind(expires_at)
+        .bind(req.public)
+        .bind(&title)
         .execute(&mut *tx)
         .await?;
         if inserted.rows_affected() == 1 {
@@ -238,6 +259,37 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>) -> Resul
         expires_at: transfer.expires_at,
         files,
     }))
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct PublicTransfer {
+    code: String,
+    title: String,
+    created_at: DateTime<Utc>,
+    expires_at: DateTime<Utc>,
+    files: i64,
+    size: i64,
+    complete: bool,
+}
+
+/// Public transfers, newest first.
+pub async fn list_public(State(state): State<Shared>) -> Result<Json<Vec<PublicTransfer>>> {
+    let transfers = sqlx::query_as(
+        "SELECT t.code, t.title, t.created_at, t.expires_at,
+                count(f.idx) AS files,
+                coalesce(sum(f.size), 0)::bigint AS size,
+                count(f.idx) = count(f.hash) AS complete
+         FROM transfers t JOIN files f ON f.transfer_id = t.id
+         WHERE t.public AND t.expires_at > now()
+         GROUP BY t.id
+         ORDER BY t.created_at DESC
+         LIMIT $1",
+    )
+    .bind(PUBLIC_LIST_LIMIT)
+    .fetch_all(&state.db)
+    .await?;
+    Ok(Json(transfers))
 }
 
 pub async fn delete(

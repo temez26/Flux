@@ -2,6 +2,8 @@
 export interface Owned {
   token: string;
   expiresAt: string;
+  /** Listed in the public space. */
+  public?: boolean;
   count: number;
   size: number;
   createdAt: number;

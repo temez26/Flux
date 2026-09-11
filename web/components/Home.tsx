@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type InputHTMLAttributes } from "react";
-import { errorMessage } from "@/lib/api";
+import { errorMessage, listPublic, type PublicTransfer } from "@/lib/api";
 import { fromDataTransfer, fromFileList, type Picked } from "@/lib/files";
 import { formatBytes, formatCode, formatRemaining, normalizeCode, plural } from "@/lib/format";
+import { useNow } from "@/lib/hooks";
 import { listOwned } from "@/lib/owned";
 import { navigate } from "@/lib/router";
 import { send } from "@/lib/session";
@@ -16,6 +17,7 @@ const EXPIRY = [
   ["7 days", 604_800],
 ] as const;
 const EXPIRY_KEY = "flux.expiry";
+const PUBLIC_POLL_MS = 15_000;
 const folderInputProps = { webkitdirectory: "" } as InputHTMLAttributes<HTMLInputElement>;
 
 function storedExpiry(): number {
@@ -29,12 +31,14 @@ function storedExpiry(): number {
 
 export default function Home() {
   const [expiresIn, setExpiresIn] = useState(storedExpiry);
+  // Deliberately not remembered: publishing should always be a conscious choice.
+  const [isPublic, setIsPublic] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
-  const expiryRef = useRef(expiresIn);
+  const options = useRef({ expiresIn, isPublic });
   const canPickFolder = window.matchMedia("(pointer: fine)").matches;
 
   const start = useCallback(async (picked: Picked[] | Promise<Picked[]>) => {
@@ -44,7 +48,7 @@ export default function Home() {
       const files = await picked;
       if (!files.length) return setBusy(null);
       setBusy(`Preparing ${plural(files.length, "file")}…`);
-      const code = await send(files, expiryRef.current);
+      const code = await send(files, options.current.expiresIn, options.current.isPublic);
       navigate(`/${formatCode(code)}`);
     } catch (err) {
       setError(errorMessage(err));
@@ -90,10 +94,15 @@ export default function Home() {
 
   function chooseExpiry(seconds: number) {
     setExpiresIn(seconds);
-    expiryRef.current = seconds;
+    options.current.expiresIn = seconds;
     try {
       localStorage.setItem(EXPIRY_KEY, String(seconds));
     } catch {}
+  }
+
+  function togglePublic() {
+    options.current.isPublic = !isPublic;
+    setIsPublic(!isPublic);
   }
 
   return (
@@ -118,24 +127,34 @@ export default function Home() {
           )}
         </button>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted">Expires after</span>
-            <div className="flex rounded-xl border border-line bg-surface p-0.5" role="radiogroup" aria-label="Expiry">
-              {EXPIRY.map(([label, seconds]) => (
-                <button
-                  key={seconds}
-                  type="button"
-                  role="radio"
-                  aria-checked={expiresIn === seconds}
-                  onClick={() => chooseExpiry(seconds)}
-                  className={`min-h-10 rounded-[10px] px-3 transition ${
-                    expiresIn === seconds ? "bg-accent text-accent-fg" : "text-muted hover:text-fg"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-muted">Expires after</span>
+              <div className="flex rounded-xl border border-line bg-surface p-0.5" role="radiogroup" aria-label="Expiry">
+                {EXPIRY.map(([label, seconds]) => (
+                  <button
+                    key={seconds}
+                    type="button"
+                    role="radio"
+                    aria-checked={expiresIn === seconds}
+                    onClick={() => chooseExpiry(seconds)}
+                    className={`min-h-10 rounded-[10px] px-3 transition ${
+                      expiresIn === seconds ? "bg-accent text-accent-fg" : "text-muted hover:text-fg"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
+            <button type="button" role="switch" aria-checked={isPublic} onClick={togglePublic} className="flex min-h-10 items-center gap-2">
+              <span className={`relative h-6 w-10 rounded-full transition ${isPublic ? "bg-accent" : "bg-line"}`}>
+                <span
+                  className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-all ${isPublic ? "left-[18px]" : "left-0.5"}`}
+                />
+              </span>
+              <span className={isPublic ? "" : "text-muted"}>Public</span>
+            </button>
           </div>
           {canPickFolder && (
             <Button disabled={!!busy} onClick={() => folderInput.current?.click()}>
@@ -144,6 +163,7 @@ export default function Home() {
             </Button>
           )}
         </div>
+        {isPublic && <p className="mt-2 text-sm text-muted">Listed below for anyone who opens Flux. No code needed.</p>}
         {error && <p className="mt-3 text-sm text-err">{error}</p>}
         <input
           ref={fileInput}
@@ -167,9 +187,86 @@ export default function Home() {
         />
       </section>
 
+      <PublicList />
       <ReceiveForm />
       <OwnedList />
     </div>
+  );
+}
+
+function TransferRow({ code, title, detail, trailing, mono = false }: { code: string; title: string; detail: string; trailing: string; mono?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(`/${formatCode(code)}`)}
+      className="flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left transition first:rounded-t-2xl last:rounded-b-2xl hover:bg-hover"
+    >
+      <span className="min-w-0 flex-1">
+        <span className={`block truncate font-medium ${mono ? "font-mono" : ""}`}>{title}</span>
+        <span className="block truncate text-sm text-muted">{detail}</span>
+      </span>
+      <span className="hidden shrink-0 text-xs text-muted sm:inline">{trailing}</span>
+      <ArrowIcon className="size-4 shrink-0 text-muted" />
+    </button>
+  );
+}
+
+function PublicList() {
+  const now = useNow(60_000);
+  const [list, setList] = useState<PublicTransfer[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    let loading = false;
+    let loaded = false;
+    let timer = 0;
+    const load = async () => {
+      if (loading) return;
+      loading = true;
+      window.clearTimeout(timer);
+      // Background tabs skip refreshes, but still get an initial list.
+      if (!document.hidden || !loaded) {
+        try {
+          const next = await listPublic();
+          loaded = true;
+          if (alive) setList(next);
+        } catch {
+          // Keep showing the last list while the server is unreachable.
+        }
+      }
+      loading = false;
+      if (alive) timer = window.setTimeout(load, PUBLIC_POLL_MS);
+    };
+    const onVisible = () => !document.hidden && void load();
+    void load();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
+  if (!list) return null;
+  return (
+    <section>
+      <h2 className="mb-2 text-sm font-medium text-muted">Public</h2>
+      {list.length ? (
+        <Card className="divide-y divide-line !p-0">
+          {list.map((t) => (
+            <TransferRow
+              key={t.code}
+              code={t.code}
+              title={t.title}
+              detail={`${plural(t.files, "file")} · ${formatBytes(t.size)}${t.complete ? "" : " · uploading"}`}
+              trailing={formatRemaining(t.expiresAt, now)}
+            />
+          ))}
+        </Card>
+      ) : (
+        <p className="text-sm text-muted">Nothing is shared publicly right now.</p>
+      )}
+    </section>
   );
 }
 
@@ -186,7 +283,7 @@ function ReceiveForm() {
 
   return (
     <section>
-      <h2 className="mb-2 text-sm font-medium text-muted">Receive</h2>
+      <h2 className="mb-2 text-sm font-medium text-muted">Receive with a code</h2>
       <form onSubmit={submit} className="flex gap-2">
         <input
           value={value}
@@ -221,19 +318,14 @@ function OwnedList() {
       <h2 className="mb-2 text-sm font-medium text-muted">Your transfers</h2>
       <Card className="divide-y divide-line !p-0">
         {owned.map(([code, o]) => (
-          <button
+          <TransferRow
             key={code}
-            type="button"
-            onClick={() => navigate(`/${formatCode(code)}`)}
-            className="flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left transition first:rounded-t-2xl last:rounded-b-2xl hover:bg-hover"
-          >
-            <span className="font-mono font-medium">{formatCode(code)}</span>
-            <span className="min-w-0 flex-1 truncate text-sm text-muted">
-              {plural(o.count, "file")} · {formatBytes(o.size)}
-            </span>
-            <span className="hidden text-xs text-muted sm:inline">{formatRemaining(o.expiresAt)}</span>
-            <ArrowIcon className="size-4 text-muted" />
-          </button>
+            code={code}
+            mono
+            title={formatCode(code)}
+            detail={`${plural(o.count, "file")} · ${formatBytes(o.size)}${o.public ? " · public" : ""}`}
+            trailing={formatRemaining(o.expiresAt)}
+          />
         ))}
       </Card>
     </section>

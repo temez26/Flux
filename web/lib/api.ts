@@ -57,12 +57,27 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
-export function createTransfer(files: NewFile[], expiresIn: number) {
+/** A transfer listed for everyone who opens Flux. */
+export interface PublicTransfer {
+  code: string;
+  title: string;
+  createdAt: string;
+  expiresAt: string;
+  files: number;
+  size: number;
+  complete: boolean;
+}
+
+export function createTransfer(files: NewFile[], expiresIn: number, isPublic: boolean) {
   return request<Created>("/api/transfers", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ files, expiresIn }),
+    body: JSON.stringify({ files, expiresIn, public: isPublic }),
   });
+}
+
+export function listPublic() {
+  return request<PublicTransfer[]>("/api/public");
 }
 
 export async function getTransfer(code: string): Promise<TransferMeta | null> {

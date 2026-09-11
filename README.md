@@ -6,6 +6,7 @@ Drop files or folders, get a short code (`abcd-efgh`), a link and a QR code. The
 
 ## Features
 
+- **Public space.** Switch on *Public* before sending and the transfer is listed on the home page for anyone who opens Flux, with no code or link needed. Transfers are private by default, reachable only by code, link or QR.
 - **Any size, any count.** Single files of many gigabytes and folders of tens of thousands of files.
 - **Resilient queue.** Every file uploads independently in resumable chunks, with per-file and overall progress, pause/resume, retry and cancel. Network drops, sleeping laptops and server restarts resume where they stopped. A failing file never restarts the others.
 - **End-to-end integrity.** The browser hashes each file with BLAKE3 while uploading, and the server only accepts the file if its own hash matches. Receivers can download a `b3sum`-compatible checksum list.
@@ -76,7 +77,8 @@ A single container serves both the app and the API, so uploads go straight to Ru
 
 | Method   | Path                                  | Purpose                                     |
 | -------- | ------------------------------------- | ------------------------------------------- |
-| `POST`   | `/api/transfers`                      | Create a transfer, returns code and owner token |
+| `POST`   | `/api/transfers`                      | Create a transfer (`public: true` to list it), returns code and owner token |
+| `GET`    | `/api/public`                         | Public transfers, newest first              |
 | `GET`    | `/api/transfers/{code}`               | Metadata and upload progress                |
 | `DELETE` | `/api/transfers/{code}`               | Delete (owner)                              |
 | `PATCH`  | `/api/transfers/{code}/files/{idx}`   | Upload a chunk (owner)                      |

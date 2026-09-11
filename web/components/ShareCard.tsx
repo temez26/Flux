@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { encode } from "uqr";
 import { formatCode, formatRemaining } from "@/lib/format";
 import { useNow } from "@/lib/hooks";
+import { getOwned } from "@/lib/owned";
 import { LinkIcon, QrIcon } from "./icons";
 import { Button, Card } from "./ui";
 
@@ -38,6 +39,7 @@ export function ShareCard({ code, expiresAt }: { code: string; expiresAt?: strin
   const now = useNow(60_000);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const [showQr, setShowQr] = useState(false);
+  const isPublic = useMemo(() => getOwned(code)?.public, [code]);
   const formatted = formatCode(code);
   const link = `${window.location.origin}/${formatted}`;
   const canShare = typeof navigator.share === "function" && window.matchMedia("(pointer: coarse)").matches;
@@ -65,7 +67,12 @@ export function ShareCard({ code, expiresAt }: { code: string; expiresAt?: strin
         >
           {copied === "code" ? <span className="text-accent">copied</span> : formatted}
         </button>
-        {expiresAt && <p className="mt-1 text-xs text-muted">{formatRemaining(expiresAt, now)}</p>}
+        {expiresAt && (
+          <p className="mt-1 text-xs text-muted">
+            {formatRemaining(expiresAt, now)}
+            {isPublic && " · Public, listed for everyone"}
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <Button onClick={shareLink}>
             <LinkIcon className="size-4" />
