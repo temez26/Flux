@@ -6,7 +6,7 @@ import { SpinnerIcon } from "./icons";
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-accent-fg shadow-sm hover:brightness-110",
+  primary: "bg-accent-solid text-accent-fg shadow-sm hover:brightness-110",
   secondary: "border border-line bg-surface hover:bg-hover",
   ghost: "text-muted hover:bg-hover hover:text-fg",
   danger: "text-err hover:bg-err/10",
@@ -40,7 +40,7 @@ export function ConfirmButton({ onConfirm, children }: { onConfirm: () => void; 
   return (
     <Button
       variant={armed ? "primary" : "danger"}
-      className={armed ? "!bg-err" : ""}
+      className={armed ? "!bg-err-solid" : ""}
       onClick={() => (armed ? onConfirm() : setArmed(true))}
     >
       {armed ? "Tap again to confirm" : children}

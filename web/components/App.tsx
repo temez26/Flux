@@ -22,6 +22,28 @@ export default function App() {
     }
   }, []);
 
+  // Some installed apps ignore media-specific theme-color tags, so one plain tag always
+  // matches the current page background and follows the system light/dark switch.
+  useEffect(() => {
+    const dark = window.matchMedia("(prefers-color-scheme: dark)");
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]:not([media])') ?? document.createElement("meta");
+    if (!meta.isConnected) {
+      meta.name = "theme-color";
+      document.head.prepend(meta);
+    }
+    const sync = () => {
+      meta.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+    };
+    sync();
+    dark.addEventListener("change", sync);
+    // The theme is usually switched in system settings while the app is in the background.
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      dark.removeEventListener("change", sync);
+      document.removeEventListener("visibilitychange", sync);
+    };
+  }, []);
+
   let view = null;
   if (mounted) {
     if (code) view = <TransferView key={code} code={code} />;

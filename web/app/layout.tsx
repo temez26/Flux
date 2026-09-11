@@ -5,7 +5,8 @@ export const metadata: Metadata = {
   title: "Flux",
   description: "Fast, simple file transfer for your home network.",
   applicationName: "Flux",
-  appleWebApp: { capable: true, title: "Flux", statusBarStyle: "default" },
+  // "default" is a white bar in every theme; "black" suits dark mode and stays readable in light.
+  appleWebApp: { capable: true, title: "Flux", statusBarStyle: "black" },
   formatDetection: { telephone: false },
 };
 

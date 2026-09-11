@@ -15,7 +15,7 @@ use std::{
 
 use axum::{
     Json,
-    body::Body,
+    body::{Body, BodyDataStream},
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
@@ -35,6 +35,8 @@ type Key = (Uuid, i32);
 
 /// A stalled client must not hold the upload lock forever, or its retry would be locked out.
 const IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+/// Upper bound for reading the rest of a chunk the server has already answered.
+const DRAIN_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Default)]
 pub struct Registry(Mutex<HashMap<Key, Arc<Upload>>>);
@@ -66,8 +68,15 @@ impl Registry {
         self.0.lock().unwrap().entry(key).or_default().clone()
     }
 
-    pub fn received(&self, key: Key) -> Option<u64> {
-        self.0.lock().unwrap().get(&key).map(|u| u.received.load(Ordering::Relaxed))
+    /// Bytes received so far for each of a transfer's files that are mid-upload.
+    pub fn received_for(&self, id: Uuid) -> HashMap<i32, u64> {
+        self.0
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(key, _)| key.0 == id)
+            .map(|(key, upload)| (key.1, upload.received.load(Ordering::Relaxed)))
+            .collect()
     }
 
     pub fn remove(&self, key: Key) {
@@ -105,6 +114,21 @@ pub async fn chunk(
     Path((code, idx)): Path<(String, i32)>,
     headers: HeaderMap,
     body: Body,
+) -> Response {
+    let mut stream = body.into_data_stream();
+    let response = write_chunk(state, code, idx, headers, &mut stream).await.into_response();
+    // Browsers report a response that arrives before their upload finished as a network
+    // error, hiding statuses the client needs (404 gone, 409 offset). Read the rest first.
+    let _ = tokio::time::timeout(DRAIN_TIMEOUT, async { while let Some(Ok(_)) = stream.next().await {} }).await;
+    response
+}
+
+async fn write_chunk(
+    state: Shared,
+    code: String,
+    idx: i32,
+    headers: HeaderMap,
+    stream: &mut BodyDataStream,
 ) -> Result<Response> {
     let transfer = transfers::find(&state.db, &code).await?;
     transfers::authorize(&headers, &transfer)?;
@@ -150,7 +174,6 @@ pub async fn chunk(
 
     file.seek(SeekFrom::Start(len)).await?;
     let mut writer = BufWriter::with_capacity(1 << 20, file);
-    let mut stream = body.into_data_stream();
     let mut oversized = false;
     while let Ok(Some(Ok(data))) = tokio::time::timeout(IDLE_TIMEOUT, stream.next()).await {
         if len + data.len() as u64 > size {

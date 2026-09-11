@@ -5,7 +5,7 @@ import { deleteTransfer, errorMessage, fileUrl, zipUrl, type FileMeta, type Tran
 import { DirectClient } from "@/lib/direct";
 import { basename, fromFileList } from "@/lib/files";
 import { formatBytes, formatCode, formatDuration, formatRemaining, plural } from "@/lib/format";
-import { useLeaveGuard, useNow, useTransferMeta, useWakeLock } from "@/lib/hooks";
+import { useLeaveGuard, useNow, useTitle, useTransferMeta, useWakeLock } from "@/lib/hooks";
 import { getOwned, removeOwned } from "@/lib/owned";
 import { Receiver, type ReceiveItem } from "@/lib/receive";
 import { navigate } from "@/lib/router";
@@ -32,15 +32,14 @@ import {
 import { ShareCard } from "./ShareCard";
 import { Badge, Button, Card, ConfirmButton, IconButton, Message, ProgressBar, Spinner, StatusCard, buttonClass, type StatusProps } from "./ui";
 
+const pageTitle = (code: string) => `${formatCode(code)} · Flux`;
+
 export default function TransferView({ code }: { code: string }) {
   const [session, setSession] = useState(() => live.get(code));
   const owned = useMemo(() => getOwned(code), [code]);
   const { meta, offline } = useTransferMeta(code, !session);
-
-  useEffect(() => {
-    document.title = `${formatCode(code)} · Flux`;
-    return () => void (document.title = "Flux");
-  }, [code]);
+  // Panels set their own title (with progress); this covers the loading and error screens.
+  useTitle(session || meta ? undefined : pageTitle(code));
 
   useEffect(() => {
     if (meta === null) removeOwned(code);
@@ -63,8 +62,22 @@ export default function TransferView({ code }: { code: string }) {
       </Message>
     );
   }
-  if (owned) return <OwnerPanel meta={meta} token={owned.token} onResume={setSession} />;
-  return <ReceiverPanel meta={meta} />;
+  return (
+    <>
+      {offline && <ConnectionBanner />}
+      {owned ? <OwnerPanel meta={meta} token={owned.token} onResume={setSession} /> : <ReceiverPanel meta={meta} />}
+    </>
+  );
+}
+
+/** Shown while the server can't be reached, so the page isn't mistaken for up to date. */
+function ConnectionBanner() {
+  return (
+    <p role="status" className="mb-4 flex items-center gap-2 rounded-xl bg-warn/10 p-3 text-sm text-warn">
+      <Spinner className="size-4 shrink-0" />
+      Lost connection to the server. Retrying…
+    </p>
+  );
 }
 
 async function removeTransfer(code: string, token: string) {
@@ -108,6 +121,9 @@ function ListTitle({ count }: { count: number }) {
 function senderStatus(session: Session): StatusProps {
   const { uploader } = session;
   const { counts, finished, reconnecting } = uploader.snapshot;
+  if (uploader.gone) {
+    return { tone: "err", icon: <AlertIcon />, title: "Transfer no longer available", subtitle: "It expired or was deleted, so it can't be downloaded any more." };
+  }
   if (finished && counts.failed) {
     return { tone: "err", icon: <AlertIcon />, title: `${plural(counts.failed, "file")} failed`, subtitle: "Retry them, or cancel them to share the rest." };
   }
@@ -125,11 +141,21 @@ function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: str
   const { uploader, host } = session;
   useSyncExternalStore(uploader.subscribe, uploader.getVersion, uploader.getVersion);
   useSyncExternalStore(host.subscribe, host.getVersion, host.getVersion);
+  const now = useNow(30_000);
   const { total, sent, counts, speed, finished } = uploader.snapshot;
   const running = !finished && !uploader.paused;
   const serving = host.receivers > 0;
+  const expired = !!expiresAt && Date.parse(expiresAt) <= now;
   useWakeLock(running || serving);
   useLeaveGuard(!finished || serving);
+  useTitle(running ? `${percent(sent, total)}% uploaded · Flux` : pageTitle(uploader.code));
+
+  // The server deletes expired transfers, so stop uploading and serving at the same moment.
+  useEffect(() => {
+    if (!expired) return;
+    uploader.markGone();
+    host.close();
+  }, [expired, uploader, host]);
 
   const files = uploader.items.length - counts.canceled;
   const delivered = session.delivered && uploader.paused && !finished;
@@ -157,7 +183,7 @@ function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: str
                 {uploader.paused ? "Resume" : "Pause"}
               </Button>
             )}
-            {counts.failed > 0 && (
+            {counts.failed > 0 && !uploader.gone && (
               <Button variant="primary" onClick={() => uploader.retry()}>
                 <RetryIcon className="size-4" />
                 Retry failed
@@ -167,7 +193,7 @@ function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: str
         }
         danger={
           <ConfirmButton onConfirm={() => removeTransfer(uploader.code, uploader.token)}>
-            {finished || delivered ? "Delete transfer" : "Cancel transfer"}
+            {uploader.gone ? "Remove" : finished || delivered ? "Delete transfer" : "Cancel transfer"}
           </ConfirmButton>
         }
       >
@@ -262,12 +288,14 @@ function UploadRow({ item, uploader }: { item: Item; uploader: Session["uploader
             </Badge>
           }
           actions={
-            <>
-              <IconButton label={`Retry ${item.path}`} onClick={() => uploader.retry(item.idx)}>
-                <RetryIcon className="size-4" />
-              </IconButton>
-              {cancel}
-            </>
+            !uploader.gone && (
+              <>
+                <IconButton label={`Retry ${item.path}`} onClick={() => uploader.retry(item.idx)}>
+                  <RetryIcon className="size-4" />
+                </IconButton>
+                {cancel}
+              </>
+            )
           }
         />
       );
@@ -369,6 +397,7 @@ function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   const [receiver, setReceiver] = useState<Receiver>();
   const [error, setError] = useState<string>();
   useSyncExternalStore(direct?.subscribe ?? subscribeNothing, direct?.getVersion ?? versionZero, versionZero);
+  useTitle(pageTitle(meta.code));
 
   useEffect(() => {
     let alive = true;
@@ -508,6 +537,7 @@ function ReceivingPanel({ receiver, meta }: { receiver: Receiver; meta: Transfer
   const running = !finished && !paused;
   useWakeLock(running);
   useLeaveGuard(!finished);
+  useTitle(running ? `${percent(received, total)}% downloaded · Flux` : undefined);
 
   const stats: [string, string][] = [
     ["Files", `${done.toLocaleString()} / ${receiver.items.length.toLocaleString()}`],
@@ -626,6 +656,7 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
   const canPickFolder = window.matchMedia("(pointer: fine)").matches;
+  useTitle(pageTitle(meta.code));
 
   function pick(list: FileList | null) {
     const picked = fromFileList(list);

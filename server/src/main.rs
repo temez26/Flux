@@ -85,6 +85,7 @@ fn app(state: Shared, web_dir: &std::path::Path) -> Router {
                 .delete(transfers::delete_file),
         )
         .route("/transfers/{code}/zip", get(download::zip))
+        .route("/transfers/{code}/summary", get(transfers::summary))
         .route("/transfers/{code}/signal", get(signal::connect))
         .route("/public", get(transfers::list_public).layer(CompressionLayer::new()))
         .fallback(|| async { error::AppError::NOT_FOUND })
