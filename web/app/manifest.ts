@@ -11,8 +11,10 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
-    background_color: "#f6f6f8",
-    theme_color: "#f6f6f8",
+    // The manifest allows one colour pair; installed apps use it for the splash screen and
+    // system bars before the page's own theme-color (which follows light/dark) takes over.
+    background_color: "#0c0c10",
+    theme_color: "#0c0c10",
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
