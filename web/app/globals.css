@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+/* Text colours meet WCAG AA (4.5:1) on surfaces and on their own 10% tints; *-solid are
+   fills that carry white text. Checked in both themes. */
 :root {
   --bg: #f6f6f8;
   --surface: #ffffff;
@@ -8,10 +10,12 @@
   --muted: #6c6c78;
   --line: #e3e3ea;
   --accent: #5a57f0;
+  --accent-solid: #5a57f0;
   --accent-fg: #ffffff;
-  --ok: #15803d;
-  --warn: #b45309;
-  --err: #dc2626;
+  --ok: #166534;
+  --warn: #92400e;
+  --err: #b91c1c;
+  --err-solid: #b91c1c;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,10 +27,12 @@
     --muted: #8f8f9c;
     --line: #262630;
     --accent: #7c79ff;
+    --accent-solid: #5a57f0;
     --accent-fg: #ffffff;
     --ok: #4ade80;
     --warn: #fbbf24;
     --err: #f87171;
+    --err-solid: #dc2626;
   }
 }
 
@@ -38,10 +44,12 @@
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-accent: var(--accent);
+  --color-accent-solid: var(--accent-solid);
   --color-accent-fg: var(--accent-fg);
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --color-err: var(--err);
+  --color-err-solid: var(--err-solid);
 }
 
 html {

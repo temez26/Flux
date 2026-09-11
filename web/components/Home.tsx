@@ -1,14 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
-import { errorMessage, listPublic, type PublicTransfer } from "@/lib/api";
+import { errorMessage, getSummary, listPublic, type Summary } from "@/lib/api";
 import { fromDataTransfer, fromFileList, type Picked } from "@/lib/files";
 import { formatBytes, formatCode, formatRemaining, normalizeCode, plural } from "@/lib/format";
-import { useNow } from "@/lib/hooks";
-import { listOwned } from "@/lib/owned";
+import { useNow, usePolling } from "@/lib/hooks";
+import { listOwned, removeOwned } from "@/lib/owned";
 import { navigate } from "@/lib/router";
-import { send } from "@/lib/session";
-import { AlertIcon, ArrowIcon, ClockIcon, DownloadIcon, FileTypeIcon, FolderIcon, GlobeIcon, LockIcon, UploadIcon } from "./icons";
+import { live, send } from "@/lib/session";
+import {
+  AlertIcon,
+  ArrowIcon,
+  CheckIcon,
+  ClockIcon,
+  DownloadIcon,
+  FileTypeIcon,
+  FolderIcon,
+  GlobeIcon,
+  LockIcon,
+  PauseIcon,
+  UploadIcon,
+} from "./icons";
 import { Badge, Button, Card, Field, SectionTitle, Segmented, Spinner } from "./ui";
 
 const EXPIRY = [
@@ -21,7 +33,7 @@ const VISIBILITY = [
   { label: "Public", value: "public", icon: <GlobeIcon className="size-4" /> },
 ];
 const EXPIRY_KEY = "flux.expiry";
-const PUBLIC_POLL_MS = 15_000;
+const LIST_POLL_MS = 15_000;
 const folderInputProps = { webkitdirectory: "" } as InputHTMLAttributes<HTMLInputElement>;
 
 function storedExpiry(): number {
@@ -228,39 +240,8 @@ function TransferRow({ code, icon, title, detail, badge, mono = false }: { code:
 
 function PublicList() {
   const now = useNow(60_000);
-  const [list, setList] = useState<PublicTransfer[] | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    let loading = false;
-    let loaded = false;
-    let timer = 0;
-    const load = async () => {
-      if (loading) return;
-      loading = true;
-      window.clearTimeout(timer);
-      // Background tabs skip refreshes, but still get an initial list.
-      if (!document.hidden || !loaded) {
-        try {
-          const next = await listPublic();
-          loaded = true;
-          if (alive) setList(next);
-        } catch {
-          // Keep showing the last list while the server is unreachable.
-        }
-      }
-      loading = false;
-      if (alive) timer = window.setTimeout(load, PUBLIC_POLL_MS);
-    };
-    const onVisible = () => !document.hidden && void load();
-    void load();
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      alive = false;
-      window.clearTimeout(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, []);
+  const [list, setList] = useState<Summary[] | null>(null);
+  usePolling(async () => setList(await listPublic()), LIST_POLL_MS);
 
   if (!list) return null;
   return (
@@ -335,8 +316,52 @@ function ReceiveForm() {
   );
 }
 
+const small = "size-3";
+
+function ownedBadge(code: string, summary: Summary | undefined): ReactNode {
+  if (!summary) return null;
+  if (summary.complete) {
+    return (
+      <Badge tone="ok" icon={<CheckIcon className={small} />}>
+        Ready
+      </Badge>
+    );
+  }
+  const uploader = live.get(code)?.uploader;
+  if (!uploader) {
+    return (
+      <Badge tone="warn" icon={<AlertIcon className={small} />}>
+        Interrupted
+      </Badge>
+    );
+  }
+  return uploader.paused ? (
+    <Badge tone="warn" icon={<PauseIcon className={small} />}>
+      Paused
+    </Badge>
+  ) : (
+    <Badge tone="accent" icon={<Spinner className={small} />}>
+      Uploading
+    </Badge>
+  );
+}
+
 function OwnedList() {
-  const [owned] = useState(listOwned);
+  const [owned, setOwned] = useState(listOwned);
+  const [summaries, setSummaries] = useState<Record<string, Summary>>({});
+
+  // Checks each transfer made on this device, so deleted ones disappear and states are real.
+  usePolling(async () => {
+    const results = await Promise.all(listOwned().map(async ([code]) => [code, await getSummary(code)] as const));
+    const found: Record<string, Summary> = {};
+    for (const [code, summary] of results) {
+      if (summary) found[code] = summary;
+      else removeOwned(code);
+    }
+    setOwned(listOwned());
+    setSummaries(found);
+  }, LIST_POLL_MS);
+
   if (!owned.length) return null;
   return (
     <Card>
@@ -349,6 +374,7 @@ function OwnedList() {
           icon={o.public ? <GlobeIcon className="size-4.5" /> : <LockIcon className="size-4.5" />}
           title={formatCode(code)}
           detail={`${plural(o.count, "file")} · ${formatBytes(o.size)} · ${formatRemaining(o.expiresAt)}`}
+          badge={ownedBadge(code, summaries[code])}
         />
       ))}
     </Card>

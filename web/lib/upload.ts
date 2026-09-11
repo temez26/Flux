@@ -57,6 +57,7 @@ const MAX_ATTEMPTS = 8;
 // A request without progress for this long is presumed dead (e.g. a proxy holding a
 // half-open connection after the server restarted) and is retried.
 const STALL_MS = 30_000;
+const GONE = "Transfer no longer exists";
 
 class Interrupted extends Error {}
 
@@ -79,6 +80,8 @@ const emptyCounts = (): Record<Status, number> => ({ pending: 0, active: 0, done
 export class Uploader extends Observable {
   readonly items: Item[];
   paused = false;
+  /** The transfer expired or was deleted, so nothing more can upload. */
+  gone = false;
   snapshot: Snapshot = { total: 0, sent: 0, counts: emptyCounts(), reconnecting: false, speed: 0, finished: false };
   private readonly tasks: Task[];
   private readonly meter = new SpeedMeter();
@@ -150,6 +153,7 @@ export class Uploader extends Observable {
   }
 
   retry(idx?: number) {
+    if (this.gone) return;
     for (const t of this.tasks) {
       if (t.item.status === "failed" && t.file && (idx === undefined || t.item.idx === idx)) {
         t.item.status = "pending";
@@ -168,6 +172,20 @@ export class Uploader extends Observable {
     t.hasher = undefined;
     this.interrupt(t);
     deleteFile(this.code, this.token, idx).catch(() => {});
+    this.changed();
+  }
+
+  /** Stops everything for good because the transfer no longer exists on the server. */
+  markGone() {
+    if (this.gone) return;
+    this.gone = true;
+    for (const t of this.tasks) {
+      if (t.item.status === "pending" || t.item.status === "active") {
+        this.interrupt(t);
+        t.item.status = "failed";
+        t.item.error = GONE;
+      }
+    }
     this.changed();
   }
 
@@ -226,7 +244,7 @@ export class Uploader extends Observable {
   }
 
   private pump() {
-    while (!this.paused && !this.held && this.active < CONCURRENCY) {
+    while (!this.paused && !this.held && !this.gone && this.active < CONCURRENCY) {
       const task = this.nextPending();
       if (!task) break;
       this.active++;
@@ -240,7 +258,7 @@ export class Uploader extends Observable {
   }
 
   private stopped(t: Task) {
-    return this.paused || this.held || t.item.status !== "active";
+    return this.paused || this.held || this.gone || t.item.status !== "active";
   }
 
   private async run(t: Task) {
@@ -352,6 +370,10 @@ export class Uploader extends Observable {
     if (!(err instanceof HttpError)) return this.fail(t, "Can't read this file");
     const { status, body } = err;
     t.item.sent = t.offset;
+    if (status === 404) {
+      this.markGone();
+      return false;
+    }
     if (status === 409) {
       // Offset mismatch: continue from what the server actually has.
       t.offset = t.item.sent = body?.offset ?? 0;
@@ -363,7 +385,7 @@ export class Uploader extends Observable {
       t.digest = undefined;
       t.offset = t.item.sent = 0;
     } else if (status >= 400 && status < 500 && ![408, 423, 429].includes(status)) {
-      return this.fail(t, status === 404 ? "Transfer no longer exists" : err.message);
+      return this.fail(t, err.message);
     }
     if (++t.attempts > MAX_ATTEMPTS) return this.fail(t, err.message);
     t.item.reconnecting = true;

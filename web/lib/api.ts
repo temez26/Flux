@@ -29,6 +29,17 @@ export interface Created {
   expiresAt: string;
 }
 
+/** A transfer's counts and state without its file list. */
+export interface Summary {
+  code: string;
+  title: string;
+  createdAt: string;
+  expiresAt: string;
+  files: number;
+  size: number;
+  complete: boolean;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -57,15 +68,13 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
-/** A transfer listed for everyone who opens Flux. */
-export interface PublicTransfer {
-  code: string;
-  title: string;
-  createdAt: string;
-  expiresAt: string;
-  files: number;
-  size: number;
-  complete: boolean;
+async function orNull<T>(promise: Promise<T>): Promise<T | null> {
+  try {
+    return await promise;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
 }
 
 export function createTransfer(files: NewFile[], expiresIn: number, isPublic: boolean) {
@@ -77,16 +86,16 @@ export function createTransfer(files: NewFile[], expiresIn: number, isPublic: bo
 }
 
 export function listPublic() {
-  return request<PublicTransfer[]>("/api/public");
+  return request<Summary[]>("/api/public");
 }
 
-export async function getTransfer(code: string): Promise<TransferMeta | null> {
-  try {
-    return await request<TransferMeta>(transferUrl(code));
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 404) return null;
-    throw err;
-  }
+/** Revalidated with the server's ETag, so polling an unchanged transfer is cheap. */
+export function getTransfer(code: string): Promise<TransferMeta | null> {
+  return orNull(request<TransferMeta>(transferUrl(code), { cache: "no-cache" }));
+}
+
+export function getSummary(code: string): Promise<Summary | null> {
+  return orNull(request<Summary>(`${transferUrl(code)}/summary`));
 }
 
 export function deleteTransfer(code: string, token: string) {

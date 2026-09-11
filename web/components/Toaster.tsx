@@ -14,7 +14,7 @@ export default function Toaster() {
       {toasts.list.map((t) => (
         <div
           key={t.id}
-          className="flex animate-[toast-in_.2s_ease-out] items-center gap-2 rounded-xl bg-fg px-4 py-2.5 text-sm font-medium text-bg shadow-lg"
+          className="flex animate-[toast-in_.2s_ease-out] items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-medium shadow-lg"
         >
           {t.tone === "ok" ? <CheckIcon className="size-4 text-ok" /> : <AlertIcon className="size-4 text-err" />}
           {t.message}

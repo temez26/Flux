@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getTransfer, type TransferMeta } from "./api";
 
 const noSubscribe = () => () => {};
@@ -64,11 +64,66 @@ export function useNow(intervalMs: number): number {
   return now;
 }
 
-const POLL_MS = 2000;
+/** Sets the tab title while mounted, e.g. to show progress when the tab is in the background. */
+export function useTitle(title: string | undefined) {
+  useEffect(() => {
+    if (!title) return;
+    const previous = document.title;
+    document.title = title;
+    return () => void (document.title = previous);
+  }, [title]);
+}
 
 /**
- * Loads transfer metadata and keeps polling while any file is still uploading.
- * `meta` is undefined while loading and null when the transfer doesn't exist.
+ * Runs `load` now and then every `intervalMs`. Hidden tabs skip refreshes (but still load
+ * once) and refresh as soon as they become visible again. Failures keep the last state.
+ */
+export function usePolling(load: () => Promise<void>, intervalMs: number) {
+  const latest = useRef(load);
+  useEffect(() => {
+    latest.current = load;
+  });
+
+  useEffect(() => {
+    let alive = true;
+    let loading = false;
+    let loaded = false;
+    let timer = 0;
+    const tick = async () => {
+      if (loading) return;
+      loading = true;
+      window.clearTimeout(timer);
+      if (!document.hidden || !loaded) {
+        try {
+          await latest.current();
+          loaded = true;
+        } catch {
+          // Keep showing the last state while the server is unreachable.
+        }
+      }
+      loading = false;
+      if (alive) timer = window.setTimeout(tick, intervalMs);
+    };
+    const onVisible = () => !document.hidden && void tick();
+    void tick();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [intervalMs]);
+}
+
+const UPLOADING_POLL_MS = 2000;
+// Finished transfers are still checked, so the page notices when they're deleted.
+const READY_POLL_MS = 30_000;
+const OFFLINE_POLL_MS = 4000;
+
+/**
+ * Loads transfer metadata and keeps it current: quickly while files are uploading, slowly
+ * once complete, and exactly at expiry. `meta` is undefined while loading and null when
+ * the transfer doesn't exist (any more). `offline` is set while the server is unreachable.
  */
 export function useTransferMeta(code: string, enabled: boolean) {
   const [meta, setMeta] = useState<TransferMeta | null>();
@@ -81,7 +136,7 @@ export function useTransferMeta(code: string, enabled: boolean) {
     let loaded = false;
     const load = async () => {
       if (document.hidden && loaded) {
-        timer = window.setTimeout(load, POLL_MS);
+        timer = window.setTimeout(load, UPLOADING_POLL_MS);
         return;
       }
       try {
@@ -90,11 +145,14 @@ export function useTransferMeta(code: string, enabled: boolean) {
         loaded = true;
         setMeta(next);
         setOffline(false);
-        if (next?.files.some((f) => f.hash === null)) timer = window.setTimeout(load, POLL_MS);
+        if (!next) return;
+        const interval = next.files.some((f) => f.hash === null) ? UPLOADING_POLL_MS : READY_POLL_MS;
+        const untilExpiry = Date.parse(next.expiresAt) - Date.now() + 1000;
+        timer = window.setTimeout(load, Math.max(0, Math.min(interval, untilExpiry)));
       } catch {
         if (!alive) return;
         setOffline(true);
-        timer = window.setTimeout(load, POLL_MS * 2);
+        timer = window.setTimeout(load, OFFLINE_POLL_MS);
       }
     };
     void load();

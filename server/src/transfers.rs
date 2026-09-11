@@ -1,9 +1,13 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use axum::{
     Json,
     extract::{Path, State},
-    http::{HeaderMap, StatusCode, header},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
+    response::{IntoResponse, Response},
 };
 use chrono::{DateTime, Utc};
 use rand::Rng;
@@ -233,7 +237,22 @@ pub struct TransferInfo {
     files: Vec<FileInfo>,
 }
 
-pub async fn get(State(state): State<Shared>, Path(code): Path<String>) -> Result<Json<TransferInfo>> {
+/// Sizes of the partial files among `wanted`, read with one directory listing.
+fn sizes_on_disk(dir: &std::path::Path, wanted: &HashSet<i32>) -> HashMap<i32, u64> {
+    let Ok(entries) = std::fs::read_dir(dir) else { return HashMap::new() };
+    entries
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let idx: i32 = entry.file_name().to_str()?.parse().ok()?;
+            if !wanted.contains(&idx) {
+                return None;
+            }
+            Some((idx, entry.metadata().ok()?.len()))
+        })
+        .collect()
+}
+
+pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers: HeaderMap) -> Result<Response> {
     let transfer = find(&state.db, &code).await?;
     let rows: Vec<(i32, String, i64, String, Option<i64>, Option<Vec<u8>>)> = sqlx::query_as(
         "SELECT idx, path, size, mime, modified, hash FROM files WHERE transfer_id = $1 ORDER BY idx",
@@ -242,28 +261,60 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>) -> Resul
     .fetch_all(&state.db)
     .await?;
 
+    let mut received = state.uploads.received_for(transfer.id);
+    // In-memory progress is lost on restart; partial files on disk still tell it.
+    let unknown: HashSet<i32> = rows
+        .iter()
+        .filter(|row| row.5.is_none() && !received.contains_key(&row.0))
+        .map(|row| row.0)
+        .collect();
+    if !unknown.is_empty() {
+        let dir = state.data_dir.join(transfer.id.to_string());
+        let on_disk = tokio::task::spawn_blocking(move || sizes_on_disk(&dir, &unknown))
+            .await
+            .map_err(|_| AppError::INTERNAL)?;
+        received.extend(on_disk);
+    }
+
     let files = rows
         .into_iter()
         .map(|(idx, path, size, mime, modified, hash)| {
-            let received = match hash {
-                Some(_) => size as u64,
-                None => state.uploads.received((transfer.id, idx)).unwrap_or(0),
-            };
+            let received = if hash.is_some() { size as u64 } else { received.get(&idx).copied().unwrap_or(0) };
             FileInfo { idx, path, size, mime, modified, hash: hash.as_deref().map(hex), received }
         })
         .collect();
 
-    Ok(Json(TransferInfo {
+    let body = serde_json::to_vec(&TransferInfo {
         code: transfer.code,
         created_at: transfer.created_at,
         expires_at: transfer.expires_at,
         files,
-    }))
+    })
+    .map_err(|_| AppError::INTERNAL)?;
+
+    // Receivers poll this; when nothing changed they get a 304 instead of the whole file list.
+    let etag = format!("\"{}\"", blake3::hash(&body).to_hex());
+    let unchanged = headers.get(header::IF_NONE_MATCH).is_some_and(|v| v.as_bytes() == etag.as_bytes());
+    let mut response = if unchanged {
+        StatusCode::NOT_MODIFIED.into_response()
+    } else {
+        ([(header::CONTENT_TYPE, "application/json")], body).into_response()
+    };
+    let response_headers = response.headers_mut();
+    response_headers.insert(header::ETAG, HeaderValue::from_str(&etag).map_err(|_| AppError::INTERNAL)?);
+    response_headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    Ok(response)
 }
+
+const SUMMARY_SQL: &str = "SELECT t.code, t.title, t.created_at, t.expires_at,
+        count(f.idx) AS files,
+        coalesce(sum(f.size), 0)::bigint AS size,
+        count(f.idx) = count(f.hash) AS complete
+     FROM transfers t JOIN files f ON f.transfer_id = t.id";
 
 #[derive(Serialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
-pub struct PublicTransfer {
+pub struct Summary {
     code: String,
     title: String,
     created_at: DateTime<Utc>,
@@ -274,22 +325,24 @@ pub struct PublicTransfer {
 }
 
 /// Public transfers, newest first.
-pub async fn list_public(State(state): State<Shared>) -> Result<Json<Vec<PublicTransfer>>> {
-    let transfers = sqlx::query_as(
-        "SELECT t.code, t.title, t.created_at, t.expires_at,
-                count(f.idx) AS files,
-                coalesce(sum(f.size), 0)::bigint AS size,
-                count(f.idx) = count(f.hash) AS complete
-         FROM transfers t JOIN files f ON f.transfer_id = t.id
-         WHERE t.public AND t.expires_at > now()
-         GROUP BY t.id
-         ORDER BY t.created_at DESC
-         LIMIT $1",
-    )
-    .bind(PUBLIC_LIST_LIMIT)
-    .fetch_all(&state.db)
-    .await?;
+pub async fn list_public(State(state): State<Shared>) -> Result<Json<Vec<Summary>>> {
+    let sql = format!(
+        "{SUMMARY_SQL} WHERE t.public AND t.expires_at > now()
+         GROUP BY t.id ORDER BY t.created_at DESC LIMIT $1"
+    );
+    let transfers = sqlx::query_as(&sql).bind(PUBLIC_LIST_LIMIT).fetch_all(&state.db).await?;
     Ok(Json(transfers))
+}
+
+/// Counts and completion without the file list, for cheap status checks.
+pub async fn summary(State(state): State<Shared>, Path(code): Path<String>) -> Result<Json<Summary>> {
+    let sql = format!("{SUMMARY_SQL} WHERE t.code = $1 AND t.expires_at > now() GROUP BY t.id");
+    let summary = sqlx::query_as(&sql)
+        .bind(normalize_code(&code))
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or(AppError::NOT_FOUND)?;
+    Ok(Json(summary))
 }
 
 pub async fn delete(
