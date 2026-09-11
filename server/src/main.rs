@@ -1,0 +1,142 @@
+mod cleanup;
+mod download;
+mod error;
+mod signal;
+mod transfers;
+mod upload;
+mod zip;
+
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
+
+use axum::{
+    Router,
+    extract::DefaultBodyLimit,
+    http::{HeaderValue, header},
+    routing::{get, patch, post},
+};
+use sqlx::postgres::PgPoolOptions;
+use tower_http::{
+    compression::CompressionLayer,
+    services::{ServeDir, ServeFile},
+    set_header::SetResponseHeaderLayer,
+};
+use tracing_subscriber::EnvFilter;
+
+pub struct AppState {
+    pub db: sqlx::PgPool,
+    pub data_dir: PathBuf,
+    pub uploads: upload::Registry,
+    pub rooms: signal::Rooms,
+}
+
+pub type Shared = Arc<AppState>;
+
+fn env_or(key: &str, default: &str) -> String {
+    std::env::var(key).unwrap_or_else(|_| default.to_owned())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
+        .init();
+
+    let database_url = std::env::var("DATABASE_URL").map_err(|_| "DATABASE_URL must be set")?;
+    let data_dir = PathBuf::from(env_or("FLUX_DATA_DIR", "data"));
+    let web_dir = PathBuf::from(env_or("FLUX_WEB_DIR", "../web/out"));
+    let addr: SocketAddr = env_or("FLUX_ADDR", "0.0.0.0:8080").parse()?;
+
+    tokio::fs::create_dir_all(&data_dir).await?;
+    let db = PgPoolOptions::new().max_connections(16).connect(&database_url).await?;
+    sqlx::migrate!().run(&db).await?;
+
+    let state = Arc::new(AppState {
+        db,
+        data_dir,
+        uploads: Default::default(),
+        rooms: Default::default(),
+    });
+    cleanup::remove_orphans(&state).await?;
+    cleanup::spawn(state.clone());
+
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    tracing::info!("listening on {addr}");
+    axum::serve(listener, app(state, &web_dir))
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
+    Ok(())
+}
+
+fn app(state: Shared, web_dir: &std::path::Path) -> Router {
+    let api = Router::new()
+        .route(
+            "/transfers",
+            post(transfers::create).layer(DefaultBodyLimit::max(64 << 20)),
+        )
+        .route(
+            "/transfers/{code}",
+            get(transfers::get).layer(CompressionLayer::new()).delete(transfers::delete),
+        )
+        .route(
+            "/transfers/{code}/files/{idx}",
+            patch(upload::chunk)
+                .layer(DefaultBodyLimit::disable())
+                .get(download::file)
+                .delete(transfers::delete_file),
+        )
+        .route("/transfers/{code}/zip", get(download::zip))
+        .route("/transfers/{code}/signal", get(signal::connect))
+        .fallback(|| async { error::AppError::NOT_FOUND })
+        .with_state(state);
+
+    // Hashed build assets never change; everything else must revalidate so updates ship immediately.
+    let immutable = ServeDir::new(web_dir.join("_next/static"));
+    // Unknown paths (e.g. /<code>) fall back to the single-page app shell.
+    let shell = ServeDir::new(web_dir).fallback(ServeFile::new(web_dir.join("index.html")));
+
+    Router::new()
+        .nest("/api", api)
+        .nest_service(
+            "/_next/static",
+            tower::ServiceBuilder::new()
+                .layer(SetResponseHeaderLayer::overriding(
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static("public, max-age=31536000, immutable"),
+                ))
+                .layer(CompressionLayer::new())
+                .service(immutable),
+        )
+        .fallback_service(
+            tower::ServiceBuilder::new()
+                .layer(SetResponseHeaderLayer::overriding(
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static("no-cache"),
+                ))
+                .layer(CompressionLayer::new())
+                .service(shell),
+        )
+        .layer(SetResponseHeaderLayer::overriding(
+            header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        ))
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c().await.ok();
+    };
+    #[cfg(unix)]
+    let terminate = async {
+        if let Ok(mut signal) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
+            signal.recv().await;
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+}

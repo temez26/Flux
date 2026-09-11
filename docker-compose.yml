@@ -1,0 +1,34 @@
+services:
+  flux:
+    build: .
+    image: flux
+    restart: unless-stopped
+    ports:
+      - "${FLUX_PORT:-8080}:8080"
+    environment:
+      DATABASE_URL: postgres://flux:${POSTGRES_PASSWORD:-flux}@db:5432/flux
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - flux-data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: flux
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flux}
+      POSTGRES_DB: flux
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flux -d flux"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  flux-data:
+  db-data:

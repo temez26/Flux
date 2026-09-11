@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f6f6f8;
+  --surface: #ffffff;
+  --hover: #f0f0f4;
+  --fg: #121216;
+  --muted: #6c6c78;
+  --line: #e3e3ea;
+  --accent: #5a57f0;
+  --accent-fg: #ffffff;
+  --ok: #15803d;
+  --err: #dc2626;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c0c10;
+    --surface: #15151b;
+    --hover: #1d1d25;
+    --fg: #ececf1;
+    --muted: #8f8f9c;
+    --line: #262630;
+    --accent: #7c79ff;
+    --accent-fg: #ffffff;
+    --ok: #4ade80;
+    --err: #f87171;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-hover: var(--hover);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-ok: var(--ok);
+  --color-err: var(--err);
+}
+
+html {
+  color-scheme: light dark;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+button,
+a,
+input {
+  touch-action: manipulation;
+}
+
+@utility safe-area {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
+}

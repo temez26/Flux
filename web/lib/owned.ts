@@ -1,0 +1,47 @@
+/** Transfers created on this device, so the sender can reopen, resume or delete them. */
+export interface Owned {
+  token: string;
+  expiresAt: string;
+  count: number;
+  size: number;
+  createdAt: number;
+}
+
+const KEY = "flux.owned";
+
+function read(): Record<string, Owned> {
+  try {
+    const all: Record<string, Owned> = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    const now = Date.now();
+    for (const [code, owned] of Object.entries(all)) {
+      if (Date.parse(owned.expiresAt) <= now) delete all[code];
+    }
+    return all;
+  } catch {
+    return {};
+  }
+}
+
+function write(all: Record<string, Owned>) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(all));
+  } catch {
+    // Storage unavailable (private mode); ownership then lasts for this tab only.
+  }
+}
+
+export function listOwned(): [string, Owned][] {
+  return Object.entries(read()).sort((a, b) => b[1].createdAt - a[1].createdAt);
+}
+
+export const getOwned = (code: string): Owned | undefined => read()[code];
+
+export function saveOwned(code: string, owned: Owned) {
+  write({ ...read(), [code]: owned });
+}
+
+export function removeOwned(code: string) {
+  const all = read();
+  delete all[code];
+  write(all);
+}
