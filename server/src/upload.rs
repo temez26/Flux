@@ -22,7 +22,7 @@ use axum::{
 };
 use futures_util::StreamExt;
 use serde_json::json;
-use tokio::io::{AsyncSeekExt, AsyncWriteExt, BufWriter};
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use uuid::Uuid;
 
 use crate::{
@@ -37,6 +37,14 @@ type Key = (Uuid, i32);
 const IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 /// Upper bound for reading the rest of a chunk the server has already answered.
 const DRAIN_TIMEOUT: Duration = Duration::from_secs(10);
+/// Bytes buffered before each write syscall.
+const WRITE_BUFFER: usize = 1 << 20;
+/// How far the file may run ahead of the digest before catching up needs a full re-read. An
+/// interrupted request leaves at most one uncommitted buffer behind, so the real gap is smaller.
+const MAX_REWIND: u64 = 4 << 20;
+
+/// Answered while a rebuild runs; the client waits and retries rather than failing the file.
+const REBUILDING: AppError = AppError(StatusCode::LOCKED, "checking the part already uploaded");
 
 #[derive(Default)]
 pub struct Registry(Mutex<HashMap<Key, Arc<Upload>>>);
@@ -44,7 +52,18 @@ pub struct Registry(Mutex<HashMap<Key, Arc<Upload>>>);
 #[derive(Default)]
 struct Upload {
     received: AtomicU64,
-    digest: tokio::sync::Mutex<Digest>,
+    state: tokio::sync::Mutex<Checksums>,
+}
+
+/// What is known about the checksums of the bytes already on disk.
+#[derive(Default)]
+enum Checksums {
+    /// Nothing, e.g. after a restart: the file must be re-read before more can be appended.
+    #[default]
+    Unknown,
+    /// A background task is re-reading the file to produce `Ready`.
+    Rebuilding,
+    Ready(Digest),
 }
 
 /// Running checksums over the first `len` bytes of the file.
@@ -92,7 +111,7 @@ fn progress(status: StatusCode, offset: u64, complete: bool) -> Response {
     (status, Json(json!({ "offset": offset, "complete": complete }))).into_response()
 }
 
-/// Rebuilds checksums from disk, e.g. after a server restart lost the in-memory state.
+/// Reads the first `len` bytes back to recompute what the running digest lost.
 async fn digest_prefix(path: PathBuf, len: u64) -> std::io::Result<Digest> {
     tokio::task::spawn_blocking(move || {
         let mut reader = std::fs::File::open(path)?.take(len);
@@ -107,6 +126,37 @@ async fn digest_prefix(path: PathBuf, len: u64) -> std::io::Result<Digest> {
         }
     })
     .await?
+}
+
+/// Rebuilds the digest off the request path. Re-reading a multi-gigabyte file takes longer than
+/// the client's stall timeout, so doing it inline makes every retry start the read over and a
+/// large upload never converges.
+fn spawn_rebuild(upload: Arc<Upload>, path: PathBuf, len: u64) {
+    tokio::spawn(async move {
+        let rebuilt = digest_prefix(path, len).await;
+        let mut slot = upload.state.lock().await;
+        *slot = match rebuilt {
+            Ok(digest) => Checksums::Ready(digest),
+            Err(err) => {
+                tracing::warn!("failed to rebuild upload digest: {err}");
+                Checksums::Unknown
+            }
+        };
+    });
+}
+
+/// Writes the buffer, then folds it into the digest. An interrupted request can leave bytes on
+/// disk that the digest never counted, but never the reverse, so the gap stays small enough to
+/// repair by dropping those bytes instead of re-reading the file.
+async fn commit(file: &mut tokio::fs::File, buf: &mut Vec<u8>, digest: &mut Digest) -> std::io::Result<()> {
+    if buf.is_empty() {
+        return Ok(());
+    }
+    file.write_all(buf).await?;
+    file.flush().await?;
+    digest.update(buf);
+    buf.clear();
+    Ok(())
 }
 
 pub async fn chunk(
@@ -157,53 +207,76 @@ async fn write_chunk(
 
     let key = (transfer.id, idx);
     let upload = state.uploads.get(key);
-    let Ok(mut digest) = upload.digest.try_lock() else {
+    let Ok(mut slot) = upload.state.try_lock() else {
         return Err(AppError(StatusCode::LOCKED, "upload already in progress"));
     };
 
     let path = transfers::file_path(&state, transfer.id, idx);
     let mut file = tokio::fs::OpenOptions::new().write(true).create(true).truncate(false).open(&path).await?;
-    let mut len = file.metadata().await?.len();
-    upload.received.store(len, Ordering::Relaxed);
-    if offset != len {
-        return Ok(progress(StatusCode::CONFLICT, len, false));
+    let on_disk = file.metadata().await?.len();
+
+    // An empty digest already describes an empty file, so a new upload never needs a rebuild.
+    if on_disk == 0 && !matches!(*slot, Checksums::Ready(_)) {
+        *slot = Checksums::Ready(Digest::default());
     }
-    if digest.len != len {
-        *digest = digest_prefix(path.clone(), len).await?;
+    let rewind = match &*slot {
+        Checksums::Ready(digest) if digest.len == on_disk => None,
+        Checksums::Ready(digest) if on_disk > digest.len && on_disk - digest.len <= MAX_REWIND => Some(digest.len),
+        Checksums::Rebuilding => return Err(REBUILDING),
+        _ => {
+            *slot = Checksums::Rebuilding;
+            spawn_rebuild(upload.clone(), path, on_disk);
+            return Err(REBUILDING);
+        }
+    };
+    // An interrupted request wrote past the digest. Dropping those few bytes for the client to
+    // resend is instant, where catching the digest up would re-read the whole file.
+    if let Some(len) = rewind {
+        file.set_len(len).await?;
+    }
+    let Checksums::Ready(digest) = &mut *slot else { return Err(AppError::INTERNAL) };
+    upload.received.store(digest.len, Ordering::Relaxed);
+    if offset != digest.len {
+        return Ok(progress(StatusCode::CONFLICT, digest.len, false));
     }
 
-    file.seek(SeekFrom::Start(len)).await?;
-    let mut writer = BufWriter::with_capacity(1 << 20, file);
+    file.seek(SeekFrom::Start(digest.len)).await?;
+    let mut buf = Vec::with_capacity(WRITE_BUFFER);
     let mut oversized = false;
+    let mut failure = None;
     while let Ok(Some(Ok(data))) = tokio::time::timeout(IDLE_TIMEOUT, stream.next()).await {
-        if len + data.len() as u64 > size {
+        if digest.len + (buf.len() + data.len()) as u64 > size {
             oversized = true;
             break;
         }
-        if let Err(err) = writer.write_all(&data).await {
-            digest.len = u64::MAX; // disk contents unknown; force a rebuild next time
-            return Err(err.into());
+        buf.extend_from_slice(&data);
+        if buf.len() >= WRITE_BUFFER {
+            if let Err(err) = commit(&mut file, &mut buf, digest).await {
+                failure = Some(err);
+                break;
+            }
+            upload.received.store(digest.len, Ordering::Relaxed);
         }
-        digest.update(&data);
-        len += data.len() as u64;
-        upload.received.store(len, Ordering::Relaxed);
     }
-    // Flush even when the client went away so the kept bytes match the digest.
-    if let Err(err) = writer.flush().await {
-        digest.len = u64::MAX;
+    // Commit even when the client went away, so the kept bytes match the digest.
+    if failure.is_none() {
+        failure = commit(&mut file, &mut buf, digest).await.err();
+    }
+    upload.received.store(digest.len, Ordering::Relaxed);
+    if let Some(err) = failure {
         return Err(err.into());
     }
     if oversized {
         return Err(AppError(StatusCode::PAYLOAD_TOO_LARGE, "data exceeds declared file size"));
     }
-    if len < size {
-        return Ok(progress(StatusCode::OK, len, false));
+    if digest.len < size {
+        return Ok(progress(StatusCode::OK, digest.len, false));
     }
 
-    let finished = std::mem::take(&mut *digest);
+    let finished = std::mem::take(digest);
     let blake3 = finished.blake3.finalize();
     if expected_hash.is_some_and(|expected| expected != blake3.to_hex().as_str()) {
-        writer.into_inner().set_len(0).await?;
+        file.set_len(0).await?;
         upload.received.store(0, Ordering::Relaxed);
         return Err(AppError(StatusCode::UNPROCESSABLE_ENTITY, "integrity check failed"));
     }
@@ -215,7 +288,7 @@ async fn write_chunk(
         .bind(finished.crc.finalize() as i32)
         .execute(&state.db)
         .await?;
-    drop(digest);
+    drop(slot);
     state.uploads.remove(key);
     Ok(progress(StatusCode::OK, size, true))
 }
