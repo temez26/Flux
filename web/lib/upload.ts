@@ -44,6 +44,8 @@ interface Task {
   hashed: number;
   digest?: string;
   attempts: number;
+  /** Retries spent waiting for the server to finish work of its own, counted separately. */
+  busy: number;
   xhr?: XMLHttpRequest;
   wake?: () => void;
 }
@@ -54,6 +56,10 @@ const CHUNK = 8 * 1024 * 1024;
 // per-host connection limit (measured ~50% more files/s than 4).
 const CONCURRENCY = 6;
 const MAX_ATTEMPTS = 8;
+// The server answers 423 while it re-reads a resumed file to recheck what it already holds.
+// That is bounded work on data we know it has, so wait it out on its own budget rather than
+// spending the error budget, which a large file would exhaust long before the read finished.
+const MAX_BUSY_ATTEMPTS = 40;
 // A request without progress for this long is presumed dead (e.g. a proxy holding a
 // half-open connection after the server restarted) and is retried.
 const STALL_MS = 30_000;
@@ -109,6 +115,7 @@ export class Uploader extends Observable {
       offset: 0,
       hashed: 0,
       attempts: 0,
+      busy: 0,
     }));
     this.items = this.tasks.map((t) => t.item);
     this.refresh();
@@ -159,6 +166,7 @@ export class Uploader extends Observable {
         t.item.status = "pending";
         t.item.error = undefined;
         t.attempts = 0;
+        t.busy = 0;
       }
     }
     this.cursor = 0;
@@ -297,6 +305,7 @@ export class Uploader extends Observable {
     const res = await this.send(t, start, data, end === item.size ? t.digest : undefined);
     t.offset = item.sent = res.offset;
     t.attempts = 0;
+    t.busy = 0;
     if (res.complete) {
       item.status = "done";
       t.hasher = undefined;
@@ -379,18 +388,27 @@ export class Uploader extends Observable {
       t.offset = t.item.sent = body?.offset ?? 0;
       return true;
     }
+    if (status === 423) {
+      if (++t.busy > MAX_BUSY_ATTEMPTS) return this.fail(t, err.message);
+      return this.wait(t, 1000 * 2 ** t.busy);
+    }
     if (status === 422) {
       t.hasher?.init();
       t.hashed = 0;
       t.digest = undefined;
       t.offset = t.item.sent = 0;
-    } else if (status >= 400 && status < 500 && ![408, 423, 429].includes(status)) {
+    } else if (status >= 400 && status < 500 && ![408, 429].includes(status)) {
       return this.fail(t, err.message);
     }
     if (++t.attempts > MAX_ATTEMPTS) return this.fail(t, err.message);
+    return this.wait(t, Math.min(30_000, 500 * 2 ** t.attempts));
+  }
+
+  /** Backs off before the next try, showing the file as waiting rather than stalled. */
+  private async wait(t: Task, ms: number): Promise<boolean> {
     t.item.reconnecting = true;
     this.changed();
-    await this.sleep(t, Math.min(30_000, 500 * 2 ** t.attempts));
+    await this.sleep(t, Math.min(30_000, ms));
     t.item.reconnecting = false;
     return true;
   }
