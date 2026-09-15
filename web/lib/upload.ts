@@ -1,6 +1,5 @@
-import type { IHasher } from "hash-wasm";
 import { deleteFile, fileUrl } from "./api";
-import { acquireHasher, releaseHasher, updateInSlices } from "./hash";
+import { createHasher, type Hasher } from "./hash";
 import { Observable, SpeedMeter } from "./observable";
 
 export type Status = "pending" | "active" | "done" | "failed" | "canceled";
@@ -39,7 +38,7 @@ interface Task {
   file?: File;
   /** Bytes the server has confirmed. */
   offset: number;
-  hasher?: IHasher;
+  hasher?: Hasher;
   /** Bytes fed into `hasher`, always a prefix of the file. */
   hashed: number;
   digest?: string;
@@ -177,7 +176,7 @@ export class Uploader extends Observable {
     const t = this.tasks.find((t) => t.item.idx === idx);
     if (!t || t.item.status === "done" || t.item.status === "canceled") return;
     t.item.status = "canceled";
-    t.hasher = undefined;
+    this.discardHasher(t);
     this.interrupt(t);
     deleteFile(this.code, this.token, idx).catch(() => {});
     this.changed();
@@ -199,7 +198,10 @@ export class Uploader extends Observable {
 
   dispose() {
     this.paused = true;
-    for (const t of this.tasks) this.interrupt(t);
+    for (const t of this.tasks) {
+      this.interrupt(t);
+      this.discardHasher(t);
+    }
     window.removeEventListener("online", this.onOnline);
     window.clearTimeout(this.holdTimer);
     this.stopTicking();
@@ -293,12 +295,16 @@ export class Uploader extends Observable {
     const { item } = t;
     const start = t.offset;
     const end = Math.min(start + CHUNK, item.size);
-    const hasher = (t.hasher ??= await acquireHasher("blake3"));
+    const hasher = (t.hasher ??= createHasher());
     if (t.hashed < start) await this.hashUntil(t, start);
-    const data = await this.read(t, start, end);
-    // `hashed` can already be past `start` when a send failed after its bytes were hashed.
-    if (t.hashed < end) await updateInSlices(hasher, data.subarray(t.hashed - start), (bytes) => (t.hashed += bytes));
-    if (end === item.size) t.digest ??= hasher.digest("hex");
+    let data = await this.read(t, start, end);
+    if (t.hashed < end) {
+      // `hashed` can already be past `start` when a send failed after its bytes were hashed.
+      // The chunk is moved to the hasher and handed back, so only what it returns is usable.
+      data = await hasher.update(data, t.hashed - start);
+      t.hashed = end;
+    }
+    if (end === item.size) t.digest ??= await hasher.digest();
 
     const res = await this.send(t, start, data, end === item.size ? t.digest : undefined);
     t.offset = item.sent = res.offset;
@@ -306,12 +312,11 @@ export class Uploader extends Observable {
     t.busy = 0;
     if (res.complete) {
       item.status = "done";
-      t.hasher = undefined;
-      releaseHasher("blake3", hasher);
+      this.discardHasher(t);
     }
   }
 
-  private async read(t: Task, start: number, end: number): Promise<Uint8Array> {
+  private async read(t: Task, start: number, end: number): Promise<Uint8Array<ArrayBuffer>> {
     const data = new Uint8Array(await t.file!.slice(start, end).arrayBuffer());
     if (this.stopped(t)) throw new Interrupted();
     return data;
@@ -320,12 +325,19 @@ export class Uploader extends Observable {
   /** Catches the hash up when the server already holds more of the file than we hashed. */
   private async hashUntil(t: Task, until: number) {
     while (t.hashed < until) {
-      const data = await this.read(t, t.hashed, Math.min(t.hashed + CHUNK, until));
-      await updateInSlices(t.hasher!, data, (bytes) => (t.hashed += bytes));
+      const end = Math.min(t.hashed + CHUNK, until);
+      await t.hasher!.update(await this.read(t, t.hashed, end));
+      t.hashed = end;
     }
   }
 
-  private send(t: Task, offset: number, data: Uint8Array, digest?: string) {
+  /** A digest can't be rewound, so restarting one means letting the old hasher go. */
+  private discardHasher(t: Task) {
+    t.hasher?.release();
+    t.hasher = undefined;
+  }
+
+  private send(t: Task, offset: number, data: Uint8Array<ArrayBuffer>, digest?: string) {
     return new Promise<{ offset: number; complete: boolean }>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       let stalled = false;
@@ -366,7 +378,7 @@ export class Uploader extends Observable {
         settle();
         reject(stalled ? new HttpError(0, null) : new Interrupted());
       };
-      xhr.send(data as Uint8Array<ArrayBuffer>);
+      xhr.send(data);
       arm();
     });
   }
@@ -390,7 +402,7 @@ export class Uploader extends Observable {
       return this.wait(t, 1000 * 2 ** t.busy);
     }
     if (status === 422) {
-      t.hasher?.init();
+      this.discardHasher(t);
       t.hashed = 0;
       t.digest = undefined;
       t.offset = t.item.sent = 0;
