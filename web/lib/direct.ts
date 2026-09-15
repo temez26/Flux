@@ -178,13 +178,12 @@ export class DirectHost extends Observable {
     const file = this.file(req.idx);
     if (!file) throw new Error("This file isn't available from the sender");
     const end = Math.min(file.size, req.offset + req.length);
-    let data = new Uint8Array(await file.slice(req.offset, end).arrayBuffer());
+    const data = new Uint8Array(await file.slice(req.offset, end).arrayBuffer());
 
     let running = hashes.get(req.idx);
     if (!running && req.offset === 0) hashes.set(req.idx, (running = { hasher: createHasher(), pos: 0 }));
     if (running?.pos === req.offset) {
-      // Hashing moves the bytes away and returns them, so the frames below must use these.
-      data = await running.hasher.update(data);
+      await running.hasher.update(data);
       running.pos = end;
     }
 

@@ -24,14 +24,15 @@ export function releaseHasher(kind: HashKind, hasher: IHasher) {
  * returns: the array passed in is left detached.
  */
 export interface Hasher {
-  update(data: Uint8Array<ArrayBuffer>, from?: number): Promise<Uint8Array<ArrayBuffer>>;
+  update(data: Uint8Array<ArrayBuffer>, from?: number): Promise<void>;
   digest(): Promise<string>;
   release(): void;
 }
 
 // Hashing a chunk is a single long run of wasm. On the main thread it blocks everything the
 // page wants to do — rendering above all — for as long as it takes, so it belongs in a
-// worker, with the chunk moved across instead of copied.
+// worker. The chunk is copied rather than moved: the page has to keep its own bytes to put
+// them on the wire, and one memcpy costs far less than waiting out the hash before sending.
 let worker: Worker | null | undefined;
 let sequence = 0;
 const pending = new Map<number, { resolve: (reply: HashReply) => void; reject: (err: Error) => void }>();
@@ -65,24 +66,19 @@ function hashWorker(): Worker | null {
   return worker;
 }
 
-function ask(req: HashRequest, transfer: Transferable[] = []): Promise<HashReply> {
+function ask(req: HashRequest): Promise<HashReply> {
   const active = hashWorker();
   if (!active) return Promise.reject(new Error("No hashing worker"));
   return new Promise((resolve, reject) => {
     pending.set(req.seq, { resolve, reject });
-    active.postMessage(req, transfer);
+    active.postMessage(req);
   });
 }
 
 function workerHasher(id: number): Hasher {
   return {
     async update(data, from = 0) {
-      const reply = await ask(
-        { op: "update", id, seq: sequence++, buffer: data.buffer, offset: data.byteOffset + from, length: data.byteLength - from },
-        [data.buffer],
-      );
-      if (!("buffer" in reply)) throw new Error("Hashing failed");
-      return new Uint8Array(reply.buffer, data.byteOffset, data.byteLength);
+      await ask({ op: "update", id, seq: sequence++, buffer: data.buffer, offset: data.byteOffset + from, length: data.byteLength - from });
     },
     async digest() {
       const reply = await ask({ op: "digest", id, seq: sequence++ });
@@ -122,7 +118,6 @@ function localHasher(): Hasher {
         hasher.update(data.subarray(offset, Math.min(offset + SLICE, data.length)));
         if (offset + SLICE < data.length) await yieldToBrowser();
       }
-      return data;
     },
     async digest() {
       hasher ??= await acquireHasher("blake3");

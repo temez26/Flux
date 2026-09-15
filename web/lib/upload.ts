@@ -295,25 +295,51 @@ export class Uploader extends Observable {
     const { item } = t;
     const start = t.offset;
     const end = Math.min(start + CHUNK, item.size);
+    const last = end === item.size;
     const hasher = (t.hasher ??= createHasher());
     if (t.hashed < start) await this.hashUntil(t, start);
-    let data = await this.read(t, start, end);
-    if (t.hashed < end) {
-      // `hashed` can already be past `start` when a send failed after its bytes were hashed.
-      // The chunk is moved to the hasher and handed back, so only what it returns is usable.
-      data = await hasher.update(data, t.hashed - start);
-      t.hashed = end;
-    }
-    if (end === item.size) t.digest ??= await hasher.digest();
+    const data = await this.read(t, start, end);
 
-    const res = await this.send(t, start, data, end === item.size ? t.digest : undefined);
-    t.offset = item.sent = res.offset;
-    t.attempts = 0;
-    t.busy = 0;
-    if (res.complete) {
-      item.status = "done";
-      this.discardHasher(t);
+    // Only the last request carries a digest, so every other chunk is hashed while it is
+    // already on its way to the server rather than before it sets off. `hashed` can also
+    // already be past `start`, when a send failed after its bytes were hashed.
+    const hashing = t.hashed < end ? this.hash(t, hasher, data, t.hashed - start, end) : undefined;
+    try {
+      if (last) {
+        await hashing;
+        if (t.hashed < end) throw new Error("Can't read this file");
+        t.digest ??= await hasher.digest();
+      }
+      const res = await this.send(t, start, data, last ? t.digest : undefined);
+      t.offset = item.sent = res.offset;
+      t.attempts = 0;
+      t.busy = 0;
+      if (res.complete) {
+        item.status = "done";
+        this.discardHasher(t);
+      }
+    } finally {
+      // The next chunk must not be fed in before this one has landed, whatever the send did.
+      await hashing;
+      if (t.hashed < end && t.hasher) this.resetHash(t);
     }
+  }
+
+  /** Resolves once the chunk has reached the hasher, recording how far the digest covers. */
+  private hash(t: Task, hasher: Hasher, data: Uint8Array<ArrayBuffer>, from: number, through: number): Promise<void> {
+    // Never rejects: a failure is read off `hashed`, so nothing is left unobserved while
+    // the request this ran alongside is still in flight.
+    return hasher.update(data, from).then(
+      () => void (t.hashed = through),
+      () => {},
+    );
+  }
+
+  /** A half-fed digest can't be rewound, so a broken one starts again from the first byte. */
+  private resetHash(t: Task) {
+    this.discardHasher(t);
+    t.hashed = 0;
+    t.digest = undefined;
   }
 
   private async read(t: Task, start: number, end: number): Promise<Uint8Array<ArrayBuffer>> {
@@ -402,9 +428,7 @@ export class Uploader extends Observable {
       return this.wait(t, 1000 * 2 ** t.busy);
     }
     if (status === 422) {
-      this.discardHasher(t);
-      t.hashed = 0;
-      t.digest = undefined;
+      this.resetHash(t);
       t.offset = t.item.sent = 0;
     } else if (status >= 400 && status < 500 && ![408, 429].includes(status)) {
       return this.fail(t, err.message);

@@ -7,11 +7,7 @@ export type HashRequest =
   | { op: "digest"; id: number; seq: number }
   | { op: "release"; id: number; seq: number };
 
-export type HashReply =
-  | { seq: number; buffer: ArrayBuffer }
-  | { seq: number; hash: string }
-  | { seq: number; done: true }
-  | { seq: number; error: string };
+export type HashReply = { seq: number; hash: string } | { seq: number; done: true } | { seq: number; error: string };
 
 const hashers = new Map<number, IHasher>();
 
@@ -24,19 +20,18 @@ async function hasherFor(id: number): Promise<IHasher> {
   return hasher;
 }
 
-async function handle(req: HashRequest): Promise<[HashReply, Transferable[]]> {
+async function handle(req: HashRequest): Promise<HashReply> {
   if (req.op === "release") {
     hashers.delete(req.id);
-    return [{ seq: req.seq, done: true }, []];
+    return { seq: req.seq, done: true };
   }
   const hasher = await hasherFor(req.id);
   if (req.op === "digest") {
     hashers.delete(req.id);
-    return [{ seq: req.seq, hash: hasher.digest("hex") }, []];
+    return { seq: req.seq, hash: hasher.digest("hex") };
   }
   hasher.update(new Uint8Array(req.buffer, req.offset, req.length));
-  // Handed straight back, so the page can upload the very bytes it lent us.
-  return [{ seq: req.seq, buffer: req.buffer }, [req.buffer]];
+  return { seq: req.seq, done: true };
 }
 
 // A streaming hash only means anything if its chunks arrive in order, so requests are run
@@ -47,8 +42,7 @@ self.onmessage = (event: MessageEvent<HashRequest>) => {
   const req = event.data;
   queue = queue.then(async () => {
     try {
-      const [reply, transfer] = await handle(req);
-      self.postMessage(reply, transfer);
+      self.postMessage(await handle(req));
     } catch (err) {
       self.postMessage({ seq: req.seq, error: err instanceof Error ? err.message : "Hashing failed" } satisfies HashReply);
     }
