@@ -144,10 +144,16 @@ function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: str
   useSyncExternalStore(uploader.subscribe, uploader.getVersion, uploader.getVersion);
   useSyncExternalStore(host.subscribe, host.getVersion, host.getVersion);
   const now = useNow(30_000);
+  const [previewing, setPreviewing] = useState<number | null>(null);
   const { total, sent, counts, speed, finished } = uploader.snapshot;
   const running = !finished && !uploader.paused;
   const serving = host.receivers > 0;
   const expired = !!expiresAt && Date.parse(expiresAt) <= now;
+  // Previews read the server's copy, so the sender only needs its metadata once the upload
+  // is done; until then the uploader's own state is all this panel shows.
+  const { meta } = useTransferMeta(uploader.code, finished);
+  const previewable = useMemo(() => new Set(meta?.files.filter(canPreview).map((f) => f.idx) ?? []), [meta]);
+  const single = meta?.files.length === 1 ? meta.files[0] : null;
   useWakeLock(running || serving);
   useLeaveGuard(!finished || serving);
   useTitle(running ? `${percent(sent, total)}% uploaded · Flux` : pageTitle(uploader.code));
@@ -206,6 +212,7 @@ function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: str
             </Badge>
           </div>
         )}
+        {single && previewable.has(single.idx) && <InlinePreview code={uploader.code} file={single} onExpand={() => setPreviewing(single.idx)} />}
       </StatusCard>
       <Pinned title="Now uploading">
         {inFlight(uploader.items, finished).map((item) => (
@@ -213,12 +220,22 @@ function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: str
         ))}
       </Pinned>
       <ListTitle count={uploader.items.length} />
-      <FileList count={uploader.items.length} renderRow={(i) => <UploadRow item={uploader.items[i]} uploader={uploader} />} />
+      <FileList
+        count={uploader.items.length}
+        renderRow={(i) => (
+          <UploadRow
+            item={uploader.items[i]}
+            uploader={uploader}
+            onPreview={previewable.has(uploader.items[i].idx) ? () => setPreviewing(uploader.items[i].idx) : undefined}
+          />
+        )}
+      />
+      <PreviewDialog code={uploader.code} files={meta?.files ?? []} idx={previewing} onChange={setPreviewing} />
     </div>
   );
 }
 
-function UploadRow({ item, uploader }: { item: Item; uploader: Session["uploader"] }) {
+function UploadRow({ item, uploader, onPreview }: { item: Item; uploader: Session["uploader"]; onPreview?: () => void }) {
   const pct = item.size ? item.sent / item.size : 0;
   const label = `${Math.floor(pct * 100)}%`;
   const cancel = (
@@ -270,6 +287,7 @@ function UploadRow({ item, uploader }: { item: Item; uploader: Session["uploader
         <FileRow
           path={item.path}
           size={item.size}
+          onOpen={onPreview}
           badge={
             <Badge tone="ok" icon={<CheckIcon className={small} />}>
               Uploaded
@@ -538,9 +556,14 @@ function receivingStatus(receiver: Receiver): StatusProps {
 
 function ReceivingPanel({ receiver, meta }: { receiver: Receiver; meta: TransferMeta }) {
   useSyncExternalStore(receiver.subscribe, receiver.getVersion, receiver.getVersion);
+  const [previewing, setPreviewing] = useState<number | null>(null);
   const { total, received, done, speed } = receiver.snapshot;
   const { finished, paused } = receiver;
   const running = !finished && !paused;
+  // Previews read the server's copy, which can still be filling in while (and after) the
+  // download runs, so this follows the polled metadata rather than the receiver's own state.
+  const previewable = useMemo(() => new Set(meta.files.filter(canPreview).map((f) => f.idx)), [meta]);
+  const single = meta.files.length === 1 ? meta.files[0] : null;
   useWakeLock(running);
   useLeaveGuard(!finished);
   useTitle(running ? `${percent(received, total)}% downloaded · Flux` : undefined);
@@ -577,6 +600,7 @@ function ReceivingPanel({ receiver, meta }: { receiver: Receiver; meta: Transfer
             </Badge>
           </div>
         )}
+        {finished && single && previewable.has(single.idx) && <InlinePreview code={meta.code} file={single} onExpand={() => setPreviewing(single.idx)} />}
       </StatusCard>
       <Pinned title="Now receiving">
         {inFlight(receiver.items, finished).map((item) => (
@@ -584,12 +608,16 @@ function ReceivingPanel({ receiver, meta }: { receiver: Receiver; meta: Transfer
         ))}
       </Pinned>
       <ListTitle count={receiver.items.length} />
-      <FileList count={receiver.items.length} renderRow={(i) => <ReceiveRow item={receiver.items[i]} />} />
+      <FileList
+        count={receiver.items.length}
+        renderRow={(i) => <ReceiveRow item={receiver.items[i]} onPreview={previewable.has(receiver.items[i].idx) ? () => setPreviewing(receiver.items[i].idx) : undefined} />}
+      />
+      <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />
     </div>
   );
 }
 
-function ReceiveRow({ item }: { item: ReceiveItem }) {
+function ReceiveRow({ item, onPreview }: { item: ReceiveItem; onPreview?: () => void }) {
   const pct = item.size ? item.received / item.size : 0;
   switch (item.status) {
     case "active":
@@ -633,6 +661,7 @@ function ReceiveRow({ item }: { item: ReceiveItem }) {
         <FileRow
           path={item.path}
           size={item.size}
+          onOpen={onPreview}
           badge={
             <Badge tone="ok" icon={<CheckIcon className={small} />}>
               Received
