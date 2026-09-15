@@ -28,6 +28,10 @@ export const CheckIcon = (p: IconProps) => <Icon d="m5 12.5 4.5 4.5L19 7" {...p}
 export const FolderIcon = (p: IconProps) => <Icon d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" {...p} />;
 export const ArrowIcon = (p: IconProps) => <Icon d="M5 12h14m-6-6 6 6-6 6" {...p} />;
 export const BackIcon = (p: IconProps) => <Icon d="M19 12H5m6-6-6 6 6 6" {...p} />;
+export const ChevronLeftIcon = (p: IconProps) => <Icon d="m15 5-7 7 7 7" {...p} />;
+export const ChevronRightIcon = (p: IconProps) => <Icon d="m9 5 7 7-7 7" {...p} />;
+export const ExpandIcon = (p: IconProps) => <Icon d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" {...p} />;
+export const ExternalIcon = (p: IconProps) => <Icon d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" {...p} />;
 export const PauseIcon = (p: IconProps) => <Icon d="M9 5v14M15 5v14" {...p} />;
 export const PlayIcon = (p: IconProps) => <Icon d="M7 5v14l12-7z" {...p} />;
 export const CopyIcon = (p: IconProps) => <Icon d="M9 9h11v11H9zM15 9V4H4v11h5" {...p} />;

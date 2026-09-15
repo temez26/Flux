@@ -58,6 +58,7 @@ export function FileRow({
   progress,
   progressTone = "accent",
   actions,
+  onOpen,
 }: {
   path: string;
   size: number;
@@ -65,17 +66,20 @@ export function FileRow({
   progress?: number;
   progressTone?: Tone;
   actions?: ReactNode;
+  /** Makes the row a button, e.g. to preview the file. */
+  onOpen?: () => void;
 }) {
   const slash = path.lastIndexOf("/");
   const name = path.slice(slash + 1);
   const dir = slash > 0 ? path.slice(0, slash) : "";
-  return (
-    <div className="flex h-full items-center gap-3 border-b border-line">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-hover text-muted">
+  const details = (
+    <>
+      <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${onOpen ? "bg-accent/10 text-accent" : "bg-hover text-muted"}`}>
         <FileTypeIcon path={path} className="size-4.5" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{name}</p>
+        {onOpen && <span className="sr-only">Preview </span>}
+        <p className="truncate text-sm font-medium transition-colors group-hover:text-accent">{name}</p>
         <p className="mt-0.5 flex min-w-0 gap-1.5 text-xs text-muted">
           <span className="shrink-0 tabular-nums">{formatBytes(size)}</span>
           {dir && <span className="truncate">· {dir}</span>}
@@ -87,6 +91,17 @@ export function FileRow({
         )}
       </div>
       {badge && <div className="flex max-w-[45%] min-w-0 shrink-0 justify-end">{badge}</div>}
+    </>
+  );
+  return (
+    <div className="flex h-full items-center gap-3 border-b border-line">
+      {onOpen ? (
+        <button type="button" onClick={onOpen} className="group flex h-full min-w-0 flex-1 cursor-pointer items-center gap-3 text-left">
+          {details}
+        </button>
+      ) : (
+        details
+      )}
       {actions && <div className="-mr-2 flex shrink-0">{actions}</div>}
     </div>
   );
