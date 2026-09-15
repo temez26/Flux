@@ -5,7 +5,7 @@ import { fileUrl, inlineUrl, type FileMeta } from "@/lib/api";
 import { basename } from "@/lib/files";
 import { formatBytes } from "@/lib/format";
 import { readSlides, readWorkbook, renderDocx } from "@/lib/office";
-import { canPreview, loadText, OFFICE_PREVIEW_BYTES, previewKind, TEXT_PREVIEW_BYTES } from "@/lib/preview";
+import { canPreview, canThumbnail, loadText, OFFICE_PREVIEW_BYTES, previewKind, TEXT_PREVIEW_BYTES } from "@/lib/preview";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, DownloadIcon, ExpandIcon, ExternalIcon, FileTypeIcon } from "./icons";
 import { Spinner, buttonClass } from "./ui";
 
@@ -43,6 +43,26 @@ function useLoad<T>(url: string, load: (url: string, signal: AbortSignal) => Pro
     return () => controller.abort();
   }, [url, load]);
   return result;
+}
+
+/**
+ * The file itself, small, for a row or tile in a listing. Falls back to the file-type icon
+ * for anything that can't be drawn at this size, and for images that fail to load.
+ */
+export function FileThumb({ code, file, className }: Target & { className: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed || !canThumbnail(file)) return <FileTypeIcon path={file.path} className={className} />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- served by the API, not a static asset
+    <img
+      src={fileUrl(code, file.idx)}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+      className="size-full object-cover"
+    />
+  );
 }
 
 /** The single file of a transfer, previewed right on its page. */

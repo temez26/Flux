@@ -25,6 +25,13 @@ export function previewKind(path: string): PreviewKind | null {
 /** Only files the server has in full can be previewed. */
 export const canPreview = (file: FileMeta) => !!file.hash && previewKind(file.path) !== null;
 
+// Listings draw the file itself only for images, and only small ones: there is no
+// server-side thumbnail, so a tile costs the whole file.
+const THUMBNAIL_BYTES = 8e6;
+
+/** Whether a listing can show the file itself in place of its file-type icon. */
+export const canThumbnail = (file: FileMeta) => canPreview(file) && previewKind(file.path) === "image" && file.size <= THUMBNAIL_BYTES;
+
 export const TEXT_PREVIEW_BYTES = 512 * 1024;
 /** Office files are parsed in memory, so very large ones are left to a download. */
 export const OFFICE_PREVIEW_BYTES = 50e6;

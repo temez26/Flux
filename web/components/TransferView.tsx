@@ -15,7 +15,7 @@ import { end, live, resume, type Session } from "@/lib/session";
 import { toast } from "@/lib/toast";
 import type { Item } from "@/lib/upload";
 import { singleTarget, zipTarget } from "@/lib/zip";
-import { FileList, FileRow } from "./FileList";
+import { FileBrowser, FileRow, FileTile } from "./FileList";
 import {
   AlertIcon,
   CheckIcon,
@@ -30,7 +30,7 @@ import {
   UploadIcon,
   ZapIcon,
 } from "./icons";
-import { InlinePreview, PreviewDialog } from "./Preview";
+import { FileThumb, InlinePreview, PreviewDialog } from "./Preview";
 import { ShareCard } from "./ShareCard";
 import { Badge, Button, Card, ConfirmButton, IconButton, Message, ProgressBar, Spinner, StatusCard, buttonClass, type StatusProps } from "./ui";
 
@@ -112,14 +112,6 @@ function Pinned({ title, children }: { title: string; children: ReactNode[] }) {
   );
 }
 
-function ListTitle({ count }: { count: number }) {
-  return (
-    <h2 className="flex items-center gap-2 pt-2 text-sm font-medium">
-      Files <Badge>{count.toLocaleString()}</Badge>
-    </h2>
-  );
-}
-
 function senderStatus(session: Session): StatusProps {
   const { uploader } = session;
   const { counts, finished, reconnecting } = uploader.snapshot;
@@ -154,6 +146,8 @@ function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: str
   const { meta } = useTransferMeta(uploader.code, finished);
   const previewable = useMemo(() => new Set(meta?.files.filter(canPreview).map((f) => f.idx) ?? []), [meta]);
   const single = meta?.files.length === 1 ? meta.files[0] : null;
+  const metaPaths = useMemo(() => meta?.files.map((f) => f.path) ?? [], [meta]);
+  const itemPaths = useMemo(() => uploader.items.map((i) => i.path), [uploader]);
   useWakeLock(running || serving);
   useLeaveGuard(!finished || serving);
   useTitle(running ? `${percent(sent, total)}% uploaded · Flux` : pageTitle(uploader.code));
@@ -219,17 +213,24 @@ function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: str
           <UploadRow key={item.idx} item={item} uploader={uploader} />
         ))}
       </Pinned>
-      <ListTitle count={uploader.items.length} />
-      <FileList
-        count={uploader.items.length}
-        renderRow={(i) => (
-          <UploadRow
-            item={uploader.items[i]}
-            uploader={uploader}
-            onPreview={previewable.has(uploader.items[i].idx) ? () => setPreviewing(uploader.items[i].idx) : undefined}
-          />
-        )}
-      />
+      {meta && !counts.failed ? (
+        <FileBrowser
+          paths={metaPaths}
+          renderRow={(i) => <MetaRow file={meta.files[i]} code={uploader.code} downloadable={false} onPreview={setPreviewing} />}
+          renderTile={(i) => <MetaTile file={meta.files[i]} code={uploader.code} onPreview={setPreviewing} />}
+        />
+      ) : (
+        <FileBrowser
+          paths={itemPaths}
+          renderRow={(i) => (
+            <UploadRow
+              item={uploader.items[i]}
+              uploader={uploader}
+              onPreview={previewable.has(uploader.items[i].idx) ? () => setPreviewing(uploader.items[i].idx) : undefined}
+            />
+          )}
+        />
+      )}
       <PreviewDialog code={uploader.code} files={meta?.files ?? []} idx={previewing} onChange={setPreviewing} />
     </div>
   );
@@ -334,12 +335,31 @@ function summarize(files: FileMeta[]) {
   return { size, received, complete, ready: complete === files.length };
 }
 
+function MetaTile({ file, code, onPreview }: { file: FileMeta; code: string; onPreview: (idx: number) => void }) {
+  return (
+    <FileTile
+      path={file.path}
+      size={file.size}
+      thumb={<FileThumb code={code} file={file} className="size-7" />}
+      onOpen={canPreview(file) ? () => onPreview(file.idx) : undefined}
+      badge={
+        !file.hash && (
+          <Badge icon={<ClockIcon className={small} />}>
+            {file.received > 0 ? `${Math.floor((file.received / file.size) * 100)}%` : "Waiting"}
+          </Badge>
+        )
+      }
+    />
+  );
+}
+
 function MetaRow({ file, code, downloadable, onPreview }: { file: FileMeta; code: string; downloadable: boolean; onPreview: (idx: number) => void }) {
   if (file.hash) {
     return (
       <FileRow
         path={file.path}
         size={file.size}
+        thumb={<FileThumb code={code} file={file} className="size-4.5" />}
         onOpen={canPreview(file) ? () => onPreview(file.idx) : undefined}
         badge={
           !downloadable && (
@@ -418,6 +438,7 @@ function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   const [receiver, setReceiver] = useState<Receiver>();
   const [error, setError] = useState<string>();
   const [previewing, setPreviewing] = useState<number | null>(null);
+  const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
   useSyncExternalStore(direct?.subscribe ?? subscribeNothing, direct?.getVersion ?? versionZero, versionZero);
   useTitle(pageTitle(meta.code));
 
@@ -535,10 +556,11 @@ function ReceiverPanel({ meta }: { meta: TransferMeta }) {
         {single && canPreview(single) && <InlinePreview code={meta.code} file={single} onExpand={() => setPreviewing(single.idx)} />}
       </Card>
       {!single && (
-        <>
-          <ListTitle count={meta.files.length} />
-          <FileList count={meta.files.length} renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable onPreview={setPreviewing} />} />
-        </>
+        <FileBrowser
+          paths={paths}
+          renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable onPreview={setPreviewing} />}
+          renderTile={(i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />}
+        />
       )}
       <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />
     </div>
@@ -564,6 +586,7 @@ function ReceivingPanel({ receiver, meta }: { receiver: Receiver; meta: Transfer
   // download runs, so this follows the polled metadata rather than the receiver's own state.
   const previewable = useMemo(() => new Set(meta.files.filter(canPreview).map((f) => f.idx)), [meta]);
   const single = meta.files.length === 1 ? meta.files[0] : null;
+  const paths = useMemo(() => receiver.items.map((i) => i.path), [receiver]);
   useWakeLock(running);
   useLeaveGuard(!finished);
   useTitle(running ? `${percent(received, total)}% downloaded · Flux` : undefined);
@@ -607,9 +630,8 @@ function ReceivingPanel({ receiver, meta }: { receiver: Receiver; meta: Transfer
           <ReceiveRow key={item.idx} item={item} />
         ))}
       </Pinned>
-      <ListTitle count={receiver.items.length} />
-      <FileList
-        count={receiver.items.length}
+      <FileBrowser
+        paths={paths}
         renderRow={(i) => <ReceiveRow item={receiver.items[i]} onPreview={previewable.has(receiver.items[i].idx) ? () => setPreviewing(receiver.items[i].idx) : undefined} />}
       />
       <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />
@@ -692,6 +714,7 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
   const folderInput = useRef<HTMLInputElement>(null);
   const canPickFolder = window.matchMedia("(pointer: fine)").matches;
   const [previewing, setPreviewing] = useState<number | null>(null);
+  const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
   const picker = useFilePicker();
   useTitle(pageTitle(meta.code));
 
@@ -749,8 +772,11 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
         <input ref={fileInput} type="file" multiple hidden onChange={receive} />
         <input ref={folderInput} type="file" hidden {...folderInputProps} onChange={receive} />
       </StatusCard>
-      <ListTitle count={meta.files.length} />
-      <FileList count={meta.files.length} renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable={false} onPreview={setPreviewing} />} />
+      <FileBrowser
+        paths={paths}
+        renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable={false} onPreview={setPreviewing} />}
+        renderTile={(i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />}
+      />
       <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />
     </div>
   );
