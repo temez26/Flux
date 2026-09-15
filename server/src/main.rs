@@ -2,6 +2,7 @@ mod cleanup;
 mod download;
 mod error;
 mod signal;
+mod thumbs;
 mod transfers;
 mod upload;
 mod zip;
@@ -84,6 +85,7 @@ fn app(state: Shared, web_dir: &std::path::Path) -> Router {
                 .get(download::file)
                 .delete(transfers::delete_file),
         )
+        .route("/transfers/{code}/files/{idx}/thumb", get(thumbs::thumb))
         .route("/transfers/{code}/zip", get(download::zip))
         .route("/transfers/{code}/summary", get(transfers::summary))
         .route("/transfers/{code}/signal", get(signal::connect))

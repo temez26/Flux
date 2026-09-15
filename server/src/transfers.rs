@@ -370,6 +370,7 @@ pub async fn delete_file(
         .execute(&state.db)
         .await?;
     state.uploads.remove((transfer.id, idx));
+    crate::thumbs::remove(&state, transfer.id, idx).await;
     match tokio::fs::remove_file(file_path(&state, transfer.id, idx)).await {
         Err(err) if err.kind() != std::io::ErrorKind::NotFound => Err(err.into()),
         _ => Ok(StatusCode::NO_CONTENT),

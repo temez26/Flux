@@ -340,7 +340,7 @@ function MetaTile({ file, code, onPreview }: { file: FileMeta; code: string; onP
     <FileTile
       path={file.path}
       size={file.size}
-      thumb={<FileThumb code={code} file={file} className="size-7" />}
+      thumb={<FileThumb key={file.idx} code={code} file={file} className="size-7" />}
       onOpen={canPreview(file) ? () => onPreview(file.idx) : undefined}
       badge={
         !file.hash && (
@@ -359,7 +359,7 @@ function MetaRow({ file, code, downloadable, onPreview }: { file: FileMeta; code
       <FileRow
         path={file.path}
         size={file.size}
-        thumb={<FileThumb code={code} file={file} className="size-4.5" />}
+        thumb={<FileThumb key={file.idx} code={code} file={file} className="size-4.5" />}
         onOpen={canPreview(file) ? () => onPreview(file.idx) : undefined}
         badge={
           !downloadable && (

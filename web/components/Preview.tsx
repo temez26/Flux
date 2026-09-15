@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
-import { fileUrl, inlineUrl, type FileMeta } from "@/lib/api";
+import { fileUrl, inlineUrl, thumbUrl, type FileMeta } from "@/lib/api";
 import { basename } from "@/lib/files";
 import { formatBytes } from "@/lib/format";
 import { readSlides, readWorkbook, renderDocx } from "@/lib/office";
-import { canPreview, canThumbnail, loadText, OFFICE_PREVIEW_BYTES, previewKind, TEXT_PREVIEW_BYTES } from "@/lib/preview";
+import { canPreview, loadText, OFFICE_PREVIEW_BYTES, previewKind, TEXT_PREVIEW_BYTES, thumbnailSource } from "@/lib/preview";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, DownloadIcon, ExpandIcon, ExternalIcon, FileTypeIcon } from "./icons";
 import { Spinner, buttonClass } from "./ui";
 
@@ -46,16 +46,19 @@ function useLoad<T>(url: string, load: (url: string, signal: AbortSignal) => Pro
 }
 
 /**
- * The file itself, small, for a row or tile in a listing. Falls back to the file-type icon
- * for anything that can't be drawn at this size, and for images that fail to load.
+ * The file itself, small, for a row or tile in a listing: the server's thumbnail where it
+ * has one, the file itself where only the browser can decode it, and the file-type icon
+ * once neither works. Give it a key of `file.idx` — a windowed list reuses rows by
+ * position, and a stale failure would otherwise follow the row to its next file.
  */
 export function FileThumb({ code, file, className }: Target & { className: string }) {
   const [failed, setFailed] = useState(false);
-  if (failed || !canThumbnail(file)) return <FileTypeIcon path={file.path} className={className} />;
+  const source = thumbnailSource(file);
+  if (failed || !source) return <FileTypeIcon path={file.path} className={className} />;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- served by the API, not a static asset
     <img
-      src={fileUrl(code, file.idx)}
+      src={source === "server" ? thumbUrl(code, file.idx) : fileUrl(code, file.idx)}
       alt=""
       loading="lazy"
       decoding="async"

@@ -1,6 +1,6 @@
 import type { IHasher } from "hash-wasm";
 import { deleteFile, fileUrl } from "./api";
-import { acquireHasher, releaseHasher } from "./hash";
+import { acquireHasher, releaseHasher, updateInSlices } from "./hash";
 import { Observable, SpeedMeter } from "./observable";
 
 export type Status = "pending" | "active" | "done" | "failed" | "canceled";
@@ -296,10 +296,8 @@ export class Uploader extends Observable {
     const hasher = (t.hasher ??= await acquireHasher("blake3"));
     if (t.hashed < start) await this.hashUntil(t, start);
     const data = await this.read(t, start, end);
-    if (t.hashed < end) {
-      hasher.update(data.subarray(t.hashed - start));
-      t.hashed = end;
-    }
+    // `hashed` can already be past `start` when a send failed after its bytes were hashed.
+    if (t.hashed < end) await updateInSlices(hasher, data.subarray(t.hashed - start), (bytes) => (t.hashed += bytes));
     if (end === item.size) t.digest ??= hasher.digest("hex");
 
     const res = await this.send(t, start, data, end === item.size ? t.digest : undefined);
@@ -322,9 +320,8 @@ export class Uploader extends Observable {
   /** Catches the hash up when the server already holds more of the file than we hashed. */
   private async hashUntil(t: Task, until: number) {
     while (t.hashed < until) {
-      const end = Math.min(t.hashed + CHUNK, until);
-      t.hasher!.update(await this.read(t, t.hashed, end));
-      t.hashed = end;
+      const data = await this.read(t, t.hashed, Math.min(t.hashed + CHUNK, until));
+      await updateInSlices(t.hasher!, data, (bytes) => (t.hashed += bytes));
     }
   }
 

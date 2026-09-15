@@ -1,5 +1,5 @@
 import type { IHasher } from "hash-wasm";
-import { acquireHasher, releaseHasher } from "./hash";
+import { acquireHasher, releaseHasher, updateInSlices } from "./hash";
 import { Emitter, Observable } from "./observable";
 import { Signal, type SignalData, type SignalMessage } from "./signal";
 
@@ -212,7 +212,7 @@ export class DirectHost extends Observable {
     hashes.delete(req.idx);
     while (running.pos < file.size) {
       const end = Math.min(file.size, running.pos + HASH_READ);
-      running.hasher.update(new Uint8Array(await file.slice(running.pos, end).arrayBuffer()));
+      await updateInSlices(running.hasher, new Uint8Array(await file.slice(running.pos, end).arrayBuffer()));
       running.pos = end;
     }
     const hash = running.hasher.digest("hex");

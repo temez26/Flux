@@ -25,12 +25,18 @@ export function previewKind(path: string): PreviewKind | null {
 /** Only files the server has in full can be previewed. */
 export const canPreview = (file: FileMeta) => !!file.hash && previewKind(file.path) !== null;
 
-// Listings draw the file itself only for images, and only small ones: there is no
-// server-side thumbnail, so a tile costs the whole file.
-const THUMBNAIL_BYTES = 8e6;
+// What the server can decode for its thumbnail endpoint.
+const SERVER_THUMBNAIL = /\.(jpe?g|png|gif|webp|bmp|tiff?|ico)$/i;
+// The rest (HEIC above all, which iPhones shoot by default) only the browser can draw, and
+// only by loading the whole file — so a listing does that for small ones and gives up after.
+const SELF_THUMBNAIL_BYTES = 8e6;
 
-/** Whether a listing can show the file itself in place of its file-type icon. */
-export const canThumbnail = (file: FileMeta) => canPreview(file) && previewKind(file.path) === "image" && file.size <= THUMBNAIL_BYTES;
+/** Where a listing should get this file's small preview, if it can have one at all. */
+export function thumbnailSource(file: FileMeta): "server" | "file" | null {
+  if (!canPreview(file) || previewKind(file.path) !== "image") return null;
+  if (SERVER_THUMBNAIL.test(file.path)) return "server";
+  return file.size <= SELF_THUMBNAIL_BYTES ? "file" : null;
+}
 
 export const TEXT_PREVIEW_BYTES = 512 * 1024;
 /** Office files are parsed in memory, so very large ones are left to a download. */
