@@ -7,6 +7,7 @@ import { basename, fromFileList } from "@/lib/files";
 import { formatBytes, formatCode, formatDuration, formatRemaining, plural } from "@/lib/format";
 import { useLeaveGuard, useNow, useTitle, useTransferMeta, useWakeLock } from "@/lib/hooks";
 import { getOwned, removeOwned } from "@/lib/owned";
+import { canPreview } from "@/lib/preview";
 import { Receiver, type ReceiveItem } from "@/lib/receive";
 import { navigate } from "@/lib/router";
 import { memorySink, saveMethod, streamSink, type SaveMethod } from "@/lib/save";
@@ -29,6 +30,7 @@ import {
   UploadIcon,
   ZapIcon,
 } from "./icons";
+import { InlinePreview, PreviewDialog } from "./Preview";
 import { ShareCard } from "./ShareCard";
 import { Badge, Button, Card, ConfirmButton, IconButton, Message, ProgressBar, Spinner, StatusCard, buttonClass, type StatusProps } from "./ui";
 
@@ -314,12 +316,13 @@ function summarize(files: FileMeta[]) {
   return { size, received, complete, ready: complete === files.length };
 }
 
-function MetaRow({ file, code, downloadable }: { file: FileMeta; code: string; downloadable: boolean }) {
+function MetaRow({ file, code, downloadable, onPreview }: { file: FileMeta; code: string; downloadable: boolean; onPreview: (idx: number) => void }) {
   if (file.hash) {
     return (
       <FileRow
         path={file.path}
         size={file.size}
+        onOpen={canPreview(file) ? () => onPreview(file.idx) : undefined}
         badge={
           !downloadable && (
             <Badge tone="ok" icon={<CheckIcon className={small} />}>
@@ -396,6 +399,7 @@ function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   const [direct, setDirect] = useState<DirectClient>();
   const [receiver, setReceiver] = useState<Receiver>();
   const [error, setError] = useState<string>();
+  const [previewing, setPreviewing] = useState<number | null>(null);
   useSyncExternalStore(direct?.subscribe ?? subscribeNothing, direct?.getVersion ?? versionZero, versionZero);
   useTitle(pageTitle(meta.code));
 
@@ -510,13 +514,15 @@ function ReceiverPanel({ meta }: { meta: TransferMeta }) {
           </p>
         )}
         {!single && (ready || viaDirect) && <p className="mt-3 text-xs text-muted">Everything downloads as one .zip file.</p>}
+        {single && canPreview(single) && <InlinePreview code={meta.code} file={single} onExpand={() => setPreviewing(single.idx)} />}
       </Card>
       {!single && (
         <>
           <ListTitle count={meta.files.length} />
-          <FileList count={meta.files.length} renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable />} />
+          <FileList count={meta.files.length} renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable onPreview={setPreviewing} />} />
         </>
       )}
+      <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />
     </div>
   );
 }
@@ -656,6 +662,7 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
   const canPickFolder = window.matchMedia("(pointer: fine)").matches;
+  const [previewing, setPreviewing] = useState<number | null>(null);
   useTitle(pageTitle(meta.code));
 
   function pick(list: FileList | null) {
@@ -700,7 +707,8 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
         <input ref={folderInput} type="file" hidden {...folderInputProps} onChange={(e) => pick(e.target.files)} />
       </StatusCard>
       <ListTitle count={meta.files.length} />
-      <FileList count={meta.files.length} renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable={false} />} />
+      <FileList count={meta.files.length} renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable={false} onPreview={setPreviewing} />} />
+      <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />
     </div>
   );
 }

@@ -51,7 +51,9 @@ export class ApiError extends Error {
 
 const transferUrl = (code: string) => `/api/transfers/${code}`;
 export const fileUrl = (code: string, idx: number) => `${transferUrl(code)}/files/${idx}`;
-export const zipUrl = (code: string) => `${transferUrl(code)}/zip`;
+/** Served inline for the browser's PDF viewer; the server only allows this for PDFs. */
+export const inlineUrl = (code: string, idx: number) => `${fileUrl(code, idx)}?inline`;
+export const zipUrl =(code: string) => `${transferUrl(code)}/zip`;
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {

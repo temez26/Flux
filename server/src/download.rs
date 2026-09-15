@@ -4,13 +4,14 @@ use std::{io::SeekFrom, path::PathBuf};
 
 use axum::{
     body::Body,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures_util::{StreamExt, TryStreamExt, stream};
+use serde::Deserialize;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio_util::io::ReaderStream;
 
@@ -85,7 +86,7 @@ fn parse_range(value: &str, total: u64) -> Option<Result<(u64, u64), ()>> {
     Some(if range.0 < range.1 { Ok(range) } else { Err(()) })
 }
 
-fn content_disposition(name: &str) -> HeaderValue {
+fn content_disposition(name: &str, inline: bool) -> HeaderValue {
     let fallback: String = name
         .chars()
         .map(|c| if c.is_ascii_graphic() && c != '"' && c != '\\' || c == ' ' { c } else { '_' })
@@ -97,11 +98,21 @@ fn content_disposition(name: &str) -> HeaderValue {
             _ => format!("%{b:02X}"),
         })
         .collect();
-    HeaderValue::from_str(&format!("attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"))
-        .unwrap_or_else(|_| HeaderValue::from_static("attachment"))
+    let disposition = if inline { "inline" } else { "attachment" };
+    HeaderValue::from_str(&format!("{disposition}; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"))
+        .unwrap_or_else(|_| HeaderValue::from_static(disposition))
 }
 
-fn respond(request: &HeaderMap, parts: Vec<Part>, etag: String, mime: &str, name: &str) -> Response {
+fn respond(request: &HeaderMap, parts: Vec<Part>, etag: String, mime: &str, name: &str, inline: bool) -> Response {
+    // Previews revisit the same files, and their content never changes under one ETag.
+    if request.get(header::IF_NONE_MATCH).is_some_and(|v| v.as_bytes() == etag.as_bytes()) {
+        return (
+            StatusCode::NOT_MODIFIED,
+            [(header::ETAG, etag), (header::CACHE_CONTROL, "private, no-cache".to_owned())],
+        )
+            .into_response();
+    }
+
     let total: u64 = parts.iter().map(Part::len).sum();
     let if_range_ok = request
         .get(header::IF_RANGE)
@@ -132,7 +143,7 @@ fn respond(request: &HeaderMap, parts: Vec<Part>, etag: String, mime: &str, name
     headers.insert(header::CONTENT_LENGTH, (end - start).into());
     headers.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("private, no-cache"));
-    headers.insert(header::CONTENT_DISPOSITION, content_disposition(name));
+    headers.insert(header::CONTENT_DISPOSITION, content_disposition(name, inline));
     if let Ok(etag) = HeaderValue::from_str(&etag) {
         headers.insert(header::ETAG, etag);
     }
@@ -143,9 +154,15 @@ fn respond(request: &HeaderMap, parts: Vec<Part>, etag: String, mime: &str, name
     response
 }
 
+#[derive(Deserialize)]
+pub struct FileQuery {
+    inline: Option<String>,
+}
+
 pub async fn file(
     State(state): State<Shared>,
     Path((code, idx)): Path<(String, i32)>,
+    Query(query): Query<FileQuery>,
     headers: HeaderMap,
 ) -> Result<Response> {
     let transfer = transfers::find(&state.db, &code).await?;
@@ -160,8 +177,12 @@ pub async fn file(
     .ok_or(AppError::NOT_FOUND)?;
 
     let name = path.rsplit('/').next().unwrap_or(&path);
+    // Only PDFs open inline, for the browser's viewer. Other uploads shown inline on this origin
+    // (HTML, SVG) could run scripts; forcing the type keeps a renamed file from being sniffed as one.
+    let inline = query.inline.is_some() && name.to_ascii_lowercase().ends_with(".pdf");
+    let mime = if inline { "application/pdf" } else { &mime };
     let parts = vec![Part::File { path: transfers::file_path(&state, transfer.id, idx), len: size as u64 }];
-    Ok(respond(&headers, parts, format!("\"{}\"", hex(&hash)), &mime, name))
+    Ok(respond(&headers, parts, format!("\"{}\"", hex(&hash)), mime, name, inline))
 }
 
 pub async fn zip(
@@ -200,5 +221,5 @@ pub async fn zip(
 
     let etag = format!("\"{}\"", etag.finalize().to_hex());
     let name = format!("flux-{}.zip", transfer.code);
-    Ok(respond(&headers, zip::build(entries), etag, "application/zip", &name))
+    Ok(respond(&headers, zip::build(entries), etag, "application/zip", &name, false))
 }
