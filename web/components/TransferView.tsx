@@ -5,7 +5,7 @@ import { deleteTransfer, errorMessage, fileUrl, zipUrl, type FileMeta, type Tran
 import { DirectClient } from "@/lib/direct";
 import { basename, fromFileList } from "@/lib/files";
 import { formatBytes, formatCode, formatDuration, formatRemaining, plural } from "@/lib/format";
-import { useLeaveGuard, useNow, useTitle, useTransferMeta, useWakeLock } from "@/lib/hooks";
+import { useFilePicker, useLeaveGuard, useNow, useTitle, useTransferMeta, useWakeLock } from "@/lib/hooks";
 import { getOwned, removeOwned } from "@/lib/owned";
 import { canPreview } from "@/lib/preview";
 import { Receiver, type ReceiveItem } from "@/lib/receive";
@@ -663,10 +663,13 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
   const folderInput = useRef<HTMLInputElement>(null);
   const canPickFolder = window.matchMedia("(pointer: fine)").matches;
   const [previewing, setPreviewing] = useState<number | null>(null);
+  const picker = useFilePicker();
   useTitle(pageTitle(meta.code));
 
-  function pick(list: FileList | null) {
-    const picked = fromFileList(list);
+  function receive(e: { target: HTMLInputElement }) {
+    picker.settle();
+    const picked = fromFileList(e.target.files);
+    e.target.value = "";
     if (picked.length) onResume(resume(meta, token, picked));
   }
 
@@ -688,12 +691,23 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
         actions={
           !ready && (
             <>
-              <Button variant="primary" onClick={() => fileInput.current?.click()}>
-                <UploadIcon className="size-4" />
-                Add files
+              <Button
+                variant="primary"
+                onClick={() => {
+                  picker.arm();
+                  fileInput.current?.click();
+                }}
+              >
+                {picker.waiting ? <Spinner className="size-4" /> : <UploadIcon className="size-4" />}
+                {picker.waiting ? "Getting your files…" : "Add files"}
               </Button>
               {canPickFolder && (
-                <Button onClick={() => folderInput.current?.click()}>
+                <Button
+                  onClick={() => {
+                    picker.arm();
+                    folderInput.current?.click();
+                  }}
+                >
                   <FolderIcon className="size-4" />
                   Add folder
                 </Button>
@@ -703,8 +717,8 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
         }
         danger={<ConfirmButton onConfirm={() => removeTransfer(meta.code, token)}>Delete transfer</ConfirmButton>}
       >
-        <input ref={fileInput} type="file" multiple hidden onChange={(e) => pick(e.target.files)} />
-        <input ref={folderInput} type="file" hidden {...folderInputProps} onChange={(e) => pick(e.target.files)} />
+        <input ref={fileInput} type="file" multiple hidden onChange={receive} />
+        <input ref={folderInput} type="file" hidden {...folderInputProps} onChange={receive} />
       </StatusCard>
       <ListTitle count={meta.files.length} />
       <FileList count={meta.files.length} renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable={false} onPreview={setPreviewing} />} />

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type InputHTM
 import { errorMessage, getSummary, listPublic, type Summary } from "@/lib/api";
 import { fromDataTransfer, fromFileList, type Picked } from "@/lib/files";
 import { formatBytes, formatCode, formatRemaining, normalizeCode, plural } from "@/lib/format";
-import { useNow, usePolling } from "@/lib/hooks";
+import { nextPaint, useFilePicker, useNow, usePolling } from "@/lib/hooks";
 import { listOwned, removeOwned } from "@/lib/owned";
 import { navigate } from "@/lib/router";
 import { live, send } from "@/lib/session";
@@ -56,6 +56,8 @@ export default function Home() {
   const folderInput = useRef<HTMLInputElement>(null);
   const options = useRef({ expiresIn, isPublic });
   const canPickFolder = window.matchMedia("(pointer: fine)").matches;
+  const picker = useFilePicker();
+  const status = busy ?? (picker.waiting ? "Getting your files…" : null);
 
   const start = useCallback(async (picked: Picked[] | Promise<Picked[]>) => {
     setError(null);
@@ -64,6 +66,8 @@ export default function Home() {
       const files = await picked;
       if (!files.length) return setBusy(null);
       setBusy(`Preparing ${plural(files.length, "file")}…`);
+      // Reading every file's metadata blocks the main thread, so let the spinner land first.
+      await nextPaint();
       const code = await send(files, options.current.expiresIn, options.current.isPublic);
       navigate(`/${formatCode(code)}`);
     } catch (err) {
@@ -123,7 +127,14 @@ export default function Home() {
 
   const pick = (kind: "files" | "folder") => (e: { stopPropagation(): void }) => {
     e.stopPropagation();
+    picker.arm();
     (kind === "files" ? fileInput : folderInput).current?.click();
+  };
+
+  const receive = (e: { target: HTMLInputElement }) => {
+    picker.settle();
+    void start(fromFileList(e.target.files));
+    e.target.value = "";
   };
 
   return (
@@ -140,15 +151,19 @@ export default function Home() {
       <Card>
         <SectionTitle icon={<UploadIcon className="size-4.5" />}>Send</SectionTitle>
         <div
-          onClick={() => !busy && fileInput.current?.click()}
+          onClick={() => {
+            if (busy) return;
+            picker.arm();
+            fileInput.current?.click();
+          }}
           className={`flex min-h-48 cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-6 text-center transition ${
-            busy ? "cursor-default border-line" : "border-line hover:border-accent/60 hover:bg-hover/50"
+            status ? "cursor-default border-line" : "border-line hover:border-accent/60 hover:bg-hover/50"
           }`}
         >
-          {busy ? (
+          {status ? (
             <>
               <Spinner className="size-7 text-accent" />
-              <p className="font-medium">{busy}</p>
+              <p className="font-medium">{status}</p>
             </>
           ) : (
             <>
@@ -187,26 +202,8 @@ export default function Home() {
             {error}
           </p>
         )}
-        <input
-          ref={fileInput}
-          type="file"
-          multiple
-          hidden
-          onChange={(e) => {
-            void start(fromFileList(e.target.files));
-            e.target.value = "";
-          }}
-        />
-        <input
-          ref={folderInput}
-          type="file"
-          hidden
-          {...folderInputProps}
-          onChange={(e) => {
-            void start(fromFileList(e.target.files));
-            e.target.value = "";
-          }}
-        />
+        <input ref={fileInput} type="file" multiple hidden onChange={receive} />
+        <input ref={folderInput} type="file" hidden {...folderInputProps} onChange={receive} />
       </Card>
 
       <Card>

@@ -1,7 +1,76 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getTransfer, type TransferMeta } from "./api";
 
 const noSubscribe = () => () => {};
+
+// A hidden tab never animates, so a frame that may never come must not block the work.
+const PAINT_TIMEOUT_MS = 50;
+// A desktop file dialog hands the selection over at once; this keeps the wait from
+// flashing there while still catching the slow copy on phones.
+const PICKER_GRACE_MS = 150;
+
+/**
+ * Resolves once the browser has had a chance to paint. Every microtask runs before
+ * rendering, so `await`ing an already-resolved value leaves a spinner set in the same turn
+ * invisible; await this instead before work that blocks the main thread.
+ */
+export function nextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(resolve, PAINT_TIMEOUT_MS);
+    requestAnimationFrame(() => {
+      window.clearTimeout(timer);
+      window.setTimeout(resolve, 0);
+    });
+  });
+}
+
+/**
+ * Opens a file input and reports the gap between the picker closing and the browser
+ * handing the files over. Phones copy (and transcode) the whole selection first, which
+ * takes seconds for photos and videos and fires no event of its own, so without this the
+ * page looks untouched — and unresponsive — long after the user confirmed the picker.
+ */
+export function useFilePicker() {
+  const [waiting, setWaiting] = useState(false);
+  const pending = useRef(false);
+  const timer = useRef(0);
+
+  const settle = useCallback(() => {
+    pending.current = false;
+    window.clearTimeout(timer.current);
+    setWaiting(false);
+  }, []);
+
+  useEffect(() => {
+    // The picker is a native overlay, so the page only learns it closed by coming back.
+    const returned = () => {
+      if (!pending.current || document.hidden) return;
+      window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => pending.current && setWaiting(true), PICKER_GRACE_MS);
+    };
+    window.addEventListener("focus", returned);
+    document.addEventListener("visibilitychange", returned);
+    // Backing out of the picker fires `cancel` on the input (React doesn't surface it for
+    // file inputs, so listen natively); touching the page again covers browsers that don't
+    // send it, so the wait can never get stuck.
+    window.addEventListener("cancel", settle, true);
+    window.addEventListener("pointerdown", settle);
+    return () => {
+      window.removeEventListener("focus", returned);
+      document.removeEventListener("visibilitychange", returned);
+      window.removeEventListener("cancel", settle, true);
+      window.removeEventListener("pointerdown", settle);
+      window.clearTimeout(timer.current);
+    };
+  }, [settle]);
+
+  /** Call right before opening a picker, so the wait that follows is attributed to it. */
+  const arm = useCallback(() => {
+    pending.current = true;
+  }, []);
+
+  return { waiting, arm, settle };
+}
 
 export function useMounted(): boolean {
   return useSyncExternalStore(noSubscribe, () => true, () => false);
