@@ -1,5 +1,4 @@
-import type { IHasher } from "hash-wasm";
-import { acquireHasher, releaseHasher, updateInSlices } from "./hash";
+import { createHasher, type Hasher } from "./hash";
 import { Emitter, Observable } from "./observable";
 import { Signal, type SignalData, type SignalMessage } from "./signal";
 
@@ -133,7 +132,7 @@ export class DirectHost extends Observable {
     channel.bufferedAmountLowThreshold = LOW_WATER;
     const queue: Request[] = [];
     // Running hashes for files read from the start, so hash requests rarely re-read a file.
-    const hashes = new Map<number, { hasher: IHasher; pos: number }>();
+    const hashes = new Map<number, { hasher: Hasher; pos: number }>();
     let draining = false;
 
     const drain = async () => {
@@ -174,17 +173,18 @@ export class DirectHost extends Observable {
   private async sendRange(
     channel: RTCDataChannel,
     req: Extract<Request, { t: "get" }>,
-    hashes: Map<number, { hasher: IHasher; pos: number }>,
+    hashes: Map<number, { hasher: Hasher; pos: number }>,
   ) {
     const file = this.file(req.idx);
     if (!file) throw new Error("This file isn't available from the sender");
     const end = Math.min(file.size, req.offset + req.length);
-    const data = new Uint8Array(await file.slice(req.offset, end).arrayBuffer());
+    let data = new Uint8Array(await file.slice(req.offset, end).arrayBuffer());
 
     let running = hashes.get(req.idx);
-    if (!running && req.offset === 0) hashes.set(req.idx, (running = { hasher: await acquireHasher("blake3"), pos: 0 }));
+    if (!running && req.offset === 0) hashes.set(req.idx, (running = { hasher: createHasher(), pos: 0 }));
     if (running?.pos === req.offset) {
-      running.hasher.update(data);
+      // Hashing moves the bytes away and returns them, so the frames below must use these.
+      data = await running.hasher.update(data);
       running.pos = end;
     }
 
@@ -204,19 +204,18 @@ export class DirectHost extends Observable {
   private async sendHash(
     channel: RTCDataChannel,
     req: Extract<Request, { t: "hash" }>,
-    hashes: Map<number, { hasher: IHasher; pos: number }>,
+    hashes: Map<number, { hasher: Hasher; pos: number }>,
   ) {
     const file = this.file(req.idx);
     if (!file) throw new Error("This file isn't available from the sender");
-    const running = hashes.get(req.idx) ?? { hasher: await acquireHasher("blake3"), pos: 0 };
+    const running = hashes.get(req.idx) ?? { hasher: createHasher(), pos: 0 };
     hashes.delete(req.idx);
     while (running.pos < file.size) {
       const end = Math.min(file.size, running.pos + HASH_READ);
-      await updateInSlices(running.hasher, new Uint8Array(await file.slice(running.pos, end).arrayBuffer()));
+      await running.hasher.update(new Uint8Array(await file.slice(running.pos, end).arrayBuffer()));
       running.pos = end;
     }
-    const hash = running.hasher.digest("hex");
-    releaseHasher("blake3", running.hasher);
+    const hash = await running.hasher.digest();
     if (channel.readyState === "open") channel.send(JSON.stringify({ t: "hash", id: req.id, hash }));
   }
 }
