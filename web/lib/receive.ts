@@ -74,20 +74,24 @@ export class Receiver extends Observable {
   private controller?: AbortController;
   private wake?: () => void;
 
+  /** `only` narrows the receive to those file indices, for taking one out of a listing. */
   constructor(
     meta: TransferMeta,
     private readonly direct: DirectClient,
     private readonly target: Target,
+    only?: ReadonlySet<number>,
   ) {
     super();
-    this.items = meta.files.map((f) => ({
-      idx: f.idx,
-      path: f.path,
-      size: f.size,
-      modified: f.modified,
-      received: 0,
-      status: "pending",
-    }));
+    this.items = meta.files
+      .filter((f) => !only || only.has(f.idx))
+      .map((f) => ({
+        idx: f.idx,
+        path: f.path,
+        size: f.size,
+        modified: f.modified,
+        received: 0,
+        status: "pending",
+      }));
     this.hashes = new Map(meta.files.map((f) => [f.idx, f.hash]));
     this.code = meta.code;
     this.refresh();

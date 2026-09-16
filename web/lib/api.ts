@@ -56,6 +56,8 @@ const transferUrl = (code: string) => `/api/transfers/${code}`;
 export const fileUrl = (code: string, idx: number) => `${transferUrl(code)}/files/${idx}`;
 /** Small, server-generated preview of an image file. */
 export const thumbUrl = (code: string, idx: number) => `${fileUrl(code, idx)}/thumb`;
+/** A bigger server-rendered copy, for showing an image the browser can't decode itself. */
+export const renderUrl = (code: string, idx: number) => `${thumbUrl(code, idx)}?full`;
 /** Served inline for the browser's PDF viewer; the server only allows this for PDFs. */
 export const inlineUrl = (code: string, idx: number) => `${fileUrl(code, idx)}?inline`;
 export const zipUrl =(code: string) => `${transferUrl(code)}/zip`;

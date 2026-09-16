@@ -25,10 +25,11 @@ export function previewKind(path: string): PreviewKind | null {
 /** Only files the server has in full can be previewed. */
 export const canPreview = (file: FileMeta) => !!file.hash && previewKind(file.path) !== null;
 
-// What the server can decode for its thumbnail endpoint.
-const SERVER_THUMBNAIL = /\.(jpe?g|png|gif|webp|bmp|tiff?|ico)$/i;
-// The rest (HEIC above all, which iPhones shoot by default) only the browser can draw, and
-// only by loading the whole file — so a listing does that for small ones and gives up after.
+// What the server can decode. HEIF is in here because only Safari draws a HEIC itself, and
+// an iPhone shoots them by default, so everywhere else depends on the server having a go.
+const SERVER_THUMBNAIL = /\.(jpe?g|png|gif|webp|bmp|tiff?|ico|hei[cf]|hif|avif)$/i;
+// The rest only the browser can draw, and only by loading the whole file — so a listing
+// does that for small ones and gives up after.
 const SELF_THUMBNAIL_BYTES = 8e6;
 
 /** Where a listing should get this file's small preview, if it can have one at all. */

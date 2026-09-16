@@ -1,19 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { errorMessage, fileUrl, zipUrl, type TransferMeta } from "@/lib/api";
+import { errorMessage, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
 import { DirectClient } from "@/lib/direct";
 import { basename } from "@/lib/files";
 import { formatBytes, formatCode, formatDuration, plural } from "@/lib/format";
 import { useLeaveGuard, useTitle, useWakeLock } from "@/lib/hooks";
 import { canPreview } from "@/lib/preview";
 import { Receiver, type ReceiveItem } from "@/lib/receive";
+import { getReceived, markReceived } from "@/lib/received";
 import { memorySink, saveMethod, streamSink, type SaveMethod } from "@/lib/save";
 import { singleTarget, zipTarget } from "@/lib/zip";
 import { FileBrowser, FileRow } from "../FileList";
-import { AlertIcon, CheckIcon, ClockIcon, CloseIcon, DeviceIcon, DownloadIcon, PauseIcon, PlayIcon, ZapIcon } from "../icons";
+import { AlertIcon, BackIcon, CheckIcon, ClockIcon, CloseIcon, DeviceIcon, DownloadIcon, PauseIcon, PlayIcon, ZapIcon } from "../icons";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
-import { Badge, Button, Card, ConfirmButton, Notice, ProgressBar, Spinner, StatusCard, buttonClass, type StatusProps } from "../ui";
+import { Badge, Button, Card, ConfirmButton, IconButton, Notice, ProgressBar, Spinner, StatusCard, buttonClass, type StatusProps } from "../ui";
 import { MetaRow, MetaTile, Pinned, TransferHeading, inFlight, pageTitle, percent, summarize } from "./common";
 
 function checksumsUrl(meta: TransferMeta): string {
@@ -29,52 +30,67 @@ const versionZero = () => 0;
 export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   const { size, received, complete, ready } = summarize(meta.files);
   const [initial] = useState({ ready: ready && !meta.hosted, size });
-  const [method, setMethod] = useState<SaveMethod | null>(null);
-  const [direct, setDirect] = useState<DirectClient>();
+  /** How the whole transfer could be saved at once; null when it is too big to be. */
+  const [whole, setWhole] = useState<SaveMethod | null>();
+  // A hosted transfer has no other source, and otherwise a peer is only worth trying while
+  // the server doesn't have everything yet. Worth it whatever the transfer weighs: one too
+  // big to save in a single go can still be taken a file at a time.
+  const [direct] = useState(() => (initial.ready ? undefined : new DirectClient(meta.code)));
   const [receiver, setReceiver] = useState<Receiver>();
+  /** Files already downloaded from this transfer on this device, from an earlier visit or a lost tab. */
+  const [saved, setSaved] = useState(() => getReceived(meta.code));
   const [error, setError] = useState<string>();
   const [previewing, setPreviewing] = useState<number | null>(null);
   const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
   useSyncExternalStore(direct?.subscribe ?? subscribeNothing, direct?.getVersion ?? versionZero, versionZero);
   useTitle(pageTitle(meta.code));
 
+  useEffect(() => () => direct?.close(), [direct]);
+
   useEffect(() => {
     let alive = true;
-    let client: DirectClient | undefined;
-    void saveMethod(initial.size).then((m) => {
-      if (!alive) return;
-      setMethod(m);
-      // A hosted transfer has no other source, and otherwise a peer is only worth trying
-      // while the server doesn't have everything yet.
-      if (m && !initial.ready) setDirect((client = new DirectClient(meta.code)));
-    });
+    void saveMethod(initial.size).then((m) => alive && setWhole(m));
     return () => {
       alive = false;
-      client?.close();
     };
-  }, [initial, meta.code]);
+  }, [initial.size]);
 
   useEffect(() => {
     receiver?.update(meta);
   }, [receiver, meta]);
 
-  if (receiver) return <ReceivingPanel receiver={receiver} meta={meta} />;
+  if (receiver) return <ReceivingPanel receiver={receiver} meta={meta} onBack={() => setReceiver(undefined)} />;
 
   const single = meta.files.length === 1 ? meta.files[0] : null;
   const directOpen = direct?.state === "open";
   const viaDirect = directOpen && (meta.hosted || !ready);
   // The sender's page is the only source, so its absence is the whole story.
   const senderMissing = meta.hosted && !directOpen;
-  const tooLargeHere = meta.hosted && method === null;
+  const tooLargeHere = whole === null;
   const unreachable = direct?.state === "unavailable";
+  const remaining = meta.files.filter((f) => !saved.has(f.idx));
 
-  async function startDirect() {
-    if (!direct || !method) return;
+  /** Receives `files` from the sender's device, as one file or as a zip of several. */
+  async function startDirect(files: FileMeta[]) {
+    if (!direct || !files.length) return;
     setError(undefined);
     try {
-      const name = single ? basename(single.path) : `flux-${meta.code}.zip`;
-      const sink = method === "stream" ? await streamSink(name, single?.size) : memorySink(name);
-      const next = new Receiver(meta, direct, single ? singleTarget(sink) : zipTarget(sink));
+      const one = files.length === 1 ? files[0] : null;
+      const method = await saveMethod(files.reduce((size, f) => size + f.size, 0));
+      if (!method) throw new Error("This browser can't save a download that large.");
+      const name = one ? basename(one.path) : `flux-${meta.code}.zip`;
+      const sink = method === "stream" ? await streamSink(name, one?.size) : memorySink(name);
+      const target = one ? singleTarget(sink) : zipTarget(sink);
+      const next = new Receiver(meta, direct, target, new Set(files.map((f) => f.idx)));
+      // Only a finished receive has actually put anything on disk: a zip lands as one file
+      // at the very end, so a run that failed part way through saved none of it.
+      const stop = next.subscribe(() => {
+        if (!next.finished) return;
+        stop();
+        if (next.error) return;
+        markReceived(meta.code, meta.expiresAt, files.map((f) => f.idx));
+        setSaved(getReceived(meta.code));
+      });
       next.start();
       setReceiver(next);
     } catch (err) {
@@ -111,7 +127,18 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
         )}
         {tooLargeHere && (
           <Notice tone="warn" icon={<AlertIcon />} className="mt-4">
-            This browser can&apos;t save a transfer this large from another device. Ask the sender to upload it to the server instead.
+            {single
+              ? "This browser can't save a file this large from another device. Ask the sender to upload it to the server instead."
+              : "This browser can't save the whole transfer in one go. Take the files one at a time below, or ask the sender to upload it to the server instead."}
+          </Notice>
+        )}
+        {remaining.length > 0 && remaining.length < meta.files.length && (
+          <Notice tone="ok" icon={<CheckIcon />} className="mt-4">
+            {plural(meta.files.length - remaining.length, "file")} of {meta.files.length.toLocaleString()} already saved on this
+            device.{" "}
+            <button type="button" onClick={() => startDirect(remaining)} disabled={!viaDirect} className="font-medium underline disabled:no-underline disabled:opacity-60">
+              Download the remaining {remaining.length.toLocaleString()}
+            </button>
           </Notice>
         )}
         {senderMissing && !tooLargeHere && (
@@ -137,11 +164,11 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
           {meta.hosted ? (
-            <Button variant="primary" className={primary} onClick={startDirect} disabled={!viaDirect}>
+            <Button variant="primary" className={primary} onClick={() => startDirect(meta.files)} disabled={!viaDirect || tooLargeHere}>
               {label}
             </Button>
           ) : viaDirect ? (
-            <Button variant="primary" className={primary} onClick={startDirect}>
+            <Button variant="primary" className={primary} onClick={() => startDirect(meta.files)}>
               {label}
             </Button>
           ) : (
@@ -174,7 +201,31 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
         (meta.hosted ? (
           <FileBrowser
             paths={paths}
-            renderRow={(i) => <FileRow path={meta.files[i].path} size={meta.files[i].size} badge={<Badge icon={<DeviceIcon />}>On the sender</Badge>} />}
+            renderRow={(i) => (
+              <FileRow
+                path={meta.files[i].path}
+                size={meta.files[i].size}
+                badge={
+                  saved.has(meta.files[i].idx) ? (
+                    <Badge tone="ok" icon={<CheckIcon />}>
+                      Saved
+                    </Badge>
+                  ) : (
+                    <Badge icon={<DeviceIcon />}>On the sender</Badge>
+                  )
+                }
+                actions={
+                  <IconButton
+                    label={`Download ${basename(meta.files[i].path)}`}
+                    disabled={!viaDirect}
+                    className="text-accent disabled:opacity-40"
+                    onClick={() => startDirect([meta.files[i]])}
+                  >
+                    <DownloadIcon className="size-4" />
+                  </IconButton>
+                }
+              />
+            )}
           />
         ) : (
           <FileBrowser
@@ -197,7 +248,7 @@ function receivingStatus(receiver: Receiver): StatusProps {
   return { tone: "accent", icon: <Spinner className="size-5" />, title: "Downloading", subtitle: "Keep this page open until it finishes." };
 }
 
-function ReceivingPanel({ receiver, meta }: { receiver: Receiver; meta: TransferMeta }) {
+function ReceivingPanel({ receiver, meta, onBack }: { receiver: Receiver; meta: TransferMeta; onBack: () => void }) {
   useSyncExternalStore(receiver.subscribe, receiver.getVersion, receiver.getVersion);
   const [previewing, setPreviewing] = useState<number | null>(null);
   const { total, received, done, speed } = receiver.snapshot;
@@ -228,7 +279,13 @@ function ReceivingPanel({ receiver, meta }: { receiver: Receiver; meta: Transfer
         progress={total ? received / total : 1}
         stats={stats}
         actions={
-          !finished && (
+          finished ? (
+            // One file out of a listing is rarely the only one wanted.
+            <Button onClick={onBack}>
+              <BackIcon className="size-4" />
+              Back to files
+            </Button>
+          ) : (
             <Button onClick={() => (paused ? receiver.resume() : receiver.pause())}>
               {paused ? <PlayIcon className="size-4" /> : <PauseIcon className="size-4" />}
               {paused ? "Resume" : "Pause"}

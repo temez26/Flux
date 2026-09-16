@@ -11,16 +11,59 @@ export type SaveMethod = "stream" | "memory";
 const MEMORY_LIMIT = 1024 ** 3;
 // Fewer, larger messages to the service worker.
 const BATCH = 512 * 1024;
+/** A wedged worker must not hold up the page that is waiting to offer a download. */
+const PROBE_TIMEOUT_MS = 3000;
+const PROBE = Uint8Array.of(0x46, 0x4c, 0x55, 0x58);
+
+const timeout = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+
+/**
+ * Asks the worker for a token download and reads it back.
+ *
+ * Holding a registration is not the same as being able to serve one: until the worker
+ * controls this page its `fetch` handler never runs, which is the state every first visit
+ * and every hard reload starts in. Nothing about that is visible from the page, and the
+ * only symptom is a download that quietly never arrives — so spend four bytes on finding
+ * out, rather than committing to a method that can't deliver.
+ */
+async function streamsWork(): Promise<boolean> {
+  const worker = navigator.serviceWorker?.controller;
+  if (!worker) return false;
+
+  const id = `probe${Date.now().toString(36)}`;
+  const { port1, port2 } = new MessageChannel();
+  let started: () => void;
+  const ready = new Promise<void>((resolve) => (started = resolve));
+  let sent = false;
+  port1.onmessage = ({ data }) => {
+    if (data === "ready") return started();
+    if (data !== "pull") return;
+    port1.postMessage(sent ? "end" : PROBE);
+    sent = true;
+  };
+
+  try {
+    worker.postMessage({ type: "flux-download", id, name: "probe.bin", size: PROBE.length }, [port2]);
+    await Promise.race([ready, timeout(PROBE_TIMEOUT_MS)]);
+    const response = await fetch(`/_flux/download/${id}`, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+    const body = new Uint8Array(await response.arrayBuffer());
+    return response.ok && body.length === PROBE.length;
+  } catch {
+    return false;
+  } finally {
+    port1.close();
+  }
+}
 
 /** How this browser can save a download produced in the page, if at all. */
 export async function saveMethod(size: number): Promise<SaveMethod | null> {
-  // Safari and every iOS browser don't reliably download service-worker streams.
-  const ua = navigator.userAgent;
-  const webkit = /^((?!chrome|android).)*safari/i.test(ua) || /iP(hone|ad|od)/.test(ua);
-  if (!webkit && "serviceWorker" in navigator) {
-    const registration = await navigator.serviceWorker.getRegistration().catch(() => undefined);
-    if (registration?.active) return "stream";
-  }
+  // WebKit reads a worker's stream back perfectly well and then declines to save it, so no
+  // probe run inside the page can tell it apart from a browser that works. It is the one
+  // engine that has to be named, and `vendor` names it with a single exact comparison —
+  // where matching the user-agent string means excluding every Chromium browser first,
+  // since they all carry "Safari" in theirs.
+  const webkit = navigator.vendor === "Apple Computer, Inc.";
+  if (!webkit && (await streamsWork())) return "stream";
   return size <= MEMORY_LIMIT ? "memory" : null;
 }
 
