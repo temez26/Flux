@@ -284,7 +284,7 @@ function HostedPanel({ session, expiresAt }: { session: Session; expiresAt?: str
 
   return (
     <div className="space-y-4">
-      <ShareCard code={code} expiresAt={expiresAt} />
+      <ShareCard code={code} hosted />
       <StatusCard
         {...hostedStatus(serving, host.sent, expired)}
         stats={[
@@ -852,7 +852,7 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
 
   return (
     <div className="space-y-4">
-      <ShareCard code={meta.code} expiresAt={meta.expiresAt} />
+      <ShareCard code={meta.code} expiresAt={meta.expiresAt} hosted={meta.hosted} />
       <StatusCard
         {...status}
         // Nothing was ever uploaded for a hosted transfer, so there is no progress to show.
