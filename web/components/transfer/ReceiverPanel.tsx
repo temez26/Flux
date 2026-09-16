@@ -17,6 +17,44 @@ import { InlinePreview, PreviewDialog } from "../preview/Preview";
 import { Badge, Button, Card, ConfirmButton, IconButton, Notice, ProgressBar, Spinner, StatusCard, buttonClass, type StatusProps } from "../ui";
 import { MetaRow, MetaTile, Pinned, TransferHeading, inFlight, pageTitle, percent, summarize } from "./common";
 
+/** A request line a reverse proxy will still accept, with room to spare. */
+const MAX_URL = 4000;
+
+/** Downloads chosen files that the server holds: one directly, several as a zip. */
+function SelectionDownload({ code, files }: { code: string; files: FileMeta[] }) {
+  const primary = buttonClass("primary", "min-h-9");
+  if (files.some((f) => !f.hash)) {
+    return (
+      <button type="button" disabled className={primary}>
+        Waiting for uploads
+      </button>
+    );
+  }
+  if (files.length === 1) {
+    return (
+      <a href={fileUrl(code, files[0].idx)} download className={primary}>
+        <DownloadIcon className="size-4" />
+        Download
+      </a>
+    );
+  }
+  const url = zipUrl(code, files.map((f) => f.idx));
+  // Scattered picks can't be written as a handful of ranges; a folder always can.
+  if (url.length > MAX_URL) {
+    return (
+      <button type="button" disabled className={primary}>
+        Too many separate files — narrow it down
+      </button>
+    );
+  }
+  return (
+    <a href={url} download className={primary}>
+      <DownloadIcon className="size-4" />
+      Download {files.length.toLocaleString()} as .zip
+    </a>
+  );
+}
+
 function checksumsUrl(meta: TransferMeta): string {
   // b3sum-compatible, so a download can be verified with `b3sum -c`.
   const lines = meta.files.filter((f) => f.hash).map((f) => `${f.hash}  ${f.path}\n`);
@@ -226,12 +264,19 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
                 }
               />
             )}
+            select={(indices) => (
+              <Button variant="primary" className="min-h-9" disabled={!viaDirect} onClick={() => startDirect(indices.map((i) => meta.files[i]))}>
+                <DownloadIcon className="size-4" />
+                {indices.length === 1 ? "Download" : `Download ${indices.length.toLocaleString()} as .zip`}
+              </Button>
+            )}
           />
         ) : (
           <FileBrowser
             paths={paths}
             renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable onPreview={setPreviewing} />}
             renderTile={(i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />}
+            select={(indices) => <SelectionDownload code={meta.code} files={indices.map((i) => meta.files[i])} />}
           />
         ))}
       <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />

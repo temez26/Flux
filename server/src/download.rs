@@ -185,18 +185,85 @@ pub async fn file(
     Ok(respond(&headers, parts, format!("\"{}\"", hex(&hash)), mime, name, inline))
 }
 
+/// Most ranges a selection may name; a folder, being contiguous, needs one.
+const MAX_RANGES: usize = 4096;
+
+/// Parses a selection written as index ranges, such as `0-12,15,40-44`, into sorted,
+/// merged ranges. `None` for anything malformed.
+fn parse_selection(spec: &str) -> Option<Vec<(i32, i32)>> {
+    let mut ranges = Vec::new();
+    for part in spec.split(',') {
+        let (first, last) = part.split_once('-').unwrap_or((part, part));
+        let (first, last): (i32, i32) = (first.parse().ok()?, last.parse().ok()?);
+        if first < 0 || last < first || ranges.len() == MAX_RANGES {
+            return None;
+        }
+        ranges.push((first, last));
+    }
+    ranges.sort_unstable();
+    let mut merged: Vec<(i32, i32)> = Vec::with_capacity(ranges.len());
+    for (first, last) in ranges {
+        match merged.last_mut() {
+            Some(prev) if first <= prev.1.saturating_add(1) => prev.1 = prev.1.max(last),
+            _ => merged.push((first, last)),
+        }
+    }
+    Some(merged)
+}
+
+fn selected(ranges: &[(i32, i32)], idx: i32) -> bool {
+    let after = ranges.partition_point(|&(first, _)| first <= idx);
+    after > 0 && idx <= ranges[after - 1].1
+}
+
+/// The deepest folder every path sits in, to name an archive of part of a transfer after.
+fn common_folder<'a>(paths: impl IntoIterator<Item = &'a str>) -> Option<&'a str> {
+    let mut shared: Option<Vec<&str>> = None;
+    for path in paths {
+        let folders: Vec<&str> = path.rsplit_once('/').map_or(vec![], |(dir, _)| dir.split('/').collect());
+        shared = Some(match shared {
+            None => folders,
+            Some(prev) => prev.into_iter().zip(folders).take_while(|(a, b)| a == b).map(|(a, _)| a).collect(),
+        });
+    }
+    shared?.pop()
+}
+
+#[derive(Deserialize)]
+pub struct ZipQuery {
+    /// Only these files, as index ranges. The whole transfer when absent.
+    files: Option<String>,
+}
+
 pub async fn zip(
     State(state): State<Shared>,
     Path(code): Path<String>,
+    Query(query): Query<ZipQuery>,
     headers: HeaderMap,
 ) -> Result<Response> {
+    let selection = match query.files.as_deref() {
+        Some(spec) => Some(parse_selection(spec).ok_or(AppError::bad_request("invalid file selection"))?),
+        None => None,
+    };
     let transfer = transfers::find(&state.db, &code).await?;
-    let rows: Vec<(i32, String, i64, Option<i64>, Option<Vec<u8>>, Option<i32>)> = sqlx::query_as(
+    let mut rows: Vec<(i32, String, i64, Option<i64>, Option<Vec<u8>>, Option<i32>)> = sqlx::query_as(
         "SELECT idx, path, size, modified, hash, crc32 FROM files WHERE transfer_id = $1 ORDER BY idx",
     )
     .bind(transfer.id)
     .fetch_all(&state.db)
     .await?;
+    if let Some(ranges) = &selection {
+        rows.retain(|row| selected(ranges, row.0));
+    }
+    // Only the files asked for have to be complete, so part of a transfer that is still
+    // uploading can already be taken.
+    let name = match &selection {
+        None => format!("flux-{}.zip", transfer.code),
+        Some(_) => match common_folder(rows.iter().map(|row| row.1.as_str())) {
+            Some(folder) => format!("{folder}.zip"),
+            None => format!("flux-{}-selection.zip", transfer.code),
+        },
+    };
 
     let mut etag = blake3::Hasher::new();
     let mut entries = Vec::with_capacity(rows.len());
@@ -220,6 +287,43 @@ pub async fn zip(
     }
 
     let etag = format!("\"{}\"", etag.finalize().to_hex());
-    let name = format!("flux-{}.zip", transfer.code);
     Ok(respond(&headers, zip::build(entries), etag, "application/zip", &name, false))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_a_selection_as_merged_ranges() {
+        assert_eq!(parse_selection("0-12,15,40-44"), Some(vec![(0, 12), (15, 15), (40, 44)]));
+        assert_eq!(parse_selection("7"), Some(vec![(7, 7)]));
+        // Overlapping, adjacent and out-of-order ranges fold together.
+        assert_eq!(parse_selection("5-9,0-4,8-12,20"), Some(vec![(0, 12), (20, 20)]));
+    }
+
+    #[test]
+    fn refuses_a_malformed_selection() {
+        for spec in ["", "a", "3-1", "-1", "1-", ",", "1,,2", "0-2147483648"] {
+            assert_eq!(parse_selection(spec), None, "{spec:?}");
+        }
+        let too_many = (0..=MAX_RANGES).map(|i| (i * 2).to_string()).collect::<Vec<_>>().join(",");
+        assert_eq!(parse_selection(&too_many), None, "more ranges than a request should carry");
+    }
+
+    #[test]
+    fn tells_which_files_a_selection_holds() {
+        let ranges = parse_selection("0-2,10,20-21").unwrap();
+        let held: Vec<i32> = (0..25).filter(|&i| selected(&ranges, i)).collect();
+        assert_eq!(held, [0, 1, 2, 10, 20, 21]);
+    }
+
+    #[test]
+    fn names_an_archive_after_the_folder_its_files_share() {
+        assert_eq!(common_folder(["trip/2024/a.jpg", "trip/2024/b.jpg"]), Some("2024"));
+        assert_eq!(common_folder(["trip/2024/a.jpg", "trip/2025/b.jpg"]), Some("trip"));
+        assert_eq!(common_folder(["a.jpg", "trip/b.jpg"]), None, "a loose file shares no folder");
+        assert_eq!(common_folder(["trip/a.jpg"]), Some("trip"));
+        assert_eq!(common_folder(Vec::<&str>::new()), None);
+    }
 }

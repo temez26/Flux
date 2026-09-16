@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { basename } from "@/lib/files";
 import { formatBytes, plural } from "@/lib/format";
-import { FileTypeIcon, GridIcon, ListIcon, SearchIcon } from "./icons";
+import { CheckIcon, FileTypeIcon, GridIcon, ListIcon, SearchIcon } from "./icons";
 import { Badge, ProgressBar, type Tone } from "./ui";
 
 const ROW_HEIGHT = 60;
@@ -138,19 +138,55 @@ function FileGrid({ count, renderTile }: { count: number; renderTile: (index: nu
  * enough of them to make scrolling to one impractical. `renderRow` and `renderTile` are
  * called with an index into the full set, so searching never shifts what a caller sees.
  */
+/**
+ * Makes a row or tile a checkbox while the listing is choosing files. The whole cell takes the
+ * tap, so a preview or download inside it can't fire by accident.
+ */
+function Selectable({ tile, checked, label, onToggle, children }: { tile: boolean; checked: boolean; label: string; onToggle: () => void; children: ReactNode }) {
+  return (
+    <div className={`relative h-full ${tile ? "" : "pl-9"}`}>
+      {children}
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={onToggle}
+        className={`absolute inset-0 flex rounded-xl transition ${tile ? "items-start justify-start p-1.5" : "items-center"} ${checked ? "bg-accent/5" : "hover:bg-hover/40"}`}
+      >
+        <span
+          className={`flex size-5 items-center justify-center rounded-md border-2 transition ${
+            checked ? "border-accent bg-accent text-accent-fg" : "border-line bg-surface"
+          }`}
+        >
+          {checked && <CheckIcon className="size-3.5" />}
+        </span>
+      </button>
+    </div>
+  );
+}
+
 export function FileBrowser({
   paths,
   renderRow,
   renderTile,
+  select,
 }: {
   /** One path per file, in listing order. Memoize it: searching walks the whole array. */
   paths: string[];
   renderRow: (index: number) => ReactNode;
   /** Omitted where a thumbnail says nothing useful, which also hides the view switch. */
   renderTile?: (index: number) => ReactNode;
+  /**
+   * What can be done with chosen files, given their indices. Passing it lets the listing be
+   * switched into choosing; searching and then selecting all is how a folder is chosen.
+   */
+  select?: (indices: number[]) => ReactNode;
 }) {
   const [view, setView] = useState<FileView>(storedView);
   const [query, setQuery] = useState("");
+  /** Indices chosen so far, or null while the listing isn't choosing. */
+  const [chosen, setChosen] = useState<Set<number> | null>(null);
   const needle = query.trim().toLowerCase();
 
   const matches = useMemo(() => {
@@ -162,6 +198,27 @@ export function FileBrowser({
 
   const count = matches ? matches.length : paths.length;
   const at = (position: number) => (matches ? matches[position] : position);
+
+  function toggle(index: number) {
+    setChosen((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(index)) next.add(index);
+      return next;
+    });
+  }
+
+  function chooseAll() {
+    setChosen((prev) => new Set([...(prev ?? []), ...(matches ?? paths.keys())]));
+  }
+
+  const cell = (index: number, tile: boolean, node: ReactNode) =>
+    chosen ? (
+      <Selectable tile={tile} checked={chosen.has(index)} label={`Select ${paths[index]}`} onToggle={() => toggle(index)}>
+        {node}
+      </Selectable>
+    ) : (
+      node
+    );
 
   function choose(next: FileView) {
     setView(next);
@@ -179,8 +236,19 @@ export function FileBrowser({
             Files
             <Badge>{matches ? `${count.toLocaleString()} of ${paths.length.toLocaleString()}` : count.toLocaleString()}</Badge>
           </h2>
+          {select && (
+            <button
+              type="button"
+              onClick={() => setChosen(chosen ? null : new Set())}
+              className={`ml-auto min-h-9 rounded-lg px-3 text-sm font-medium transition ${
+                chosen ? "bg-accent/10 text-accent" : "text-muted hover:bg-hover hover:text-fg"
+              }`}
+            >
+              {chosen ? "Done" : "Select"}
+            </button>
+          )}
           {renderTile && (
-            <div role="radiogroup" aria-label="Layout" className="ml-auto flex gap-1 rounded-xl border border-line bg-bg p-1">
+            <div role="radiogroup" aria-label="Layout" className={`${select ? "" : "ml-auto "}flex gap-1 rounded-xl border border-line bg-bg p-1`}>
               {(
                 [
                   ["list", "List", <ListIcon key="l" className="size-4" />],
@@ -205,6 +273,20 @@ export function FileBrowser({
             </div>
           )}
         </div>
+        {chosen && select && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-hover p-2 pl-3 text-sm">
+            <span className="font-medium tabular-nums">{chosen.size ? `${chosen.size.toLocaleString()} selected` : "Tap files to select them"}</span>
+            <button type="button" onClick={chooseAll} className="rounded-lg px-2 py-1 text-accent transition hover:bg-surface">
+              {matches ? `Select all ${matches.length.toLocaleString()} matching` : "Select all"}
+            </button>
+            {chosen.size > 0 && (
+              <button type="button" onClick={() => setChosen(new Set())} className="rounded-lg px-2 py-1 text-muted transition hover:bg-surface hover:text-fg">
+                Clear
+              </button>
+            )}
+            <span className="ml-auto">{chosen.size > 0 && select([...chosen].sort((a, b) => a - b))}</span>
+          </div>
+        )}
         {paths.length >= SEARCH_FROM && (
           <div className="relative mt-2">
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
@@ -232,9 +314,9 @@ export function FileBrowser({
       {count === 0 ? (
         <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">No files match that search.</p>
       ) : view === "grid" && renderTile ? (
-        <FileGrid count={count} renderTile={(position) => renderTile(at(position))} />
+        <FileGrid count={count} renderTile={(position) => cell(at(position), true, renderTile(at(position)))} />
       ) : (
-        <FileList count={count} renderRow={(position) => renderRow(at(position))} />
+        <FileList count={count} renderRow={(position) => cell(at(position), false, renderRow(at(position)))} />
       )}
     </section>
   );
