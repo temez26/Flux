@@ -8,6 +8,9 @@ const PAINT_TIMEOUT_MS = 50;
 // A desktop file dialog hands the selection over at once; this keeps the wait from
 // flashing there while still catching the slow copy on phones.
 const PICKER_GRACE_MS = 150;
+// Waiting this long means something is wrong: a phone that can't hand over the selection
+// says nothing at all about it, so the page has to notice on its own.
+const PICKER_STALL_MS = 10_000;
 
 /**
  * Resolves once the browser has had a chance to paint. Every microtask runs before
@@ -32,21 +35,35 @@ export function nextPaint(): Promise<void> {
  */
 export function useFilePicker() {
   const [waiting, setWaiting] = useState(false);
+  // Android's picker drops a selection it can't hand over without telling anyone, and
+  // Chrome there sends no `cancel` either, so a wait that goes nowhere needs explaining.
+  const [stalled, setStalled] = useState(false);
   const pending = useRef(false);
   const timer = useRef(0);
+  const stall = useRef(0);
 
   const settle = useCallback(() => {
     pending.current = false;
     window.clearTimeout(timer.current);
+    window.clearTimeout(stall.current);
     setWaiting(false);
+    setStalled(false);
+  }, []);
+
+  const show = useCallback(() => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => pending.current && setWaiting(true), PICKER_GRACE_MS);
   }, []);
 
   useEffect(() => {
     // The picker is a native overlay, so the page only learns it closed by coming back.
+    // Only once it has is a wait worth explaining: before that the delay is the picker
+    // opening, and on a desktop dialog the page can sit behind it for as long as it likes.
     const returned = () => {
       if (!pending.current || document.hidden) return;
-      window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => pending.current && setWaiting(true), PICKER_GRACE_MS);
+      show();
+      window.clearTimeout(stall.current);
+      stall.current = window.setTimeout(() => pending.current && setStalled(true), PICKER_STALL_MS);
     };
     window.addEventListener("focus", returned);
     document.addEventListener("visibilitychange", returned);
@@ -61,15 +78,21 @@ export function useFilePicker() {
       window.removeEventListener("cancel", settle, true);
       window.removeEventListener("pointerdown", settle);
       window.clearTimeout(timer.current);
+      window.clearTimeout(stall.current);
     };
   }, [settle]);
 
-  /** Call right before opening a picker, so the wait that follows is attributed to it. */
+  /**
+   * Call right before opening a picker. A phone with a full camera roll can take seconds
+   * just to put the picker on screen, and the page is still the thing being looked at for
+   * all of it, so the wait starts here rather than when the files come back.
+   */
   const arm = useCallback(() => {
     pending.current = true;
-  }, []);
+    show();
+  }, [show]);
 
-  return { waiting, arm, settle };
+  return { waiting, stalled, arm, settle };
 }
 
 export function useMounted(): boolean {
