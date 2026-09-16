@@ -23,7 +23,7 @@ function finish(picked: Picked[]): Picked[] {
     .sort((a, b) => collator.compare(a.path, b.path));
 }
 
-export function fromFileList(list: FileList | null): Picked[] {
+export function fromFileList(list: ArrayLike<File> | null): Picked[] {
   if (!list) return [];
   return finish(Array.from(list, (file) => ({ file, path: cleanPath(file.webkitRelativePath || file.name) })));
 }
@@ -38,6 +38,24 @@ export function fromText(text: string): Picked[] {
   const name = firstLine.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "").trim().slice(0, 40).trim();
   const path = `${name || "Text"}.txt`;
   return [{ path, file: new File([text], path, { type: "text/plain" }) }];
+}
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * Pasted files, as files to send. A copied screenshot arrives called "image.png" — every one of
+ * them — so those are named for when they were pasted, the way a screenshot on disk would be.
+ */
+export function fromClipboard(files: FileList | File[], now = new Date()): Picked[] {
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} at ${pad(now.getHours())}.${pad(now.getMinutes())}.${pad(now.getSeconds())}`;
+  return finish(
+    Array.from(files, (file, i) => {
+      const generic = /^image\.[a-z0-9]+$/i.test(file.name);
+      const extension = file.name.slice(file.name.lastIndexOf("."));
+      const name = generic ? `Pasted image ${stamp}${i ? ` (${i})` : ""}${extension}` : file.name;
+      return { file, path: cleanPath(name) };
+    }),
+  );
 }
 
 /** Collects dropped files, descending into dropped folders. */

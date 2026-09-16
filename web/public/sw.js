@@ -4,6 +4,10 @@ const CACHE = "flux-v2";
 const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png"];
 const NAVIGATION_TIMEOUT_MS = 4000;
 const DOWNLOAD_PREFIX = "/_flux/download/";
+// Where a share from another app is parked for the page; lib/share.ts reads the same names.
+const SHARE_CACHE = "flux-share";
+const SHARE_TARGET = "/share-target";
+const SHARED = "/_flux/shared/";
 
 /** Streams registered by pages, awaiting the download request that picks them up. */
 const downloads = new Map();
@@ -21,7 +25,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE && key !== SHARE_CACHE).map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   );
 });
@@ -37,6 +41,10 @@ self.addEventListener("message", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
+  if (request.method === "POST" && url.origin === self.location.origin && url.pathname === SHARE_TARGET) {
+    event.respondWith(receiveShare(request));
+    return;
+  }
   if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
 
   if (url.pathname.startsWith(DOWNLOAD_PREFIX)) event.respondWith(download(url.pathname.slice(DOWNLOAD_PREFIX.length)));
@@ -44,6 +52,40 @@ self.addEventListener("fetch", (event) => {
   else if (request.mode === "navigate") event.respondWith(shell(request));
   else event.respondWith(networkFirst(request));
 });
+
+/**
+ * A share from another app arrives as a form post. What it carried is parked in a cache, and the
+ * page is sent to pick it up: the page loads after this answers, so nothing held here in memory
+ * could be counted on to still be around when it asks.
+ */
+async function receiveShare(request) {
+  const form = await request.formData();
+  const files = form.getAll("files").filter((value) => typeof value !== "string");
+  const text = ["title", "text", "url"]
+    .map((field) => form.get(field))
+    .filter((value) => typeof value === "string" && value.trim())
+    // Browsers tend to put a shared link in both text and url.
+    .filter((value, i, all) => all.indexOf(value) === i)
+    .join("\n");
+
+  const cache = await caches.open(SHARE_CACHE);
+  for (const key of await cache.keys()) await cache.delete(key);
+  await Promise.all(
+    files.map((file, i) =>
+      cache.put(
+        SHARED + i,
+        new Response(file, {
+          headers: {
+            "Content-Type": file.type || "application/octet-stream",
+            "X-Name": encodeURIComponent(file.name),
+          },
+        }),
+      ),
+    ),
+  );
+  await cache.put(SHARED + "meta", new Response(JSON.stringify({ files: files.length, text })));
+  return new Response(null, { status: 303, headers: { Location: "/?shared" } });
+}
 
 // The page posts one message per pull, so the browser's download speed paces the transfer.
 function download(id) {

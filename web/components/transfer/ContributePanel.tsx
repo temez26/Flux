@@ -12,7 +12,7 @@ import { AlertIcon, CheckIcon, FolderIcon, PauseIcon, PlayIcon, PlusIcon, RetryI
 import { canPickFolder, useFilePickers } from "../picker";
 import { PreviewDialog } from "../preview/Preview";
 import { Button, Card, SectionTitle, Spinner, StatusCard, type StatusProps } from "../ui";
-import { MetaRow, MetaTile, SelectionDownload, pageTitle, percent, subscribeNothing, versionZero } from "./common";
+import { MetaRow, MetaTile, SelectionDownload, pageTitle, percent, subscribeNothing, useRememberRecent, versionZero } from "./common";
 
 /**
  * Someone else's collection: add files to it, follow those uploads, and see what is already
@@ -26,6 +26,7 @@ export function ContributePanel({ meta }: { meta: TransferMeta }) {
   const folders = canPickFolder();
   useSyncExternalStore(uploader?.subscribe ?? subscribeNothing, uploader?.getVersion ?? versionZero, versionZero);
   useTitle(pageTitle(meta.code));
+  useRememberRecent(meta);
 
   const picker = useFilePickers(async (picked) => {
     if (!picked.length) return;

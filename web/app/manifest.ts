@@ -11,6 +11,14 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
+    // Lists Flux under Share in other apps once installed. Android and desktop Chrome honour it;
+    // iOS offers web apps no way in.
+    share_target: {
+      action: "/share-target",
+      method: "POST",
+      enctype: "multipart/form-data",
+      params: { title: "title", text: "text", url: "url", files: [{ name: "files", accept: ["*/*"] }] },
+    },
     // The manifest allows one colour pair; installed apps use it for the splash screen and
     // system bars before the page's own theme-color (which follows light/dark) takes over.
     background_color: "#0c0c10",

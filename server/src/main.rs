@@ -16,6 +16,7 @@ use axum::{
     Router,
     extract::DefaultBodyLimit,
     http::{HeaderValue, header},
+    response::Redirect,
     routing::{get, patch, post},
 };
 use sqlx::postgres::PgPoolOptions;
@@ -142,6 +143,10 @@ fn app(state: Shared, web_dir: &std::path::Path) -> Router {
 
     Router::new()
         .nest("/api", api)
+        // The installed app's service worker answers shares from other apps. Without one — not
+        // installed after all, or not running yet — the share is lost, but it lands on the
+        // home page rather than an error.
+        .route("/share-target", post(|| async { Redirect::to("/") }))
         .nest_service(
             "/_next/static",
             tower::ServiceBuilder::new()

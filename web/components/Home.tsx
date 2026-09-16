@@ -1,14 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { EXPIRY_OPTIONS, errorMessage, getSummary, listPublic, type Summary } from "@/lib/api";
-import { fromDataTransfer, fromText, type Picked } from "@/lib/files";
+import { fromClipboard, fromDataTransfer, fromText, type Picked } from "@/lib/files";
 import { formatBytes, formatCode, formatLifetime, formatRemaining, normalizeCode, plural } from "@/lib/format";
 import { nextPaint, useNow, usePolling } from "@/lib/hooks";
-import { listOwned, removeOwned } from "@/lib/owned";
+import { listOwned, ownedVersion, removeOwned, subscribeOwned } from "@/lib/owned";
+import { clearRecent, forgetRecent, listRecent, recentVersion, subscribeRecent } from "@/lib/recent";
+import { getReceived } from "@/lib/received";
 import { navigate } from "@/lib/router";
 import { offerTitle, type Peer } from "@/lib/nearby";
 import { collect, live, send } from "@/lib/session";
+import { takeShared } from "@/lib/share";
 import { toast } from "@/lib/toast";
 import {
   AlertIcon,
@@ -70,6 +73,8 @@ export default function Home() {
   const [target, setTarget] = useState<Peer | null>(null);
   /** Text being written to send instead of files; null while choosing files. */
   const [text, setText] = useState<string | null>(null);
+  /** Files another app shared to Flux, waiting to be told where to go. */
+  const [shared, setShared] = useState<Picked[] | null>(null);
   const options = useRef({ expiresIn, isPublic, hosted, target: null as Peer | null });
   const folders = canPickFolder();
 
@@ -145,6 +150,36 @@ export default function Home() {
     };
   }, [start]);
 
+  // Arriving from another app's Share sheet: pick up what it shared, once, and tidy the address.
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has("shared")) return;
+    window.history.replaceState(window.history.state, "", "/");
+    void takeShared().then((received) => {
+      if (received?.files.length) setShared(received.files);
+      else if (received?.text) setText(received.text);
+    });
+  }, []);
+
+  // Pasting a copied screenshot or file sends it the way dropping it would, and pasted text
+  // opens the text box. A paste into a field on the page is left to that field.
+  useEffect(() => {
+    const paste = (e: ClipboardEvent) => {
+      const into = e.target instanceof Element ? e.target : null;
+      if (!e.clipboardData || into?.closest("input, textarea, [contenteditable]")) return;
+      if (e.clipboardData.files.length) {
+        e.preventDefault();
+        void start(fromClipboard(e.clipboardData.files));
+        return;
+      }
+      const pasted = e.clipboardData.getData("text/plain");
+      if (!pasted.trim()) return;
+      e.preventDefault();
+      setText((current) => (current ?? "") + pasted);
+    };
+    window.addEventListener("paste", paste);
+    return () => window.removeEventListener("paste", paste);
+  }, [start]);
+
   function chooseExpiry(seconds: number) {
     setExpiresIn(seconds);
     options.current.expiresIn = seconds;
@@ -172,7 +207,15 @@ export default function Home() {
   function chooseDevice(peer: Peer) {
     if (target?.device === peer.device) return chooseTarget(null);
     chooseTarget(peer);
-    if (text === null) picker.open("files");
+    // Something already waiting goes straight to the device; otherwise choosing one comes first.
+    if (shared) sendShared();
+    else if (text === null) picker.open("files");
+  }
+
+  function sendShared() {
+    if (!shared) return;
+    setShared(null);
+    void start(shared);
   }
 
   function sendText() {
@@ -198,7 +241,29 @@ export default function Home() {
 
       <Card>
         <SectionTitle icon={<UploadIcon className="size-4.5" />}>Send</SectionTitle>
-        {text !== null && !status ? (
+        {shared && !status ? (
+          <div className="rounded-2xl border-2 border-accent/60 bg-accent/5 p-5">
+            <p className="font-semibold">{plural(shared.length, "file")} shared to Flux</p>
+            <p className="mt-1 truncate text-sm text-muted">
+              {formatBytes(shared.reduce((sum, p) => sum + p.file.size, 0))} ·{" "}
+              {shared
+                .slice(0, 2)
+                .map((p) => p.path)
+                .join(", ")}
+              {shared.length > 2 ? ` and ${(shared.length - 2).toLocaleString()} more` : ""}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button variant="primary" onClick={sendShared}>
+                <UploadIcon className="size-4" />
+                {target ? `Send to ${target.name}` : "Send"}
+              </Button>
+              <Button variant="ghost" onClick={() => setShared(null)}>
+                Cancel
+              </Button>
+            </div>
+            <p className="mt-3 text-xs text-muted">Or choose a nearby device below to send straight to it.</p>
+          </div>
+        ) : text !== null && !status ? (
           <div className="rounded-2xl border-2 border-line p-3 focus-within:border-accent/60">
             <textarea
               autoFocus
@@ -245,7 +310,7 @@ export default function Home() {
                   <p className="font-semibold">
                     {target ? `Choose what to send to ${target.name}` : folders ? "Drop files or folders here" : "Send photos, videos or any files"}
                   </p>
-                  <p className="mt-1 text-sm text-muted">Any size, any number of files</p>
+                  <p className="mt-1 text-sm text-muted">{folders ? "Any size, any number of files — or paste them" : "Any size, any number of files"}</p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
                   <Button variant="primary" onClick={pick("files")}>
@@ -326,6 +391,7 @@ export default function Home() {
       </Card>
 
       <OwnedList />
+      <RecentList />
     </div>
   );
 }
@@ -525,6 +591,58 @@ function ReceiveForm() {
   );
 }
 
+/** Transfers this device opened someone else's code for, to get back to without the code. */
+function RecentList() {
+  useSyncExternalStore(subscribeRecent, recentVersion, recentVersion);
+  const recent = listRecent();
+  const summaries = useSummaries(() => listRecent().map(([code]) => code), forgetRecent);
+
+  if (!recent.length) return null;
+  return (
+    <Card>
+      <SectionTitle
+        icon={<DownloadIcon className="size-4.5" />}
+        aside={
+          <button type="button" onClick={clearRecent} className="text-sm text-muted transition hover:text-fg">
+            Clear
+          </button>
+        }
+      >
+        Recently received
+      </SectionTitle>
+      {recent.map(([code, r]) => {
+        const summary = summaries[code];
+        const files = summary?.files ?? r.files;
+        const size = summary?.size ?? r.size;
+        const saved = files > 0 && getReceived(code).size >= files;
+        return (
+          <TransferRow
+            key={code}
+            code={code}
+            icon={r.collect || files > 1 ? <FolderIcon className="size-4.5" /> : <FileTypeIcon path={r.title} className="size-4.5" />}
+            title={summary?.title ?? r.title}
+            detail={[
+              plural(files, "file"),
+              formatBytes(size),
+              // How long a device keeps sharing is its sender's business, not the code's expiry.
+              r.hosted ? "From the sender's device" : formatRemaining(summary?.expiresAt ?? r.expiresAt),
+            ].join(" · ")}
+            badge={
+              saved ? (
+                <Badge tone="ok" icon={<CheckIcon />}>
+                  Saved
+                </Badge>
+              ) : (
+                summary?.collect && <Badge icon={<FolderIcon />}>{summary.closed ? "Closed" : "Collection"}</Badge>
+              )
+            }
+          />
+        );
+      })}
+    </Card>
+  );
+}
+
 function ownedBadge(code: string, summary: Summary | undefined): ReactNode {
   if (!summary) return null;
   if (summary.collect) {
@@ -574,21 +692,28 @@ function ownedBadge(code: string, summary: Summary | undefined): ReactNode {
   );
 }
 
-function OwnedList() {
-  const [owned, setOwned] = useState(listOwned);
+/**
+ * Keeps the summary of each listed transfer current, and forgets any the server no longer has,
+ * so a list of remembered codes shows what is really there.
+ */
+function useSummaries(codes: () => string[], forget: (code: string) => void): Record<string, Summary> {
   const [summaries, setSummaries] = useState<Record<string, Summary>>({});
-
-  // Checks each transfer made on this device, so deleted ones disappear and states are real.
   usePolling(async () => {
-    const results = await Promise.all(listOwned().map(async ([code]) => [code, await getSummary(code)] as const));
+    const results = await Promise.all(codes().map(async (code) => [code, await getSummary(code)] as const));
     const found: Record<string, Summary> = {};
     for (const [code, summary] of results) {
       if (summary) found[code] = summary;
-      else removeOwned(code);
+      else forget(code);
     }
-    setOwned(listOwned());
     setSummaries(found);
   }, LIST_POLL_MS);
+  return summaries;
+}
+
+function OwnedList() {
+  useSyncExternalStore(subscribeOwned, ownedVersion, ownedVersion);
+  const owned = listOwned();
+  const summaries = useSummaries(() => listOwned().map(([code]) => code), removeOwned);
 
   if (!owned.length) return null;
   return (
