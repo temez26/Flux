@@ -34,6 +34,8 @@ pub struct Transfer {
     pub token_hash: Vec<u8>,
     pub created_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
+    /// Served from the sender's device; the server never holds the bytes.
+    pub hosted: bool,
 }
 
 pub fn normalize_code(raw: &str) -> String {
@@ -42,7 +44,7 @@ pub fn normalize_code(raw: &str) -> String {
 
 pub async fn find(db: &sqlx::PgPool, code: &str) -> Result<Transfer> {
     sqlx::query_as(
-        "SELECT id, code, token_hash, created_at, expires_at FROM transfers
+        "SELECT id, code, token_hash, created_at, expires_at, hosted FROM transfers
          WHERE code = $1 AND expires_at > now()",
     )
     .bind(normalize_code(code))
@@ -122,6 +124,9 @@ pub struct NewTransfer {
     expires_in: i64,
     #[serde(default)]
     public: bool,
+    /// Keep nothing but the file list: the sender serves the bytes itself.
+    #[serde(default)]
+    hosted: bool,
 }
 
 #[derive(Serialize)]
@@ -147,7 +152,7 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
         }
         total = total.saturating_add(file.size as u64);
     }
-    if available_space(&state.data_dir).is_some_and(|free| total > free) {
+    if !req.hosted && available_space(&state.data_dir).is_some_and(|free| total > free) {
         return Err(AppError(StatusCode::INSUFFICIENT_STORAGE, "not enough free space on server"));
     }
 
@@ -162,8 +167,8 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
     for _ in 0..8 {
         let candidate = random_code();
         let inserted = sqlx::query(
-            "INSERT INTO transfers (id, code, token_hash, expires_at, public, title)
-             VALUES ($1, $2, $3, $4, $5, $6)
+            "INSERT INTO transfers (id, code, token_hash, expires_at, public, title, hosted)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
              ON CONFLICT (code) DO NOTHING",
         )
         .bind(id)
@@ -172,6 +177,7 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
         .bind(expires_at)
         .bind(req.public)
         .bind(&title)
+        .bind(req.hosted)
         .execute(&mut *tx)
         .await?;
         if inserted.rows_affected() == 1 {
@@ -209,7 +215,9 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
     .execute(&mut *tx)
     .await?;
 
-    tokio::fs::create_dir_all(state.data_dir.join(id.to_string())).await?;
+    if !req.hosted {
+        tokio::fs::create_dir_all(state.data_dir.join(id.to_string())).await?;
+    }
     tx.commit().await?;
 
     Ok(Json(Created { code, token, expires_at }))
@@ -234,6 +242,7 @@ pub struct TransferInfo {
     code: String,
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
+    hosted: bool,
     files: Vec<FileInfo>,
 }
 
@@ -288,6 +297,7 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
         code: transfer.code,
         created_at: transfer.created_at,
         expires_at: transfer.expires_at,
+        hosted: transfer.hosted,
         files,
     })
     .map_err(|_| AppError::INTERNAL)?;
@@ -306,10 +316,11 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
     Ok(response)
 }
 
-const SUMMARY_SQL: &str = "SELECT t.code, t.title, t.created_at, t.expires_at,
+const SUMMARY_SQL: &str = "SELECT t.code, t.title, t.created_at, t.expires_at, t.hosted,
         count(f.idx) AS files,
         coalesce(sum(f.size), 0)::bigint AS size,
-        count(f.idx) = count(f.hash) AS complete
+        -- Nothing is pending for a hosted transfer: its bytes were never coming here.
+        t.hosted OR count(f.idx) = count(f.hash) AS complete
      FROM transfers t JOIN files f ON f.transfer_id = t.id";
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -319,6 +330,7 @@ pub struct Summary {
     title: String,
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
+    hosted: bool,
     files: i64,
     size: i64,
     complete: bool,

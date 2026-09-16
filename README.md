@@ -4,7 +4,7 @@ Self-hosted file transfer for your home network. Drop files or folders and share
 
 - Very large files and thousands of files, with resumable uploads (pause, retry, cancel)
 - End-to-end integrity check (BLAKE3)
-- Direct device-to-device transfer when both devices are online, server fallback otherwise
+- Send from the server, or straight from your device without uploading anything
 - Optional public space: transfers listed on the home page, no code needed
 - Transfers expire after 1 hour, 1 day or 7 days
 - Installable, mobile-first web app
