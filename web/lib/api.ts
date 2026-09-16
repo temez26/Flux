@@ -99,8 +99,13 @@ export function getConfig() {
   return request<{ stunPort: number | null }>("/api/config");
 }
 
-export function listPublic() {
-  return request<Summary[]>("/api/public");
+/** Public transfers, newest first. `q` narrows by title; `limit` is how many to ask for. */
+export function listPublic(options: { q?: string; limit?: number } = {}) {
+  const params = new URLSearchParams();
+  if (options.q) params.set("q", options.q);
+  if (options.limit) params.set("limit", String(options.limit));
+  const query = params.toString();
+  return request<Summary[]>(`/api/public${query ? `?${query}` : ""}`);
 }
 
 /** Revalidated with the server's ETag, so polling an unchanged transfer is cheap. */
