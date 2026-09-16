@@ -39,11 +39,14 @@ export function useFilePicker() {
   // Chrome there sends no `cancel` either, so a wait that goes nowhere needs explaining.
   const [stalled, setStalled] = useState(false);
   const pending = useRef(false);
+  /** The picker took the screen, so coming back means it has had its say. */
+  const away = useRef(false);
   const timer = useRef(0);
   const stall = useRef(0);
 
   const settle = useCallback(() => {
     pending.current = false;
+    away.current = false;
     window.clearTimeout(timer.current);
     window.clearTimeout(stall.current);
     setWaiting(false);
@@ -62,11 +65,20 @@ export function useFilePicker() {
     const returned = () => {
       if (!pending.current || document.hidden) return;
       show();
+      // Clicking the input focuses the window before the picker is anywhere near the
+      // screen, and a desktop dialog never takes it at all, so only a picker that has
+      // actually been and gone is one that can have dropped the selection.
+      if (!away.current) return;
+      away.current = false;
       window.clearTimeout(stall.current);
       stall.current = window.setTimeout(() => pending.current && setStalled(true), PICKER_STALL_MS);
     };
+    const moved = () => {
+      if (document.hidden) away.current = pending.current;
+      else returned();
+    };
     window.addEventListener("focus", returned);
-    document.addEventListener("visibilitychange", returned);
+    document.addEventListener("visibilitychange", moved);
     // Backing out of the picker fires `cancel` on the input (React doesn't surface it for
     // file inputs, so listen natively); touching the page again covers browsers that don't
     // send it, so the wait can never get stuck.
@@ -74,7 +86,7 @@ export function useFilePicker() {
     window.addEventListener("pointerdown", settle);
     return () => {
       window.removeEventListener("focus", returned);
-      document.removeEventListener("visibilitychange", returned);
+      document.removeEventListener("visibilitychange", moved);
       window.removeEventListener("cancel", settle, true);
       window.removeEventListener("pointerdown", settle);
       window.clearTimeout(timer.current);
