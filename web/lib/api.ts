@@ -92,6 +92,11 @@ export function createTransfer(files: NewFile[], expiresIn: number, isPublic: bo
   });
 }
 
+/** Where this deployment's STUN responder listens, so peers can find each other. */
+export function getConfig() {
+  return request<{ stunPort: number | null }>("/api/config");
+}
+
 export function listPublic() {
   return request<Summary[]>("/api/public");
 }

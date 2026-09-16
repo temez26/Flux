@@ -22,5 +22,6 @@ ENV FLUX_DATA_DIR=/data \
     FLUX_WEB_DIR=/app/web \
     FLUX_ADDR=0.0.0.0:8080
 EXPOSE 8080
+EXPOSE 3478/udp
 VOLUME /data
 ENTRYPOINT ["/app/flux"]
