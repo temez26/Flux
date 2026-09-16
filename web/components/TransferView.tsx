@@ -13,14 +13,15 @@ import { navigate } from "@/lib/router";
 import { memorySink, saveMethod, streamSink, type SaveMethod } from "@/lib/save";
 import { end, live, resume, type Session } from "@/lib/session";
 import { toast } from "@/lib/toast";
-import type { Item } from "@/lib/upload";
+import type { Item, Uploader } from "@/lib/upload";
 import { singleTarget, zipTarget } from "@/lib/zip";
-import { FileList, FileRow } from "./FileList";
+import { FileBrowser, FileRow, FileTile } from "./FileList";
 import {
   AlertIcon,
   CheckIcon,
   ClockIcon,
   CloseIcon,
+  DeviceIcon,
   DownloadIcon,
   FileTypeIcon,
   FolderIcon,
@@ -30,7 +31,7 @@ import {
   UploadIcon,
   ZapIcon,
 } from "./icons";
-import { InlinePreview, PreviewDialog } from "./Preview";
+import { FileThumb, InlinePreview, PreviewDialog } from "./Preview";
 import { ShareCard } from "./ShareCard";
 import { Badge, Button, Card, ConfirmButton, IconButton, Message, ProgressBar, Spinner, StatusCard, buttonClass, type StatusProps } from "./ui";
 
@@ -47,7 +48,14 @@ export default function TransferView({ code }: { code: string }) {
     if (meta === null) removeOwned(code);
   }, [meta, code]);
 
-  if (session) return <SenderPanel session={session} expiresAt={owned?.expiresAt} />;
+  if (session) {
+    const { uploader } = session;
+    return uploader ? (
+      <SenderPanel session={session} uploader={uploader} expiresAt={owned?.expiresAt} />
+    ) : (
+      <HostedPanel session={session} expiresAt={owned?.expiresAt} />
+    );
+  }
   if (meta === undefined) {
     return offline ? (
       <Message icon={<AlertIcon />} title="Can't reach the Flux server">
@@ -112,16 +120,7 @@ function Pinned({ title, children }: { title: string; children: ReactNode[] }) {
   );
 }
 
-function ListTitle({ count }: { count: number }) {
-  return (
-    <h2 className="flex items-center gap-2 pt-2 text-sm font-medium">
-      Files <Badge>{count.toLocaleString()}</Badge>
-    </h2>
-  );
-}
-
-function senderStatus(session: Session): StatusProps {
-  const { uploader } = session;
+function senderStatus(session: Session, uploader: Uploader): StatusProps {
   const { counts, finished, reconnecting } = uploader.snapshot;
   if (uploader.gone) {
     return { tone: "err", icon: <AlertIcon />, title: "Transfer no longer available", subtitle: "It expired or was deleted, so it can't be downloaded any more." };
@@ -139,8 +138,8 @@ function senderStatus(session: Session): StatusProps {
   return { tone: "accent", icon: <Spinner className="size-5" />, title: "Uploading", subtitle: "Keep this page open until it finishes." };
 }
 
-function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: string }) {
-  const { uploader, host } = session;
+function SenderPanel({ session, uploader, expiresAt }: { session: Session; uploader: Uploader; expiresAt?: string }) {
+  const { host } = session;
   useSyncExternalStore(uploader.subscribe, uploader.getVersion, uploader.getVersion);
   useSyncExternalStore(host.subscribe, host.getVersion, host.getVersion);
   const now = useNow(30_000);
@@ -154,6 +153,8 @@ function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: str
   const { meta } = useTransferMeta(uploader.code, finished);
   const previewable = useMemo(() => new Set(meta?.files.filter(canPreview).map((f) => f.idx) ?? []), [meta]);
   const single = meta?.files.length === 1 ? meta.files[0] : null;
+  const metaPaths = useMemo(() => meta?.files.map((f) => f.path) ?? [], [meta]);
+  const itemPaths = useMemo(() => uploader.items.map((i) => i.path), [uploader]);
   useWakeLock(running || serving);
   useLeaveGuard(!finished || serving);
   useTitle(running ? `${percent(sent, total)}% uploaded · Flux` : pageTitle(uploader.code));
@@ -179,7 +180,7 @@ function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: str
     <div className="space-y-4">
       <ShareCard code={uploader.code} expiresAt={expiresAt} />
       <StatusCard
-        {...senderStatus(session)}
+        {...senderStatus(session, uploader)}
         percent={percent(sent, total)}
         progress={total ? sent / total : 1}
         stats={stats}
@@ -219,23 +220,106 @@ function SenderPanel({ session, expiresAt }: { session: Session; expiresAt?: str
           <UploadRow key={item.idx} item={item} uploader={uploader} />
         ))}
       </Pinned>
-      <ListTitle count={uploader.items.length} />
-      <FileList
-        count={uploader.items.length}
-        renderRow={(i) => (
-          <UploadRow
-            item={uploader.items[i]}
-            uploader={uploader}
-            onPreview={previewable.has(uploader.items[i].idx) ? () => setPreviewing(uploader.items[i].idx) : undefined}
-          />
-        )}
-      />
+      {meta && !counts.failed ? (
+        <FileBrowser
+          paths={metaPaths}
+          renderRow={(i) => <MetaRow file={meta.files[i]} code={uploader.code} downloadable={false} onPreview={setPreviewing} />}
+          renderTile={(i) => <MetaTile file={meta.files[i]} code={uploader.code} onPreview={setPreviewing} />}
+        />
+      ) : (
+        <FileBrowser
+          paths={itemPaths}
+          renderRow={(i) => (
+            <UploadRow
+              item={uploader.items[i]}
+              uploader={uploader}
+              onPreview={previewable.has(uploader.items[i].idx) ? () => setPreviewing(uploader.items[i].idx) : undefined}
+            />
+          )}
+        />
+      )}
       <PreviewDialog code={uploader.code} files={meta?.files ?? []} idx={previewing} onChange={setPreviewing} />
     </div>
   );
 }
 
-function UploadRow({ item, uploader, onPreview }: { item: Item; uploader: Session["uploader"]; onPreview?: () => void }) {
+function hostedStatus(serving: number, sent: number, expired: boolean): StatusProps {
+  if (expired) return { tone: "err", icon: <AlertIcon />, title: "Link expired", subtitle: "The code no longer works. Send the files again to share them." };
+  if (serving > 0) {
+    return {
+      tone: "accent",
+      icon: <ZapIcon />,
+      title: `Sending to ${plural(serving, "device")}`,
+      subtitle: `${formatBytes(sent)} sent straight from here.`,
+    };
+  }
+  return {
+    tone: "ok",
+    icon: <DeviceIcon />,
+    title: "Ready to send from this device",
+    subtitle: "Nothing was uploaded. Keep this page open until the files have been received.",
+  };
+}
+
+/**
+ * A transfer whose bytes never left this device. There is no upload to follow, so the panel
+ * shows what is being served and makes it plain that closing the page ends it.
+ */
+function HostedPanel({ session, expiresAt }: { session: Session; expiresAt?: string }) {
+  const { host, entries, code, token } = session;
+  useSyncExternalStore(host.subscribe, host.getVersion, host.getVersion);
+  const now = useNow(30_000);
+  const expired = !!expiresAt && Date.parse(expiresAt) <= now;
+  const serving = host.receivers;
+  const paths = useMemo(() => entries.map((e) => e.path), [entries]);
+  const size = useMemo(() => entries.reduce((sum, e) => sum + e.size, 0), [entries]);
+  useWakeLock(!expired);
+  // Closing this page is the only thing that can end the transfer, so always ask.
+  useLeaveGuard(!expired);
+  useTitle(pageTitle(code));
+
+  useEffect(() => {
+    if (expired) host.close();
+  }, [expired, host]);
+
+  return (
+    <div className="space-y-4">
+      <ShareCard code={code} expiresAt={expiresAt} />
+      <StatusCard
+        {...hostedStatus(serving, host.sent, expired)}
+        stats={[
+          ["Files", entries.length.toLocaleString()],
+          ["Size", formatBytes(size)],
+        ]}
+        danger={<ConfirmButton onConfirm={() => removeTransfer(code, token)}>Delete transfer</ConfirmButton>}
+      >
+        {serving > 0 && (
+          <div className="mt-4">
+            <Badge tone="ok" icon={<ZapIcon className={small} />}>
+              Direct from this device · {formatCode(code)}
+            </Badge>
+          </div>
+        )}
+      </StatusCard>
+      <FileBrowser
+        paths={paths}
+        renderRow={(i) => (
+          <FileRow
+            path={entries[i].path}
+            size={entries[i].size}
+            badge={
+              <Badge icon={<DeviceIcon className={small} />}>
+                On this device
+              </Badge>
+            }
+          />
+        )}
+      />
+    </div>
+  );
+}
+
+function UploadRow({ item, uploader, onPreview }: { item: Item; uploader: Uploader; onPreview?: () => void }) {
   const pct = item.size ? item.sent / item.size : 0;
   const label = `${Math.floor(pct * 100)}%`;
   const cancel = (
@@ -334,12 +418,31 @@ function summarize(files: FileMeta[]) {
   return { size, received, complete, ready: complete === files.length };
 }
 
+function MetaTile({ file, code, onPreview }: { file: FileMeta; code: string; onPreview: (idx: number) => void }) {
+  return (
+    <FileTile
+      path={file.path}
+      size={file.size}
+      thumb={<FileThumb key={file.idx} code={code} file={file} className="size-7" />}
+      onOpen={canPreview(file) ? () => onPreview(file.idx) : undefined}
+      badge={
+        !file.hash && (
+          <Badge icon={<ClockIcon className={small} />}>
+            {file.received > 0 ? `${Math.floor((file.received / file.size) * 100)}%` : "Waiting"}
+          </Badge>
+        )
+      }
+    />
+  );
+}
+
 function MetaRow({ file, code, downloadable, onPreview }: { file: FileMeta; code: string; downloadable: boolean; onPreview: (idx: number) => void }) {
   if (file.hash) {
     return (
       <FileRow
         path={file.path}
         size={file.size}
+        thumb={<FileThumb key={file.idx} code={code} file={file} className="size-4.5" />}
         onOpen={canPreview(file) ? () => onPreview(file.idx) : undefined}
         badge={
           !downloadable && (
@@ -412,12 +515,13 @@ function TransferHeading({ meta, badges }: { meta: TransferMeta; badges?: ReactN
 
 function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   const { size, received, complete, ready } = summarize(meta.files);
-  const [initial] = useState({ ready, size });
+  const [initial] = useState({ ready: ready && !meta.hosted, size });
   const [method, setMethod] = useState<SaveMethod | null>(null);
   const [direct, setDirect] = useState<DirectClient>();
   const [receiver, setReceiver] = useState<Receiver>();
   const [error, setError] = useState<string>();
   const [previewing, setPreviewing] = useState<number | null>(null);
+  const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
   useSyncExternalStore(direct?.subscribe ?? subscribeNothing, direct?.getVersion ?? versionZero, versionZero);
   useTitle(pageTitle(meta.code));
 
@@ -427,7 +531,8 @@ function ReceiverPanel({ meta }: { meta: TransferMeta }) {
     void saveMethod(initial.size).then((m) => {
       if (!alive) return;
       setMethod(m);
-      // A direct connection is only useful while the server doesn't have everything yet.
+      // A hosted transfer has no other source, and otherwise a peer is only worth trying
+      // while the server doesn't have everything yet.
       if (m && !initial.ready) setDirect((client = new DirectClient(meta.code)));
     });
     return () => {
@@ -444,7 +549,10 @@ function ReceiverPanel({ meta }: { meta: TransferMeta }) {
 
   const single = meta.files.length === 1 ? meta.files[0] : null;
   const directOpen = direct?.state === "open";
-  const viaDirect = directOpen && !ready;
+  const viaDirect = directOpen && (meta.hosted || !ready);
+  // The sender's page is the only source, so its absence is the whole story.
+  const senderMissing = meta.hosted && !directOpen;
+  const tooLargeHere = meta.hosted && method === null;
 
   async function startDirect() {
     if (!direct || !method) return;
@@ -485,10 +593,26 @@ function ReceiverPanel({ meta }: { meta: TransferMeta }) {
         {viaDirect && (
           <p className="mt-4 flex items-start gap-2 rounded-xl bg-ok/10 p-3 text-sm text-ok">
             <ZapIcon className="mt-0.5 size-4 shrink-0" />
-            The sender is online, so files come straight from their device.
+            {meta.hosted ? "Connected to the sender. These files come straight from their device." : "The sender is online, so files come straight from their device."}
           </p>
         )}
-        {!ready && !viaDirect && (
+        {tooLargeHere && (
+          <p className="mt-4 flex items-start gap-2 rounded-xl bg-warn/10 p-3 text-sm text-warn">
+            <AlertIcon className="mt-0.5 size-4 shrink-0" />
+            This browser can&apos;t save a transfer this large from another device. Ask the sender to upload it to the server instead.
+          </p>
+        )}
+        {senderMissing && !tooLargeHere && (
+          <p className="mt-4 flex items-start gap-2 rounded-xl bg-hover p-3 text-sm">
+            {direct?.state === "unavailable" ? <AlertIcon className="mt-0.5 size-4 shrink-0 text-warn" /> : <Spinner className="mt-0.5 size-4 shrink-0 text-accent" />}
+            <span>
+              {direct?.state === "unavailable"
+                ? "Couldn't reach the sender's device. These files were never uploaded, so they can only come from there."
+                : "Waiting for the sender. Nothing was uploaded, so their page has to be open for this to arrive."}
+            </span>
+          </p>
+        )}
+        {!meta.hosted && !ready && !viaDirect && (
           <div className="mt-4 rounded-xl bg-hover p-3">
             <div className="mb-2 flex items-center gap-2 text-sm">
               <Spinner className="size-4 text-accent" />
@@ -503,7 +627,11 @@ function ReceiverPanel({ meta }: { meta: TransferMeta }) {
         )}
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
-          {viaDirect ? (
+          {meta.hosted ? (
+            <Button variant="primary" className={primary} onClick={startDirect} disabled={!viaDirect}>
+              {label}
+            </Button>
+          ) : viaDirect ? (
             <Button variant="primary" className={primary} onClick={startDirect}>
               {label}
             </Button>
@@ -534,12 +662,25 @@ function ReceiverPanel({ meta }: { meta: TransferMeta }) {
         {!single && (ready || viaDirect) && <p className="mt-3 text-xs text-muted">Everything downloads as one .zip file.</p>}
         {single && canPreview(single) && <InlinePreview code={meta.code} file={single} onExpand={() => setPreviewing(single.idx)} />}
       </Card>
-      {!single && (
-        <>
-          <ListTitle count={meta.files.length} />
-          <FileList count={meta.files.length} renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable onPreview={setPreviewing} />} />
-        </>
-      )}
+      {!single &&
+        (meta.hosted ? (
+          <FileBrowser
+            paths={paths}
+            renderRow={(i) => (
+              <FileRow
+                path={meta.files[i].path}
+                size={meta.files[i].size}
+                badge={<Badge icon={<DeviceIcon className={small} />}>On the sender</Badge>}
+              />
+            )}
+          />
+        ) : (
+          <FileBrowser
+            paths={paths}
+            renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable onPreview={setPreviewing} />}
+            renderTile={(i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />}
+          />
+        ))}
       <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />
     </div>
   );
@@ -564,6 +705,7 @@ function ReceivingPanel({ receiver, meta }: { receiver: Receiver; meta: Transfer
   // download runs, so this follows the polled metadata rather than the receiver's own state.
   const previewable = useMemo(() => new Set(meta.files.filter(canPreview).map((f) => f.idx)), [meta]);
   const single = meta.files.length === 1 ? meta.files[0] : null;
+  const paths = useMemo(() => receiver.items.map((i) => i.path), [receiver]);
   useWakeLock(running);
   useLeaveGuard(!finished);
   useTitle(running ? `${percent(received, total)}% downloaded · Flux` : undefined);
@@ -607,9 +749,8 @@ function ReceivingPanel({ receiver, meta }: { receiver: Receiver; meta: Transfer
           <ReceiveRow key={item.idx} item={item} />
         ))}
       </Pinned>
-      <ListTitle count={receiver.items.length} />
-      <FileList
-        count={receiver.items.length}
+      <FileBrowser
+        paths={paths}
         renderRow={(i) => <ReceiveRow item={receiver.items[i]} onPreview={previewable.has(receiver.items[i].idx) ? () => setPreviewing(receiver.items[i].idx) : undefined} />}
       />
       <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />
@@ -692,6 +833,7 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
   const folderInput = useRef<HTMLInputElement>(null);
   const canPickFolder = window.matchMedia("(pointer: fine)").matches;
   const [previewing, setPreviewing] = useState<number | null>(null);
+  const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
   const picker = useFilePicker();
   useTitle(pageTitle(meta.code));
 
@@ -702,21 +844,31 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
     if (picked.length) onResume(resume(meta, token, picked));
   }
 
-  const status: StatusProps = ready
-    ? { tone: "ok", icon: <CheckIcon />, title: "Ready to receive", subtitle: "Every file is uploaded and verified." }
-    : { tone: "warn", icon: <AlertIcon />, title: "Upload interrupted", subtitle: "Add the same files again to continue where it stopped." };
+  const status: StatusProps = meta.hosted
+    ? { tone: "warn", icon: <DeviceIcon />, title: "Not being shared", subtitle: "Nothing was uploaded, so add the files again to serve them from this device." }
+    : ready
+      ? { tone: "ok", icon: <CheckIcon />, title: "Ready to receive", subtitle: "Every file is uploaded and verified." }
+      : { tone: "warn", icon: <AlertIcon />, title: "Upload interrupted", subtitle: "Add the same files again to continue where it stopped." };
 
   return (
     <div className="space-y-4">
       <ShareCard code={meta.code} expiresAt={meta.expiresAt} />
       <StatusCard
         {...status}
-        percent={percent(received, size)}
-        progress={size ? received / size : 1}
-        stats={[
-          ["Files", `${complete.toLocaleString()} / ${meta.files.length.toLocaleString()}`],
-          ["Uploaded", `${formatBytes(received)} / ${formatBytes(size)}`],
-        ]}
+        // Nothing was ever uploaded for a hosted transfer, so there is no progress to show.
+        percent={meta.hosted ? undefined : percent(received, size)}
+        progress={meta.hosted ? undefined : size ? received / size : 1}
+        stats={
+          meta.hosted
+            ? [
+                ["Files", meta.files.length.toLocaleString()],
+                ["Size", formatBytes(size)],
+              ]
+            : [
+                ["Files", `${complete.toLocaleString()} / ${meta.files.length.toLocaleString()}`],
+                ["Uploaded", `${formatBytes(received)} / ${formatBytes(size)}`],
+              ]
+        }
         actions={
           !ready && (
             <>
@@ -727,8 +879,8 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
                   fileInput.current?.click();
                 }}
               >
-                {picker.waiting ? <Spinner className="size-4" /> : <UploadIcon className="size-4" />}
-                {picker.waiting ? "Getting your files…" : "Add files"}
+                {picker.waiting ? <Spinner className="size-4" /> : meta.hosted ? <DeviceIcon className="size-4" /> : <UploadIcon className="size-4" />}
+                {picker.waiting ? "Getting your files…" : meta.hosted ? "Share these files again" : "Add files"}
               </Button>
               {canPickFolder && (
                 <Button
@@ -749,8 +901,17 @@ function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: stri
         <input ref={fileInput} type="file" multiple hidden onChange={receive} />
         <input ref={folderInput} type="file" hidden {...folderInputProps} onChange={receive} />
       </StatusCard>
-      <ListTitle count={meta.files.length} />
-      <FileList count={meta.files.length} renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable={false} onPreview={setPreviewing} />} />
+      <FileBrowser
+        paths={paths}
+        renderRow={(i) =>
+          meta.hosted ? (
+            <FileRow path={meta.files[i].path} size={meta.files[i].size} badge={<Badge icon={<DeviceIcon className={small} />}>Not shared</Badge>} />
+          ) : (
+            <MetaRow file={meta.files[i]} code={meta.code} downloadable={false} onPreview={setPreviewing} />
+          )
+        }
+        renderTile={meta.hosted ? undefined : (i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />}
+      />
       <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />
     </div>
   );
