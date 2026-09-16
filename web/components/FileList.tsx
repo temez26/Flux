@@ -68,13 +68,22 @@ export function FileList({ count, renderRow }: { count: number; renderRow: (inde
   // The range is measured in an effect, so a render that shrinks the list sees the old one.
   for (let i = start; i < Math.min(end, count); i++) {
     rows.push(
-      <div key={i} className="absolute inset-x-0" style={{ top: i * ROW_HEIGHT, height: ROW_HEIGHT }}>
+      // Only the rows near the viewport exist, so each one has to say where it sits in the
+      // whole list; without that a reader announces twenty files and calls it the lot.
+      <div
+        key={i}
+        role="listitem"
+        aria-setsize={count}
+        aria-posinset={i + 1}
+        className="absolute inset-x-0"
+        style={{ top: i * ROW_HEIGHT, height: ROW_HEIGHT }}
+      >
         {renderRow(i)}
       </div>,
     );
   }
   return (
-    <div ref={ref} className="relative" style={{ height: count * ROW_HEIGHT }}>
+    <div ref={ref} role="list" className="relative" style={{ height: count * ROW_HEIGHT }}>
       {rows}
     </div>
   );
@@ -106,6 +115,9 @@ function FileGrid({ count, renderTile }: { count: number; renderTile: (index: nu
       tiles.push(
         <div
           key={i}
+          role="listitem"
+          aria-setsize={count}
+          aria-posinset={i + 1}
           className="absolute"
           style={{ top: row * rowHeight, left: column * (tile + TILE_GAP), width: tile, height: rowHeight - TILE_GAP }}
         >
@@ -115,7 +127,7 @@ function FileGrid({ count, renderTile }: { count: number; renderTile: (index: nu
     }
   }
   return (
-    <div ref={ref} className="relative" style={{ height: rows * rowHeight }}>
+    <div ref={ref} role="list" className="relative" style={{ height: rows * rowHeight }}>
       {tiles}
     </div>
   );
@@ -211,6 +223,10 @@ export function FileBrowser({
           </div>
         )}
       </div>
+      {/* The heading carries the count too, but only a live region reports it changing. */}
+      <p role="status" className="sr-only">
+        {matches ? `${count.toLocaleString()} of ${paths.length.toLocaleString()} files match “${needle}”` : `${count.toLocaleString()} files`}
+      </p>
       {count === 0 ? (
         <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">No files match that search.</p>
       ) : view === "grid" && renderTile ? (
