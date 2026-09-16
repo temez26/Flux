@@ -50,17 +50,20 @@ export function useFilePicker() {
     setStalled(false);
   }, []);
 
+  const show = useCallback(() => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => pending.current && setWaiting(true), PICKER_GRACE_MS);
+  }, []);
+
   useEffect(() => {
     // The picker is a native overlay, so the page only learns it closed by coming back.
+    // Only once it has is a wait worth explaining: before that the delay is the picker
+    // opening, and on a desktop dialog the page can sit behind it for as long as it likes.
     const returned = () => {
       if (!pending.current || document.hidden) return;
-      window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => {
-        if (!pending.current) return;
-        setWaiting(true);
-        window.clearTimeout(stall.current);
-        stall.current = window.setTimeout(() => pending.current && setStalled(true), PICKER_STALL_MS);
-      }, PICKER_GRACE_MS);
+      show();
+      window.clearTimeout(stall.current);
+      stall.current = window.setTimeout(() => pending.current && setStalled(true), PICKER_STALL_MS);
     };
     window.addEventListener("focus", returned);
     document.addEventListener("visibilitychange", returned);
@@ -79,10 +82,15 @@ export function useFilePicker() {
     };
   }, [settle]);
 
-  /** Call right before opening a picker, so the wait that follows is attributed to it. */
+  /**
+   * Call right before opening a picker. A phone with a full camera roll can take seconds
+   * just to put the picker on screen, and the page is still the thing being looked at for
+   * all of it, so the wait starts here rather than when the files come back.
+   */
   const arm = useCallback(() => {
     pending.current = true;
-  }, []);
+    show();
+  }, [show]);
 
   return { waiting, stalled, arm, settle };
 }
