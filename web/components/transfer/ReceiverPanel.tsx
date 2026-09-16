@@ -15,45 +15,7 @@ import { FileBrowser, FileRow } from "../FileList";
 import { AlertIcon, BackIcon, CheckIcon, ClockIcon, CloseIcon, DeviceIcon, DownloadIcon, PauseIcon, PlayIcon, ZapIcon } from "../icons";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
 import { Badge, Button, Card, ConfirmButton, IconButton, Notice, ProgressBar, Spinner, StatusCard, buttonClass, type StatusProps } from "../ui";
-import { MetaRow, MetaTile, Pinned, TransferHeading, inFlight, pageTitle, percent, summarize } from "./common";
-
-/** A request line a reverse proxy will still accept, with room to spare. */
-const MAX_URL = 4000;
-
-/** Downloads chosen files that the server holds: one directly, several as a zip. */
-function SelectionDownload({ code, files }: { code: string; files: FileMeta[] }) {
-  const primary = buttonClass("primary", "min-h-9");
-  if (files.some((f) => !f.hash)) {
-    return (
-      <button type="button" disabled className={primary}>
-        Waiting for uploads
-      </button>
-    );
-  }
-  if (files.length === 1) {
-    return (
-      <a href={fileUrl(code, files[0].idx)} download className={primary}>
-        <DownloadIcon className="size-4" />
-        Download
-      </a>
-    );
-  }
-  const url = zipUrl(code, files.map((f) => f.idx));
-  // Scattered picks can't be written as a handful of ranges; a folder always can.
-  if (url.length > MAX_URL) {
-    return (
-      <button type="button" disabled className={primary}>
-        Too many separate files — narrow it down
-      </button>
-    );
-  }
-  return (
-    <a href={url} download className={primary}>
-      <DownloadIcon className="size-4" />
-      Download {files.length.toLocaleString()} as .zip
-    </a>
-  );
-}
+import { MetaRow, MetaTile, Pinned, SelectionDownload, TransferHeading, inFlight, pageTitle, percent, subscribeNothing, summarize, versionZero } from "./common";
 
 function checksumsUrl(meta: TransferMeta): string {
   // b3sum-compatible, so a download can be verified with `b3sum -c`.
@@ -61,8 +23,6 @@ function checksumsUrl(meta: TransferMeta): string {
   return URL.createObjectURL(new Blob(lines, { type: "text/plain" }));
 }
 
-const subscribeNothing = () => () => {};
-const versionZero = () => 0;
 
 /** What someone who opened a code sees before they start downloading. */
 export function ReceiverPanel({ meta }: { meta: TransferMeta }) {

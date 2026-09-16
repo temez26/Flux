@@ -7,6 +7,7 @@ code. Receivers take single files or the lot as one zip.
 - BLAKE3 integrity check end to end
 - Upload to the server, or send straight from your device
 - Send to another device on your network without a code
+- Collect files from others: hand out a code people add files to
 - Optional public listing on the home page
 - Expires after 1 hour, 1 day or 7 days
 - Installable, mobile-first web app

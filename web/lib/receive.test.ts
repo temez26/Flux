@@ -32,7 +32,7 @@ async function transfer(count: number): Promise<TransferMeta> {
       received: 0,
     });
   }
-  return { code: "abcdefgh", createdAt: "", expiresAt: "", hosted: true, files };
+  return { code: "abcdefgh", title: "", collect: false, createdAt: "", expiresAt: "", hosted: true, files };
 }
 
 /** A sender that serves each file's bytes, and its digest, straight from memory. */

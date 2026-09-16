@@ -6,6 +6,8 @@ import { getOwned, removeOwned } from "@/lib/owned";
 import { live } from "@/lib/session";
 import { AlertIcon, ClockIcon } from "../icons";
 import { Message, Notice, Spinner } from "../ui";
+import { CollectPanel } from "./CollectPanel";
+import { ContributePanel } from "./ContributePanel";
 import { HostedPanel } from "./HostedPanel";
 import { OwnerPanel } from "./OwnerPanel";
 import { ReceiverPanel } from "./ReceiverPanel";
@@ -59,7 +61,17 @@ export default function TransferView({ code }: { code: string }) {
           Lost connection to the server. Retrying…
         </Notice>
       )}
-      {owned ? <OwnerPanel meta={meta} token={owned.token} onResume={setSession} /> : <ReceiverPanel meta={meta} />}
+      {meta.collect ? (
+        owned ? (
+          <CollectPanel meta={meta} token={owned.token} />
+        ) : (
+          <ContributePanel meta={meta} />
+        )
+      ) : owned ? (
+        <OwnerPanel meta={meta} token={owned.token} onResume={setSession} />
+      ) : (
+        <ReceiverPanel meta={meta} />
+      )}
     </>
   );
 }

@@ -1,4 +1,5 @@
-import { appendFiles, createTransfer, type NewFile, type TransferMeta } from "./api";
+import { appendFiles, createCollection, createTransfer, type NewFile, type TransferMeta } from "./api";
+import { getDevice } from "./device";
 import { DirectHost } from "./direct";
 import { basename, uniquePaths, type Picked } from "./files";
 import { getOwned, saveOwned } from "./owned";
@@ -72,6 +73,39 @@ export async function send(picked: Picked[], expiresIn: number, isPublic: boolea
     hosted,
   );
   return created.code;
+}
+
+/** Opens a collection for other people to send files into, and returns its code. */
+export async function collect(expiresIn: number, title?: string): Promise<string> {
+  const created = await createCollection(expiresIn, title);
+  saveOwned(created.code, { token: created.token, expiresAt: created.expiresAt, collect: true, count: 0, size: 0, createdAt: Date.now() });
+  return created.code;
+}
+
+/** Uploads this tab has added to collections, by code. Like sessions, they outlive the page showing them. */
+export const contributions = new Map<string, Uploader>();
+
+/**
+ * Adds files to someone else's collection. They go into a folder named after this device, and
+ * a second batch joins the first — same token, same queue — so what this device sent stays one
+ * upload to follow.
+ */
+export async function contribute(code: string, picked: Picked[]): Promise<Uploader> {
+  const files = uniquePaths(picked);
+  const existing = contributions.get(code);
+  const current = existing && !existing.gone ? existing : undefined;
+  const { files: added, token } = await appendFiles(code, current?.token, files.map(describe), getDevice().name);
+  const entries: Entry[] = added.map((f, i) => ({ idx: f.idx, path: f.path, size: files[i].file.size, file: files[i].file }));
+  if (current) {
+    current.add(entries);
+    return current;
+  }
+  if (!token) throw new Error("The server didn't hand back an upload token");
+  existing?.dispose();
+  const uploader = new Uploader(code, token, entries);
+  contributions.set(code, uploader);
+  uploader.start();
+  return uploader;
 }
 
 /**

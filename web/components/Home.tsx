@@ -8,7 +8,7 @@ import { nextPaint, useNow, usePolling } from "@/lib/hooks";
 import { listOwned, removeOwned } from "@/lib/owned";
 import { navigate } from "@/lib/router";
 import { offerTitle, type Peer } from "@/lib/nearby";
-import { live, send } from "@/lib/session";
+import { collect, live, send } from "@/lib/session";
 import { toast } from "@/lib/toast";
 import {
   AlertIcon,
@@ -325,6 +325,7 @@ export default function Home() {
       <Card>
         <SectionTitle icon={<DownloadIcon className="size-4.5" />}>Receive</SectionTitle>
         <ReceiveForm />
+        <CollectForm expiresIn={expiresIn} />
         <PublicList />
       </Card>
 
@@ -428,6 +429,59 @@ function PublicList() {
   );
 }
 
+/** Opens a collection: a code other people use to send files here, rather than to receive them. */
+function CollectForm({ expiresIn }: { expiresIn: number }) {
+  // Null while folded away; the name being typed once opened.
+  const [name, setName] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const code = await collect(expiresIn, name?.trim() || undefined);
+      navigate(`/${formatCode(code)}`);
+    } catch (err) {
+      toast(errorMessage(err), "err");
+      setBusy(false);
+    }
+  }
+
+  if (name === null) {
+    return (
+      <button type="button" onClick={() => setName("")} className="mt-3 flex items-center gap-1.5 text-sm text-muted transition hover:text-fg">
+        <FolderIcon className="size-4" />
+        Collect files from others instead
+      </button>
+    );
+  }
+  return (
+    <form onSubmit={submit} className="mt-4">
+      <Field label="Collect files" hint="Anyone you give the code to can add files, and download what's there.">
+        <div className="flex gap-2">
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={80}
+            placeholder="What for? e.g. Holiday photos"
+            aria-label="Name of the collection"
+            enterKeyHint="go"
+            className="min-h-12 min-w-0 flex-1 rounded-xl border border-line bg-bg px-4 text-base outline-none placeholder:text-muted/60 focus:border-accent"
+          />
+          <Button type="submit" variant="primary" className="min-h-12 px-5" disabled={busy}>
+            {busy ? <Spinner className="size-4" /> : <FolderIcon className="size-4" />}
+            Create
+          </Button>
+        </div>
+      </Field>
+      <button type="button" onClick={() => setName(null)} className="mt-2 text-sm text-muted transition hover:text-fg">
+        Cancel
+      </button>
+    </form>
+  );
+}
+
 function ReceiveForm() {
   const [value, setValue] = useState("");
   const [invalid, setInvalid] = useState(false);
@@ -477,6 +531,13 @@ function ReceiveForm() {
 
 function ownedBadge(code: string, summary: Summary | undefined): ReactNode {
   if (!summary) return null;
+  if (summary.collect) {
+    return (
+      <Badge tone="accent" icon={<FolderIcon />}>
+        Collecting
+      </Badge>
+    );
+  }
   // A hosted transfer only exists while this tab is serving it, so that is what to report.
   if (summary.hosted) {
     return live.has(code) ? (
@@ -535,17 +596,23 @@ function OwnedList() {
   return (
     <Card>
       <SectionTitle icon={<ClockIcon className="size-4.5" />}>Your transfers</SectionTitle>
-      {owned.map(([code, o]) => (
-        <TransferRow
-          key={code}
-          code={code}
-          mono
-          icon={o.public ? <GlobeIcon className="size-4.5" /> : <LockIcon className="size-4.5" />}
-          title={formatCode(code)}
-          detail={`${plural(o.count, "file")} · ${formatBytes(o.size)} · ${formatLifetime(o.expiresAt, !!o.hosted, live.has(code))}`}
-          badge={ownedBadge(code, summaries[code])}
-        />
-      ))}
+      {owned.map(([code, o]) => {
+        // The server's count is the current one: files can be added after this device made it.
+        const summary = summaries[code];
+        const count = summary?.files ?? o.count;
+        const size = summary?.size ?? o.size;
+        return (
+          <TransferRow
+            key={code}
+            code={code}
+            mono
+            icon={o.collect ? <FolderIcon className="size-4.5" /> : o.public ? <GlobeIcon className="size-4.5" /> : <LockIcon className="size-4.5" />}
+            title={o.collect && summary ? `${formatCode(code)} · ${summary.title}` : formatCode(code)}
+            detail={`${plural(count, "file")} · ${formatBytes(size)} · ${formatLifetime(o.expiresAt, !!o.hosted, live.has(code))}`}
+            badge={ownedBadge(code, summary)}
+          />
+        );
+      })}
     </Card>
   );
 }

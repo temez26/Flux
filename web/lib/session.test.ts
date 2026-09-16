@@ -7,6 +7,8 @@ import { matchPicked } from "./session";
 function transfer(files: { path: string; size: number; hash?: string }[]): TransferMeta {
   return {
     code: "abcdefgh",
+    title: "",
+    collect: false,
     createdAt: "",
     expiresAt: "",
     hosted: false,
