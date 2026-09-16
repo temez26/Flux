@@ -29,8 +29,12 @@ const versionZero = () => 0;
 export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   const { size, received, complete, ready } = summarize(meta.files);
   const [initial] = useState({ ready: ready && !meta.hosted, size });
-  const [method, setMethod] = useState<SaveMethod | null>(null);
-  const [direct, setDirect] = useState<DirectClient>();
+  /** How the whole transfer could be saved at once; null when it is too big to be. */
+  const [whole, setWhole] = useState<SaveMethod | null>();
+  // A hosted transfer has no other source, and otherwise a peer is only worth trying while
+  // the server doesn't have everything yet. Worth it whatever the transfer weighs: one too
+  // big to save in a single go can still be taken a file at a time.
+  const [direct] = useState(() => (initial.ready ? undefined : new DirectClient(meta.code)));
   const [receiver, setReceiver] = useState<Receiver>();
   const [error, setError] = useState<string>();
   const [previewing, setPreviewing] = useState<number | null>(null);
@@ -38,21 +42,15 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   useSyncExternalStore(direct?.subscribe ?? subscribeNothing, direct?.getVersion ?? versionZero, versionZero);
   useTitle(pageTitle(meta.code));
 
+  useEffect(() => () => direct?.close(), [direct]);
+
   useEffect(() => {
     let alive = true;
-    let client: DirectClient | undefined;
-    void saveMethod(initial.size).then((m) => {
-      if (!alive) return;
-      setMethod(m);
-      // A hosted transfer has no other source, and otherwise a peer is only worth trying
-      // while the server doesn't have everything yet.
-      if (m && !initial.ready) setDirect((client = new DirectClient(meta.code)));
-    });
+    void saveMethod(initial.size).then((m) => alive && setWhole(m));
     return () => {
       alive = false;
-      client?.close();
     };
-  }, [initial, meta.code]);
+  }, [initial.size]);
 
   useEffect(() => {
     receiver?.update(meta);
@@ -65,7 +63,7 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   const viaDirect = directOpen && (meta.hosted || !ready);
   // The sender's page is the only source, so its absence is the whole story.
   const senderMissing = meta.hosted && !directOpen;
-  const tooLargeHere = meta.hosted && method === null;
+  const tooLargeHere = whole === null;
   const unreachable = direct?.state === "unavailable";
 
   /** Receives `files` from the sender's device, as one file or as a zip of several. */
@@ -116,7 +114,9 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
         )}
         {tooLargeHere && (
           <Notice tone="warn" icon={<AlertIcon />} className="mt-4">
-            This browser can&apos;t save a transfer this large from another device. Ask the sender to upload it to the server instead.
+            {single
+              ? "This browser can't save a file this large from another device. Ask the sender to upload it to the server instead."
+              : "This browser can't save the whole transfer in one go. Take the files one at a time below, or ask the sender to upload it to the server instead."}
           </Notice>
         )}
         {senderMissing && !tooLargeHere && (
@@ -142,7 +142,7 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
           {meta.hosted ? (
-            <Button variant="primary" className={primary} onClick={() => startDirect(meta.files)} disabled={!viaDirect}>
+            <Button variant="primary" className={primary} onClick={() => startDirect(meta.files)} disabled={!viaDirect || tooLargeHere}>
               {label}
             </Button>
           ) : viaDirect ? (
