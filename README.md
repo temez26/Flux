@@ -80,6 +80,9 @@ docker compose up -d --build            # API on :8080
 cd web && npm install && npm run dev    # UI on :3000, proxies /api to :8080
 ```
 
+`npm test` in `web/` and `cargo test` in `server/` cover the two zip writers, where a mistake
+yields an archive that looks fine until someone opens it somewhere else.
+
 `server/` — Rust API (axum, sqlx, PostgreSQL), also serves the web app. A module per concern:
 `upload`, `download`, `zip`, `thumbs`, `signal`, `stun`, `cleanup`.
 
