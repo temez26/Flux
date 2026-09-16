@@ -280,13 +280,27 @@ export class DirectClient extends Emitter {
   constructor(code: string) {
     super();
     this.signal = new Signal(code, { role: "receiver" }, (msg) => void this.onSignal(msg));
+    // A locked phone or a sleeping laptop takes the connection down without the page
+    // getting a chance to react, and whatever it was in the middle of is still worth
+    // finishing. Coming back into view is the moment to try again.
+    window.addEventListener("online", this.revive);
+    document.addEventListener("visibilitychange", this.revive);
   }
 
   close() {
     this.closed = true;
+    window.removeEventListener("online", this.revive);
+    document.removeEventListener("visibilitychange", this.revive);
     this.signal.close();
     this.teardown();
   }
+
+  /** Gives a connection that ran out of attempts while away another go. */
+  private revive = () => {
+    if (this.closed || document.hidden || this.state !== "unavailable") return;
+    this.attempts = 0;
+    void this.connect();
+  };
 
   /** Streams bytes `offset..size` of a file, keeping a bounded window of requests in flight. */
   async *read(idx: number, offset: number, size: number, signal: AbortSignal): AsyncGenerator<Uint8Array> {
