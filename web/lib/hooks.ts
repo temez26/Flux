@@ -92,7 +92,7 @@ export function useFilePicker() {
       window.clearTimeout(timer.current);
       window.clearTimeout(stall.current);
     };
-  }, [settle]);
+  }, [settle, show]);
 
   /**
    * Call right before opening a picker. A phone with a full camera roll can take seconds

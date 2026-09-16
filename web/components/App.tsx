@@ -7,7 +7,7 @@ import { navigate, usePath } from "@/lib/router";
 import Home from "./Home";
 import { AlertIcon, BackIcon, LogoIcon } from "./icons";
 import Toaster from "./Toaster";
-import TransferView from "./TransferView";
+import TransferView from "./transfer/TransferView";
 import { Badge, IconButton, Message } from "./ui";
 
 export default function App() {
@@ -76,7 +76,7 @@ export default function App() {
         </a>
         {!online && (
           <span className="ml-auto">
-            <Badge tone="warn" icon={<AlertIcon className="size-3" />}>
+            <Badge tone="warn" icon={<AlertIcon />}>
               Offline
             </Badge>
           </span>

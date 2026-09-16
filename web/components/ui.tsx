@@ -73,9 +73,32 @@ const solid: Record<Tone, string> = {
 export function Badge({ tone = "muted", icon, children }: { tone?: Tone; icon?: ReactNode; children: ReactNode }) {
   return (
     <span className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${soft[tone]}`}>
-      {icon}
+      {/* Sized here so no caller has to repeat it; a descendant rule outranks the icon's own class. */}
+      {icon && <span className="flex shrink-0 [&_svg]:size-3">{icon}</span>}
       <span className="truncate">{children}</span>
     </span>
+  );
+}
+
+/** An aside inside a card: why something is waiting, blocked, or went wrong. */
+export function Notice({
+  tone = "muted",
+  icon,
+  role,
+  className = "",
+  children,
+}: {
+  tone?: Tone;
+  icon?: ReactNode;
+  role?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <p role={role} className={`flex items-start gap-2 rounded-xl p-3 text-sm ${soft[tone]} ${className}`}>
+      {icon && <span className="mt-0.5 flex shrink-0 [&_svg]:size-4">{icon}</span>}
+      <span>{children}</span>
+    </p>
   );
 }
 
