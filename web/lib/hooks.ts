@@ -8,6 +8,9 @@ const PAINT_TIMEOUT_MS = 50;
 // A desktop file dialog hands the selection over at once; this keeps the wait from
 // flashing there while still catching the slow copy on phones.
 const PICKER_GRACE_MS = 150;
+// Waiting this long means something is wrong: a phone that can't hand over the selection
+// says nothing at all about it, so the page has to notice on its own.
+const PICKER_STALL_MS = 10_000;
 
 /**
  * Resolves once the browser has had a chance to paint. Every microtask runs before
@@ -32,13 +35,19 @@ export function nextPaint(): Promise<void> {
  */
 export function useFilePicker() {
   const [waiting, setWaiting] = useState(false);
+  // Android's picker drops a selection it can't hand over without telling anyone, and
+  // Chrome there sends no `cancel` either, so a wait that goes nowhere needs explaining.
+  const [stalled, setStalled] = useState(false);
   const pending = useRef(false);
   const timer = useRef(0);
+  const stall = useRef(0);
 
   const settle = useCallback(() => {
     pending.current = false;
     window.clearTimeout(timer.current);
+    window.clearTimeout(stall.current);
     setWaiting(false);
+    setStalled(false);
   }, []);
 
   useEffect(() => {
@@ -46,7 +55,12 @@ export function useFilePicker() {
     const returned = () => {
       if (!pending.current || document.hidden) return;
       window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => pending.current && setWaiting(true), PICKER_GRACE_MS);
+      timer.current = window.setTimeout(() => {
+        if (!pending.current) return;
+        setWaiting(true);
+        window.clearTimeout(stall.current);
+        stall.current = window.setTimeout(() => pending.current && setStalled(true), PICKER_STALL_MS);
+      }, PICKER_GRACE_MS);
     };
     window.addEventListener("focus", returned);
     document.addEventListener("visibilitychange", returned);
@@ -61,6 +75,7 @@ export function useFilePicker() {
       window.removeEventListener("cancel", settle, true);
       window.removeEventListener("pointerdown", settle);
       window.clearTimeout(timer.current);
+      window.clearTimeout(stall.current);
     };
   }, [settle]);
 
@@ -69,7 +84,7 @@ export function useFilePicker() {
     pending.current = true;
   }, []);
 
-  return { waiting, arm, settle };
+  return { waiting, stalled, arm, settle };
 }
 
 export function useMounted(): boolean {

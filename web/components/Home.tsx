@@ -179,6 +179,11 @@ export default function Home() {
             <>
               <Spinner className="size-7 text-accent" />
               <p className="font-medium">{status}</p>
+              {picker.stalled && (
+                <p className="max-w-xs text-sm text-muted">
+                  Still nothing. Phones quietly give up on very large selections — try a few hundred files at a time.
+                </p>
+              )}
             </>
           ) : (
             <>
