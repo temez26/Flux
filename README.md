@@ -84,4 +84,12 @@ docker compose up -d --build            # API on :8080
 cd web && npm install && npm run dev    # UI on :3000, proxies /api to :8080
 ```
 
-`server/` is the Rust API (axum, sqlx, PostgreSQL), which also serves the web app. `web/` is the Next.js app, built as a static export.
+`server/` is the Rust API (axum, sqlx, PostgreSQL), which also serves the web app, with a module
+per concern: `upload`, `download`, `zip`, `thumbs`, `signal` (rendezvous for direct transfers),
+`stun` and `cleanup`.
+
+`web/` is the Next.js app, built as a static export. `lib/` is the transfer engine in plain
+TypeScript — uploading, receiving, direct peer connections, hashing, zipping — and never imports
+a component. `components/` renders it: `transfer/` has a file per panel (who you are decides
+which one you see), `preview/` a file per family of file viewer, and `ui.tsx` the shared
+primitives.
