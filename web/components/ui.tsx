@@ -29,14 +29,38 @@ export function IconButton({ label, className = "", ...props }: ButtonHTMLAttrib
   return <button type="button" aria-label={label} title={label} className={`${iconButtonClass} ${className}`} {...props} />;
 }
 
-/** Destructive action that needs a second tap, instead of a blocking dialog. */
-export function ConfirmButton({ onConfirm, children }: { onConfirm: () => void; children: ReactNode }) {
+/** A destructive control's wait for its second tap, which lapses if that tap doesn't come. */
+function useArmed(): [boolean, (armed: boolean) => void] {
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return;
     const id = window.setTimeout(() => setArmed(false), 3000);
     return () => window.clearTimeout(id);
   }, [armed]);
+  return [armed, setArmed];
+}
+
+/** ConfirmButton for a row with no room for words: an icon that turns red while it waits. */
+export function ConfirmIconButton({ label, onConfirm, children }: { label: string; onConfirm: () => void; children: ReactNode }) {
+  const [armed, setArmed] = useArmed();
+  return (
+    <IconButton
+      label={armed ? `Tap again: ${label}` : label}
+      onClick={() => {
+        if (!armed) return setArmed(true);
+        setArmed(false);
+        onConfirm();
+      }}
+      className={armed ? "bg-err/10 !text-err" : "hover:!text-err"}
+    >
+      {children}
+    </IconButton>
+  );
+}
+
+/** Destructive action that needs a second tap, instead of a blocking dialog. */
+export function ConfirmButton({ onConfirm, children }: { onConfirm: () => void; children: ReactNode }) {
+  const [armed, setArmed] = useArmed();
   return (
     <Button
       variant={armed ? "primary" : "danger"}

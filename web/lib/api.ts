@@ -14,6 +14,10 @@ export interface TransferMeta {
   title: string;
   /** A collection: anyone with the code may add files, not only whoever created it. */
   collect: boolean;
+  /** Downloads started from a page, of all or part of the transfer. */
+  downloads: number;
+  /** A collection its owner stopped: nothing more can be added. */
+  closed: boolean;
   createdAt: string;
   expiresAt: string;
   /** Served from the sender's device: the server has the file list but none of the bytes. */
@@ -42,6 +46,8 @@ export interface Summary {
   expiresAt: string;
   hosted: boolean;
   collect: boolean;
+  downloads: number;
+  closed: boolean;
   files: number;
   size: number;
   complete: boolean;
@@ -55,6 +61,13 @@ export class ApiError extends Error {
     super(message);
   }
 }
+
+/** How long a transfer can be kept, the only lengths the server accepts. */
+export const EXPIRY_OPTIONS = [
+  { label: "1 hour", value: 3600 },
+  { label: "1 day", value: 86_400 },
+  { label: "7 days", value: 604_800 },
+];
 
 const transferUrl = (code: string) => `/api/transfers/${code}`;
 export const fileUrl = (code: string, idx: number) => `${transferUrl(code)}/files/${idx}`;
@@ -165,6 +178,20 @@ export function getTransfer(code: string): Promise<TransferMeta | null> {
 
 export function getSummary(code: string): Promise<Summary | null> {
   return orNull(request<Summary>(`${transferUrl(code)}/summary`));
+}
+
+/** Records that a download of this transfer started. Best effort: it never holds a download up. */
+export function countDownload(code: string) {
+  void fetch(`${transferUrl(code)}/downloads`, { method: "POST", keepalive: true }).catch(() => {});
+}
+
+/** Changes a transfer its owner holds the token for; `expiresIn` counts from now. */
+export function updateTransfer(code: string, token: string, changes: { expiresIn?: number; closed?: boolean }) {
+  return request<{ expiresAt: string; closed: boolean }>(transferUrl(code), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...auth(token) },
+    body: JSON.stringify(changes),
+  });
 }
 
 export function deleteTransfer(code: string, token: string) {

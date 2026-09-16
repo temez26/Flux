@@ -1,19 +1,19 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { deleteTransfer, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
+import { countDownload, deleteTransfer, errorMessage, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
 import { basename } from "@/lib/files";
 import { formatBytes, formatCode, formatRemaining, plural } from "@/lib/format";
-import { useNow } from "@/lib/hooks";
+import { reloadTransfer, useNow } from "@/lib/hooks";
 import { removeOwned } from "@/lib/owned";
 import { canPreview } from "@/lib/preview";
 import { navigate } from "@/lib/router";
-import { end } from "@/lib/session";
+import { end, removeFile } from "@/lib/session";
 import { toast } from "@/lib/toast";
 import { FileRow, FileTile } from "../FileList";
-import { CheckIcon, ClockIcon, DownloadIcon, FileTypeIcon, FolderIcon } from "../icons";
+import { CheckIcon, ClockIcon, DownloadIcon, FileTypeIcon, FolderIcon, TrashIcon } from "../icons";
 import { FileThumb } from "../preview/Preview";
-import { Badge, Spinner, buttonClass } from "../ui";
+import { Badge, ConfirmIconButton, Spinner, buttonClass } from "../ui";
 
 /** Stand-ins for a store that doesn't exist yet, for useSyncExternalStore. */
 export const subscribeNothing = () => () => {};
@@ -34,6 +34,17 @@ const UNDO_MS = 7000;
  * the window then leaves the transfer whole and still listed, which is a far better way to
  * be wrong than leaving one alive that its owner can no longer see or reach.
  */
+/** Removes a file from a transfer this device owns, once its row's second tap arrives. */
+export function removeOwnedFile(code: string, token: string, file: FileMeta) {
+  removeFile(code, token, file.idx, file.size).then(
+    () => {
+      reloadTransfer(code);
+      toast(`Removed ${basename(file.path)}`);
+    },
+    (err) => toast(errorMessage(err), "err"),
+  );
+}
+
 export function removeTransfer(code: string, token: string) {
   navigate("/", true);
   const timer = window.setTimeout(() => {
@@ -112,7 +123,28 @@ export function TransferHeading({ meta, badges }: { meta: TransferMeta; badges?:
 }
 
 /** A file as the server knows it: uploaded, part-way there, or still expected. */
-export function MetaRow({ file, code, downloadable, onPreview }: { file: FileMeta; code: string; downloadable: boolean; onPreview: (idx: number) => void }) {
+/** `counted` records a download taken from the row, for anyone who isn't the transfer's owner. */
+export function MetaRow({
+  file,
+  code,
+  downloadable,
+  counted = false,
+  onPreview,
+  onRemove,
+}: {
+  file: FileMeta;
+  code: string;
+  downloadable: boolean;
+  counted?: boolean;
+  onPreview: (idx: number) => void;
+  /** Offered to the transfer's owner, finished upload or not. */
+  onRemove?: () => void;
+}) {
+  const remove = onRemove && (
+    <ConfirmIconButton label={`Remove ${basename(file.path)}`} onConfirm={onRemove}>
+      <TrashIcon className="size-4" />
+    </ConfirmIconButton>
+  );
   if (file.hash) {
     return (
       <FileRow
@@ -128,10 +160,21 @@ export function MetaRow({ file, code, downloadable, onPreview }: { file: FileMet
           )
         }
         actions={
-          downloadable && (
-            <a href={fileUrl(code, file.idx)} download className={buttonClass("ghost", "min-h-10 px-3 text-accent")} aria-label={`Download ${basename(file.path)}`}>
-              <DownloadIcon className="size-4" />
-            </a>
+          (downloadable || remove) && (
+            <>
+              {downloadable && (
+                <a
+                  href={fileUrl(code, file.idx)}
+                  download
+                  onClick={counted ? () => countDownload(code) : undefined}
+                  className={buttonClass("ghost", "min-h-10 px-3 text-accent")}
+                  aria-label={`Download ${basename(file.path)}`}
+                >
+                  <DownloadIcon className="size-4" />
+                </a>
+              )}
+              {remove}
+            </>
           )
         }
       />
@@ -148,9 +191,10 @@ export function MetaRow({ file, code, downloadable, onPreview }: { file: FileMet
         </Badge>
       }
       progress={pct}
+      actions={remove}
     />
   ) : (
-    <FileRow path={file.path} size={file.size} badge={<Badge icon={<ClockIcon />}>Waiting</Badge>} />
+    <FileRow path={file.path} size={file.size} badge={<Badge icon={<ClockIcon />}>Waiting</Badge>} actions={remove} />
   );
 }
 
@@ -176,7 +220,8 @@ export function MetaTile({ file, code, onPreview }: { file: FileMeta; code: stri
 const MAX_URL = 4000;
 
 /** Downloads chosen files that the server holds: one directly, several as a zip. */
-export function SelectionDownload({ code, files }: { code: string; files: FileMeta[] }) {
+export function SelectionDownload({ code, files, counted = false }: { code: string; files: FileMeta[]; counted?: boolean }) {
+  const count = counted ? () => countDownload(code) : undefined;
   const primary = buttonClass("primary", "min-h-9");
   if (files.some((f) => !f.hash)) {
     return (
@@ -187,7 +232,7 @@ export function SelectionDownload({ code, files }: { code: string; files: FileMe
   }
   if (files.length === 1) {
     return (
-      <a href={fileUrl(code, files[0].idx)} download className={primary}>
+      <a href={fileUrl(code, files[0].idx)} download onClick={count} className={primary}>
         <DownloadIcon className="size-4" />
         Download
       </a>
@@ -203,7 +248,7 @@ export function SelectionDownload({ code, files }: { code: string; files: FileMe
     );
   }
   return (
-    <a href={url} download className={primary}>
+    <a href={url} download onClick={count} className={primary}>
       <DownloadIcon className="size-4" />
       Download {files.length.toLocaleString()} as .zip
     </a>

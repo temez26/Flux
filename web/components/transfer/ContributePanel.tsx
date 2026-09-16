@@ -4,7 +4,7 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { errorMessage, type TransferMeta } from "@/lib/api";
 import { getDevice } from "@/lib/device";
 import { formatBytes, plural } from "@/lib/format";
-import { useLeaveGuard, useNotifyWhen, useTitle, useWakeLock } from "@/lib/hooks";
+import { reloadTransfer, useLeaveGuard, useNotifyWhen, useTitle, useWakeLock } from "@/lib/hooks";
 import { contribute, contributions } from "@/lib/session";
 import { toast } from "@/lib/toast";
 import { FileBrowser } from "../FileList";
@@ -34,6 +34,8 @@ export function ContributePanel({ meta }: { meta: TransferMeta }) {
       setUploader(await contribute(meta.code, picked));
     } catch (err) {
       toast(errorMessage(err), "err");
+      // Most likely it was closed since this page last looked.
+      reloadTransfer(meta.code);
     } finally {
       setAdding(false);
     }
@@ -63,23 +65,31 @@ export function ContributePanel({ meta }: { meta: TransferMeta }) {
     <div className="space-y-4">
       <Card>
         <SectionTitle icon={<FolderIcon className="size-4.5" />}>{meta.title}</SectionTitle>
-        <p className="text-sm text-muted">
-          Someone is collecting files here. Yours go into a folder named <span className="font-medium text-fg">{getDevice().name}</span>, and
-          anyone with the code can download what&apos;s here.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button variant="primary" onClick={() => picker.open("files")} disabled={adding}>
-            {adding || picker.waiting ? <Spinner className="size-4" /> : <UploadIcon className="size-4" />}
-            {picker.waiting ? "Getting your files…" : uploader ? "Add more files" : "Add files"}
-          </Button>
-          {folders && (
-            <Button onClick={() => picker.open("folder")} disabled={adding}>
-              <PlusIcon className="size-4" />
-              Add a folder
-            </Button>
-          )}
-        </div>
-        {picker.inputs}
+        {meta.closed ? (
+          <p className="text-sm text-muted">
+            This collection is closed, so nothing more can be added. Anyone with the code can still download what&apos;s here.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-muted">
+              Someone is collecting files here. Yours go into a folder named <span className="font-medium text-fg">{getDevice().name}</span>, and
+              anyone with the code can download what&apos;s here.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button variant="primary" onClick={() => picker.open("files")} disabled={adding}>
+                {adding || picker.waiting ? <Spinner className="size-4" /> : <UploadIcon className="size-4" />}
+                {picker.waiting ? "Getting your files…" : uploader ? "Add more files" : "Add files"}
+              </Button>
+              {folders && (
+                <Button onClick={() => picker.open("folder")} disabled={adding}>
+                  <PlusIcon className="size-4" />
+                  Add a folder
+                </Button>
+              )}
+            </div>
+            {picker.inputs}
+          </>
+        )}
       </Card>
 
       {uploader && snapshot && status && (
@@ -115,9 +125,9 @@ export function ContributePanel({ meta }: { meta: TransferMeta }) {
       {meta.files.length ? (
         <FileBrowser
           paths={paths}
-          renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable onPreview={setPreviewing} />}
+          renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable counted onPreview={setPreviewing} />}
           renderTile={(i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />}
-          select={(indices) => <SelectionDownload code={meta.code} files={indices.map((i) => meta.files[i])} />}
+          select={(indices) => <SelectionDownload code={meta.code} files={indices.map((i) => meta.files[i])} counted />}
         />
       ) : (
         <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">Nothing here yet — yours can be the first.</p>

@@ -14,7 +14,7 @@ import { useFilePickers } from "../picker";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
 import { ShareCard } from "../ShareCard";
 import { Badge, Button, ConfirmButton, IconButton, Spinner, StatusCard, type StatusProps } from "../ui";
-import { MetaRow, MetaTile, Pinned, inFlight, pageTitle, percent, removeTransfer } from "./common";
+import { MetaRow, MetaTile, Pinned, inFlight, pageTitle, percent, removeOwnedFile, removeTransfer } from "./common";
 
 function senderStatus(session: Session, uploader: Uploader): StatusProps {
   const { counts, finished, reconnecting } = uploader.snapshot;
@@ -88,6 +88,7 @@ export function SenderPanel({ session, uploader, expiresAt }: { session: Session
     ["Files", `${counts.done.toLocaleString()} / ${files.toLocaleString()}`],
     ["Uploaded", `${formatBytes(sent)} / ${formatBytes(total)}`],
   ];
+  if (finished && meta) stats.push(["Downloads", meta.downloads.toLocaleString()]);
   if (running && !uploader.held) {
     stats.push(["Speed", speed > 0 ? `${formatBytes(speed)}/s` : "–"], ["Time left", speed > 0 ? formatDuration((total - sent) / speed) : "–"]);
   }
@@ -146,7 +147,15 @@ export function SenderPanel({ session, uploader, expiresAt }: { session: Session
       {meta && !counts.failed ? (
         <FileBrowser
           paths={metaPaths}
-          renderRow={(i) => <MetaRow file={meta.files[i]} code={uploader.code} downloadable={false} onPreview={setPreviewing} />}
+          renderRow={(i) => (
+            <MetaRow
+              file={meta.files[i]}
+              code={uploader.code}
+              downloadable={false}
+              onPreview={setPreviewing}
+              onRemove={meta.files.length > 1 ? () => removeOwnedFile(uploader.code, uploader.token, meta.files[i]) : undefined}
+            />
+          )}
           renderTile={(i) => <MetaTile file={meta.files[i]} code={uploader.code} onPreview={setPreviewing} />}
         />
       ) : (

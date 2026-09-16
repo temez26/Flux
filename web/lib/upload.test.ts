@@ -38,3 +38,18 @@ test("a transfer that has gone takes nothing more", () => {
   uploader.add([{ idx: 1, path: "late.txt", size: 5, file: new File(["hello"], "late.txt") }]);
   assert.equal(uploader.items.length, 1);
 });
+
+test("a file removed from the server stops counting, even once uploaded", () => {
+  const uploader = new Uploader("abcdefgh", "token", [
+    { idx: 0, path: "keep.txt", size: 10, done: true },
+    { idx: 1, path: "remove.txt", size: 5, done: true },
+  ]);
+  uploader.paused = true;
+  assert.equal(uploader.snapshot.total, 15);
+
+  uploader.forget(1);
+  assert.equal(uploader.items[1].status, "canceled");
+  (uploader as unknown as { refresh(): void }).refresh();
+  assert.equal(uploader.snapshot.total, 10, "no longer part of the total");
+  assert.equal(uploader.snapshot.counts.done, 1);
+});

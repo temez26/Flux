@@ -14,7 +14,7 @@ import { canPickFolder, useFilePickers } from "../picker";
 import { PreviewDialog } from "../preview/Preview";
 import { ShareCard } from "../ShareCard";
 import { Badge, Button, ConfirmButton, Notice, Spinner, StatusCard, type StatusProps } from "../ui";
-import { MetaRow, MetaTile, pageTitle, percent, removeTransfer, summarize } from "./common";
+import { MetaRow, MetaTile, pageTitle, percent, removeOwnedFile, removeTransfer, summarize } from "./common";
 
 /**
  * The sender coming back to a transfer this tab is no longer uploading — after a reload, or
@@ -71,10 +71,12 @@ export function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; toke
             ? [
                 ["Files", meta.files.length.toLocaleString()],
                 ["Size", formatBytes(size)],
+                ["Downloads", meta.downloads.toLocaleString()],
               ]
             : [
                 ["Files", `${complete.toLocaleString()} / ${meta.files.length.toLocaleString()}`],
                 ["Uploaded", `${formatBytes(received)} / ${formatBytes(size)}`],
+                ["Downloads", meta.downloads.toLocaleString()],
               ]
         }
         actions={
@@ -125,7 +127,13 @@ export function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; toke
           meta.hosted ? (
             <FileRow path={meta.files[i].path} size={meta.files[i].size} badge={<Badge icon={<DeviceIcon />}>Not shared</Badge>} />
           ) : (
-            <MetaRow file={meta.files[i]} code={meta.code} downloadable={false} onPreview={setPreviewing} />
+            <MetaRow
+              file={meta.files[i]}
+              code={meta.code}
+              downloadable={false}
+              onPreview={setPreviewing}
+              onRemove={meta.files.length > 1 ? () => removeOwnedFile(meta.code, token, meta.files[i]) : undefined}
+            />
           )
         }
         renderTile={meta.hosted ? undefined : (i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />}

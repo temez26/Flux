@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { errorMessage, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
+import { countDownload, errorMessage, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
 import { DirectClient } from "@/lib/direct";
 import { basename } from "@/lib/files";
 import { formatBytes, formatCode, formatDuration, plural } from "@/lib/format";
@@ -80,6 +80,7 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
       const sink = method === "stream" ? await streamSink(name, one?.size) : memorySink(name);
       const target = one ? singleTarget(sink) : zipTarget(sink);
       const next = new Receiver(meta, direct, target, new Set(files.map((f) => f.idx)));
+      countDownload(meta.code);
       // Only a finished receive has actually put anything on disk: a zip lands as one file
       // at the very end, so a run that failed part way through saved none of it.
       const stop = next.subscribe(() => {
@@ -170,7 +171,13 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
               {label}
             </Button>
           ) : (
-            <a href={single ? fileUrl(meta.code, single.idx) : zipUrl(meta.code)} download aria-disabled={!ready} className={buttonClass("primary", primary)}>
+            <a
+              href={single ? fileUrl(meta.code, single.idx) : zipUrl(meta.code)}
+              download
+              aria-disabled={!ready}
+              onClick={() => countDownload(meta.code)}
+              className={buttonClass("primary", primary)}
+            >
               {label}
             </a>
           )}
@@ -234,9 +241,9 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
         ) : (
           <FileBrowser
             paths={paths}
-            renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable onPreview={setPreviewing} />}
+            renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable counted onPreview={setPreviewing} />}
             renderTile={(i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />}
-            select={(indices) => <SelectionDownload code={meta.code} files={indices.map((i) => meta.files[i])} />}
+            select={(indices) => <SelectionDownload code={meta.code} files={indices.map((i) => meta.files[i])} counted />}
           />
         ))}
       <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />

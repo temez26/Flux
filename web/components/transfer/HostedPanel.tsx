@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { formatBytes, formatCode, plural } from "@/lib/format";
-import { useLeaveGuard, useNotifyWhen, useNow, useTitle, useWakeLock } from "@/lib/hooks";
+import { useLeaveGuard, useNotifyWhen, useNow, useTitle, useTransferMeta, useWakeLock } from "@/lib/hooks";
 import type { Session } from "@/lib/session";
 import { FileBrowser, FileRow } from "../FileList";
 import { AlertIcon, DeviceIcon, ZapIcon } from "../icons";
@@ -38,6 +38,8 @@ export function HostedPanel({ session, expiresAt }: { session: Session; expiresA
   const now = useNow(30_000);
   const expired = !!expiresAt && Date.parse(expiresAt) <= now;
   const serving = host.receivers;
+  // Only for the download count: everything else here comes from this tab's own session.
+  const { meta } = useTransferMeta(code, true);
   const paths = useMemo(() => entries.map((e) => e.path), [entries]);
   const size = useMemo(() => entries.reduce((sum, e) => sum + e.size, 0), [entries]);
   useWakeLock(!expired);
@@ -58,6 +60,7 @@ export function HostedPanel({ session, expiresAt }: { session: Session; expiresA
         stats={[
           ["Files", entries.length.toLocaleString()],
           ["Size", formatBytes(size)],
+          ["Downloads", (meta?.downloads ?? 0).toLocaleString()],
         ]}
         danger={<ConfirmButton onConfirm={() => removeTransfer(code, token)}>Delete transfer</ConfirmButton>}
       >

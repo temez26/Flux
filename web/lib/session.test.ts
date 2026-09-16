@@ -9,6 +9,8 @@ function transfer(files: { path: string; size: number; hash?: string }[]): Trans
     code: "abcdefgh",
     title: "",
     collect: false,
+    downloads: 0,
+    closed: false,
     createdAt: "",
     expiresAt: "",
     hosted: false,

@@ -28,12 +28,24 @@ function read(): Record<string, Owned> {
   }
 }
 
+const listeners = new Set<() => void>();
+let version = 0;
+
+/** For useSyncExternalStore: what this device owns changes as transfers are made, changed and removed. */
+export const subscribeOwned = (listener: () => void) => {
+  listeners.add(listener);
+  return () => void listeners.delete(listener);
+};
+export const ownedVersion = () => version;
+
 function write(all: Record<string, Owned>) {
   try {
     localStorage.setItem(KEY, JSON.stringify(all));
   } catch {
     // Storage unavailable (private mode); ownership then lasts for this tab only.
   }
+  version++;
+  for (const listener of listeners) listener();
 }
 
 export function listOwned(): [string, Owned][] {
