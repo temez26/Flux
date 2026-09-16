@@ -5,6 +5,7 @@ use axum::{
 };
 use serde_json::json;
 
+#[derive(Debug)]
 pub struct AppError(pub StatusCode, pub &'static str);
 
 pub type Result<T, E = AppError> = std::result::Result<T, E>;

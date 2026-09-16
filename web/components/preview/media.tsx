@@ -1,14 +1,17 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
-import { inlineUrl } from "@/lib/api";
+import { inlineUrl, renderUrl } from "@/lib/api";
 import { basename } from "@/lib/files";
+import { thumbnailSource } from "@/lib/preview";
 import { ExpandIcon, ExternalIcon, FileTypeIcon } from "../icons";
 import { Spinner } from "../ui";
 import { InlineFrame, Loading, Unavailable, overlayTextButton, type Status, type ViewProps } from "./chrome";
 
 export function ImageView({ code, file, url, inline, onExpand }: ViewProps) {
   const [status, setStatus] = useState<Status>("loading");
+  /** Showing the server's rendering because the browser couldn't read the original. */
+  const [rendered, setRendered] = useState(false);
   const [zoomable, setZoomable] = useState(false);
   /** Where the image was clicked to zoom in, as fractions of its size. */
   const [zoom, setZoom] = useState<{ x: number; y: number } | null>(null);
@@ -24,11 +27,20 @@ export function ImageView({ code, file, url, inline, onExpand }: ViewProps) {
 
   if (status === "failed") return <Unavailable code={code} file={file} url={url} inline={inline} message="This image format can't be shown in the browser" />;
 
+  // A format this browser can't decode (a HEIC outside Safari, say) is worth one more try
+  // against the server's rendering of it before giving up on showing anything at all.
+  function failed() {
+    if (rendered || thumbnailSource(file) !== "server") return setStatus("failed");
+    setRendered(true);
+    setStatus("loading");
+  }
+
   const loaded = status === "ready" ? "opacity-100" : "opacity-0";
   const image = (className: string, onClick?: (e: MouseEvent<HTMLImageElement>) => void) => (
     // eslint-disable-next-line @next/next/no-img-element -- served by the API, not a static asset
     <img
-      src={url}
+      key={rendered ? "rendered" : "original"}
+      src={rendered ? renderUrl(code, file.idx) : url}
       alt={name}
       draggable={false}
       onClick={onClick}
@@ -37,7 +49,7 @@ export function ImageView({ code, file, url, inline, onExpand }: ViewProps) {
         setZoomable(img.naturalWidth > img.clientWidth || img.naturalHeight > img.clientHeight);
         setStatus("ready");
       }}
-      onError={() => setStatus("failed")}
+      onError={failed}
       className={`select-none transition-opacity duration-200 ${loaded} ${className}`}
     />
   );
