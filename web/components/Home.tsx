@@ -7,7 +7,9 @@ import { formatBytes, formatCode, formatLifetime, formatRemaining, normalizeCode
 import { nextPaint, useNow, usePolling } from "@/lib/hooks";
 import { listOwned, removeOwned } from "@/lib/owned";
 import { navigate } from "@/lib/router";
+import { offerTitle, type Peer } from "@/lib/nearby";
 import { live, send } from "@/lib/session";
+import { toast } from "@/lib/toast";
 import {
   AlertIcon,
   ArrowIcon,
@@ -23,6 +25,7 @@ import {
   SearchIcon,
   UploadIcon,
 } from "./icons";
+import { getNearby, NearbyDevices } from "./nearby";
 import { canPickFolder, useFilePickers } from "./picker";
 import { Badge, Button, Card, Field, Notice, SectionTitle, Segmented, Spinner } from "./ui";
 
@@ -66,7 +69,9 @@ export default function Home() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const options = useRef({ expiresIn, isPublic, hosted });
+  /** A nearby device the next files are offered to, instead of only handing out a code. */
+  const [target, setTarget] = useState<Peer | null>(null);
+  const options = useRef({ expiresIn, isPublic, hosted, target: null as Peer | null });
   const folders = canPickFolder();
 
   const start = useCallback(async (picked: Picked[] | Promise<Picked[]>) => {
@@ -79,6 +84,22 @@ export default function Home() {
       // Reading every file's metadata blocks the main thread, so let the spinner land first.
       await nextPaint();
       const code = await send(files, options.current.hosted ? HOSTED_EXPIRY : options.current.expiresIn, options.current.isPublic, options.current.hosted);
+      const to = options.current.target;
+      if (to) {
+        const nearby = getNearby();
+        // The transfer exists either way, so a device that left only costs the offer.
+        if (nearby.peers.some((p) => p.device === to.device)) {
+          nearby.offer(to, {
+            code,
+            title: offerTitle(files.map((f) => f.path)),
+            files: files.length,
+            size: files.reduce((sum, f) => sum + f.file.size, 0),
+          });
+          toast(`Offered to ${to.name}`);
+        } else {
+          toast(`${to.name} is no longer nearby — share the code instead`, "err");
+        }
+      }
       navigate(`/${formatCode(code)}`);
     } catch (err) {
       setError(errorMessage(err));
@@ -143,6 +164,18 @@ export default function Home() {
     setHosted(value === "device");
   }
 
+  function chooseTarget(peer: Peer | null) {
+    options.current.target = peer;
+    setTarget(peer);
+  }
+
+  // Choosing a device goes straight on to choosing files; choosing it again lets it go.
+  function chooseDevice(peer: Peer) {
+    if (target?.device === peer.device) return chooseTarget(null);
+    chooseTarget(peer);
+    picker.open("files");
+  }
+
   // The drop zone around these buttons opens the file picker too.
   const pick = (kind: "files" | "folder") => (e: { stopPropagation(): void }) => {
     e.stopPropagation();
@@ -181,7 +214,9 @@ export default function Home() {
           ) : (
             <>
               <div>
-                <p className="font-semibold">{folders ? "Drop files or folders here" : "Send photos, videos or any files"}</p>
+                <p className="font-semibold">
+                  {target ? `Choose what to send to ${target.name}` : folders ? "Drop files or folders here" : "Send photos, videos or any files"}
+                </p>
                 <p className="mt-1 text-sm text-muted">Any size, any number of files</p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
@@ -199,6 +234,19 @@ export default function Home() {
             </>
           )}
         </div>
+
+        {target && (
+          <p className="mt-3 flex items-center gap-2 text-sm">
+            <DeviceIcon className="size-4 text-accent" />
+            <span className="min-w-0 flex-1 truncate">
+              Sending to <span className="font-medium">{target.name}</span>
+            </span>
+            <button type="button" onClick={() => chooseTarget(null)} className="text-muted transition hover:text-fg">
+              Cancel
+            </button>
+          </p>
+        )}
+        <NearbyDevices target={target} onChoose={chooseDevice} />
 
         <div className="mt-5 space-y-4">
           <Field

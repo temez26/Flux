@@ -6,6 +6,7 @@ import { useMounted, useOnline } from "@/lib/hooks";
 import { navigate, usePath } from "@/lib/router";
 import Home from "./Home";
 import { AlertIcon, BackIcon, LogoIcon } from "./icons";
+import { IncomingOffers } from "./nearby";
 import Toaster from "./Toaster";
 import TransferView from "./transfer/TransferView";
 import { Badge, IconButton, Message } from "./ui";
@@ -83,6 +84,8 @@ export default function App() {
         )}
       </header>
       <main className="flex-1 pt-4">{view}</main>
+      {/* Offers can arrive on any page, and there is nothing to connect for before hydration. */}
+      {mounted && <IncomingOffers />}
       <Toaster />
     </div>
   );
