@@ -76,16 +76,21 @@ function ask(req: HashRequest): Promise<HashReply> {
 }
 
 function workerHasher(id: number): Hasher {
+  let spent = false;
   return {
     async update(data, from = 0) {
       await ask({ op: "update", id, seq: sequence++, buffer: data.buffer, offset: data.byteOffset + from, length: data.byteLength - from });
     },
     async digest() {
       const reply = await ask({ op: "digest", id, seq: sequence++ });
+      spent = true;
       if (!("hash" in reply)) throw new Error("Hashing failed");
       return reply.hash;
     },
     release() {
+      // Taking the digest already handed the hasher back.
+      if (spent) return;
+      spent = true;
       void ask({ op: "release", id, seq: sequence++ }).catch(() => {});
     },
   };
