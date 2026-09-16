@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { formatBytes, formatCode, plural } from "@/lib/format";
-import { useLeaveGuard, useNow, useTitle, useWakeLock } from "@/lib/hooks";
+import { useLeaveGuard, useNotifyWhen, useNow, useTitle, useWakeLock } from "@/lib/hooks";
 import type { Session } from "@/lib/session";
 import { FileBrowser, FileRow } from "../FileList";
 import { AlertIcon, DeviceIcon, ZapIcon } from "../icons";
@@ -43,6 +43,7 @@ export function HostedPanel({ session, expiresAt }: { session: Session; expiresA
   useWakeLock(!expired);
   // Closing this page is the only thing that can end the transfer, so always ask.
   useLeaveGuard(!expired);
+  useNotifyWhen(serving > 0, "A device is downloading", `${formatCode(code)}, straight from this device`);
   useTitle(pageTitle(code));
 
   useEffect(() => {

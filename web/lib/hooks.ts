@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getTransfer, type TransferMeta } from "./api";
+import { notify } from "./notify";
 
 const noSubscribe = () => () => {};
 
@@ -105,6 +106,18 @@ export function useFilePicker() {
   }, [show]);
 
   return { waiting, stalled, arm, settle };
+}
+
+/**
+ * Notifies each time `when` turns true — but not for a state the page opened in, which the
+ * person opening it can already see.
+ */
+export function useNotifyWhen(when: boolean, title: string, body?: string) {
+  const previous = useRef(when);
+  useEffect(() => {
+    if (when && !previous.current) void notify(title, body);
+    previous.current = when;
+  }, [when, title, body]);
 }
 
 export function useMounted(): boolean {

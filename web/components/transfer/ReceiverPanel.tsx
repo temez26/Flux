@@ -5,7 +5,7 @@ import { errorMessage, fileUrl, zipUrl, type FileMeta, type TransferMeta } from 
 import { DirectClient } from "@/lib/direct";
 import { basename } from "@/lib/files";
 import { formatBytes, formatCode, formatDuration, plural } from "@/lib/format";
-import { useLeaveGuard, useTitle, useWakeLock } from "@/lib/hooks";
+import { useLeaveGuard, useNotifyWhen, useTitle, useWakeLock } from "@/lib/hooks";
 import { canPreview } from "@/lib/preview";
 import { Receiver, type ReceiveItem } from "@/lib/receive";
 import { getReceived, markReceived } from "@/lib/received";
@@ -306,6 +306,8 @@ function ReceivingPanel({ receiver, meta, onBack }: { receiver: Receiver; meta: 
   const paths = useMemo(() => receiver.items.map((i) => i.path), [receiver]);
   useWakeLock(running);
   useLeaveGuard(!finished);
+  useNotifyWhen(finished && !receiver.error, "Download complete", `${plural(receiver.items.length, "file")} saved and verified`);
+  useNotifyWhen(finished && !!receiver.error && receiver.error !== "Canceled", "Download failed", receiver.error);
   useTitle(running ? `${percent(received, total)}% downloaded · Flux` : undefined);
 
   const stats: [string, string][] = [

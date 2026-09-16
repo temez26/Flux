@@ -72,6 +72,8 @@ export class Nearby extends Emitter {
   constructor(
     private readonly open: () => SocketLike,
     private readonly onAnswer: (answer: Answer) => void,
+    /** Called once for each transfer offered, however many times its sender taps. */
+    private readonly onOffer?: (offer: Offer) => void,
   ) {
     super();
     this.connect();
@@ -144,7 +146,9 @@ export class Nearby extends Emitter {
       case "offer": {
         const offer: Offer = { from: msg.from, code: msg.code, title: msg.title, files: msg.files, size: msg.size };
         // The same transfer offered twice, from a sender who tapped again, is one offer.
+        const known = this.offers.some((o) => o.code === offer.code);
         this.offers = [...this.offers.filter((o) => o.code !== offer.code), offer].slice(-MAX_OFFERS);
+        if (!known) this.onOffer?.(offer);
         break;
       }
       case "answer":

@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { formatBytes, formatCode, plural } from "@/lib/format";
 import { Nearby, type Peer, type SocketLike } from "@/lib/nearby";
+import { notify } from "@/lib/notify";
 import { navigate } from "@/lib/router";
 import { toast } from "@/lib/toast";
 import { CloseIcon, DeviceIcon, DownloadIcon } from "./icons";
@@ -18,6 +19,8 @@ export function getNearby(): Nearby {
       return new WebSocket(`${scheme}://${window.location.host}/api/nearby`) as unknown as SocketLike;
     },
     ({ from, accepted }) => toast(accepted ? `${from.name} is opening it` : `${from.name} declined`, accepted ? "ok" : "err"),
+    (offer) =>
+      notify(`${offer.from.name} wants to send you files`, `${offer.title} · ${plural(offer.files, "file")} · ${formatBytes(offer.size)}`, `offer-${offer.code}`),
   ));
 }
 

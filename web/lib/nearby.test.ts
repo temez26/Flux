@@ -32,6 +32,7 @@ class FakeSocket implements SocketLike {
 
 let sockets: FakeSocket[];
 let answers: Answer[];
+let offered: string[];
 
 function nearby() {
   return new Nearby(
@@ -41,6 +42,7 @@ function nearby() {
       return socket;
     },
     (answer) => answers.push(answer),
+    (offer) => offered.push(offer.code),
   );
 }
 
@@ -48,6 +50,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   sockets = [];
   answers = [];
+  offered = [];
   const store = new Map<string, string>();
   Object.defineProperty(globalThis, "window", { value: globalThis, configurable: true });
   Object.defineProperty(globalThis, "localStorage", {
@@ -104,6 +107,8 @@ test("collects offers, once per transfer, and only the latest few", () => {
   sockets[0].push(offer("aaaaaaaa"));
   sockets[0].push(offer("aaaaaaaa"));
   assert.equal(client.offers.length, 1, "a sender tapping twice is still one offer");
+
+  assert.deepEqual(offered, ["aaaaaaaa"], "and announced once, not once per tap");
 
   for (const code of ["b", "c", "d", "e", "f", "g"]) sockets[0].push(offer(code.repeat(8)));
   assert.equal(client.offers.length, 5);

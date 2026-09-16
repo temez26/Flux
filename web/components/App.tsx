@@ -7,6 +7,7 @@ import { navigate, usePath } from "@/lib/router";
 import Home from "./Home";
 import { AlertIcon, BackIcon, LogoIcon } from "./icons";
 import { IncomingOffers } from "./nearby";
+import { NotificationToggle } from "./notifications";
 import Toaster from "./Toaster";
 import TransferView from "./transfer/TransferView";
 import { Badge, IconButton, Message } from "./ui";
@@ -75,13 +76,14 @@ export default function App() {
           </span>
           Flux
         </a>
-        {!online && (
-          <span className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
+          {!online && (
             <Badge tone="warn" icon={<AlertIcon />}>
               Offline
             </Badge>
-          </span>
-        )}
+          )}
+          {mounted && <NotificationToggle />}
+        </div>
       </header>
       <main className="flex-1 pt-4">{view}</main>
       {/* Offers can arrive on any page, and there is nothing to connect for before hydration. */}
