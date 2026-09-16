@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { errorMessage, getSummary, listPublic, type Summary } from "@/lib/api";
-import { fromDataTransfer, fromFileList, type Picked } from "@/lib/files";
+import { fromDataTransfer, type Picked } from "@/lib/files";
 import { formatBytes, formatCode, formatRemaining, normalizeCode, plural } from "@/lib/format";
-import { nextPaint, useFilePicker, useNow, usePolling } from "@/lib/hooks";
+import { nextPaint, useNow, usePolling } from "@/lib/hooks";
 import { listOwned, removeOwned } from "@/lib/owned";
 import { navigate } from "@/lib/router";
 import { live, send } from "@/lib/session";
@@ -22,7 +22,8 @@ import {
   PauseIcon,
   UploadIcon,
 } from "./icons";
-import { Badge, Button, Card, Field, SectionTitle, Segmented, Spinner } from "./ui";
+import { canPickFolder, useFilePickers } from "./picker";
+import { Badge, Button, Card, Field, Notice, SectionTitle, Segmented, Spinner } from "./ui";
 
 const EXPIRY = [
   { label: "1 hour", value: 3600 },
@@ -42,7 +43,6 @@ const EXPIRY_KEY = "flux.expiry";
 // plausible sitting; the row holds a file list and nothing else.
 const HOSTED_EXPIRY = 604_800;
 const LIST_POLL_MS = 15_000;
-const folderInputProps = { webkitdirectory: "" } as InputHTMLAttributes<HTMLInputElement>;
 
 function storedExpiry(): number {
   try {
@@ -62,12 +62,8 @@ export default function Home() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const folderInput = useRef<HTMLInputElement>(null);
   const options = useRef({ expiresIn, isPublic, hosted });
-  const canPickFolder = window.matchMedia("(pointer: fine)").matches;
-  const picker = useFilePicker();
-  const status = busy ?? (picker.waiting ? "Getting your files…" : null);
+  const folders = canPickFolder();
 
   const start = useCallback(async (picked: Picked[] | Promise<Picked[]>) => {
     setError(null);
@@ -85,6 +81,9 @@ export default function Home() {
       setBusy(null);
     }
   }, []);
+
+  const picker = useFilePickers((picked) => void start(picked));
+  const status = busy ?? (picker.waiting ? "Getting your files…" : null);
 
   // The whole window is a drop target on devices with drag and drop.
   useEffect(() => {
@@ -140,16 +139,10 @@ export default function Home() {
     setHosted(value === "device");
   }
 
+  // The drop zone around these buttons opens the file picker too.
   const pick = (kind: "files" | "folder") => (e: { stopPropagation(): void }) => {
     e.stopPropagation();
-    picker.arm();
-    (kind === "files" ? fileInput : folderInput).current?.click();
-  };
-
-  const receive = (e: { target: HTMLInputElement }) => {
-    picker.settle();
-    void start(fromFileList(e.target.files));
-    e.target.value = "";
+    picker.open(kind);
   };
 
   return (
@@ -166,11 +159,7 @@ export default function Home() {
       <Card>
         <SectionTitle icon={<UploadIcon className="size-4.5" />}>Send</SectionTitle>
         <div
-          onClick={() => {
-            if (busy) return;
-            picker.arm();
-            fileInput.current?.click();
-          }}
+          onClick={() => !busy && picker.open("files")}
           className={`flex min-h-48 cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-6 text-center transition ${
             status ? "cursor-default border-line" : "border-line hover:border-accent/60 hover:bg-hover/50"
           }`}
@@ -188,7 +177,7 @@ export default function Home() {
           ) : (
             <>
               <div>
-                <p className="font-semibold">{canPickFolder ? "Drop files or folders here" : "Send photos, videos or any files"}</p>
+                <p className="font-semibold">{folders ? "Drop files or folders here" : "Send photos, videos or any files"}</p>
                 <p className="mt-1 text-sm text-muted">Any size, any number of files</p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
@@ -196,7 +185,7 @@ export default function Home() {
                   <UploadIcon className="size-4" />
                   Choose files
                 </Button>
-                {canPickFolder && (
+                {folders && (
                   <Button onClick={pick("folder")}>
                     <FolderIcon className="size-4" />
                     Choose folder
@@ -231,13 +220,11 @@ export default function Home() {
         </div>
 
         {error && (
-          <p className="mt-4 flex items-center gap-2 rounded-xl bg-err/10 p-3 text-sm text-err">
-            <AlertIcon className="size-4 shrink-0" />
+          <Notice tone="err" icon={<AlertIcon />} className="mt-4">
             {error}
-          </p>
+          </Notice>
         )}
-        <input ref={fileInput} type="file" multiple hidden onChange={receive} />
-        <input ref={folderInput} type="file" hidden {...folderInputProps} onChange={receive} />
+        {picker.inputs}
       </Card>
 
       <Card>
@@ -292,10 +279,10 @@ function PublicList() {
             detail={`${plural(t.files, "file")} · ${formatBytes(t.size)} · ${formatRemaining(t.expiresAt, now)}`}
             badge={
               t.hosted ? (
-                <Badge icon={<DeviceIcon className="size-3" />}>From a device</Badge>
+                <Badge icon={<DeviceIcon />}>From a device</Badge>
               ) : (
                 !t.complete && (
-                  <Badge tone="accent" icon={<Spinner className="size-3" />}>
+                  <Badge tone="accent" icon={<Spinner />}>
                     Uploading
                   </Badge>
                 )
@@ -357,25 +344,23 @@ function ReceiveForm() {
   );
 }
 
-const small = "size-3";
-
 function ownedBadge(code: string, summary: Summary | undefined): ReactNode {
   if (!summary) return null;
   // A hosted transfer only exists while this tab is serving it, so that is what to report.
   if (summary.hosted) {
     return live.has(code) ? (
-      <Badge tone="ok" icon={<DeviceIcon className={small} />}>
+      <Badge tone="ok" icon={<DeviceIcon />}>
         Sharing
       </Badge>
     ) : (
-      <Badge tone="warn" icon={<AlertIcon className={small} />}>
+      <Badge tone="warn" icon={<AlertIcon />}>
         Not shared
       </Badge>
     );
   }
   if (summary.complete) {
     return (
-      <Badge tone="ok" icon={<CheckIcon className={small} />}>
+      <Badge tone="ok" icon={<CheckIcon />}>
         Ready
       </Badge>
     );
@@ -383,17 +368,17 @@ function ownedBadge(code: string, summary: Summary | undefined): ReactNode {
   const uploader = live.get(code)?.uploader;
   if (!uploader) {
     return (
-      <Badge tone="warn" icon={<AlertIcon className={small} />}>
+      <Badge tone="warn" icon={<AlertIcon />}>
         Interrupted
       </Badge>
     );
   }
   return uploader.paused ? (
-    <Badge tone="warn" icon={<PauseIcon className={small} />}>
+    <Badge tone="warn" icon={<PauseIcon />}>
       Paused
     </Badge>
   ) : (
-    <Badge tone="accent" icon={<Spinner className={small} />}>
+    <Badge tone="accent" icon={<Spinner />}>
       Uploading
     </Badge>
   );

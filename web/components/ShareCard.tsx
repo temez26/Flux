@@ -62,13 +62,13 @@ export function ShareCard({ code, expiresAt, hosted }: { code: string; expiresAt
     <Card>
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="mr-auto text-sm font-semibold">Share</h2>
-        <Badge tone={isPublic ? "accent" : "muted"} icon={isPublic ? <GlobeIcon className="size-3" /> : <LockIcon className="size-3" />}>
+        <Badge tone={isPublic ? "accent" : "muted"} icon={isPublic ? <GlobeIcon /> : <LockIcon />}>
           {isPublic ? "Public" : "Private"}
         </Badge>
         {hosted ? (
-          <Badge icon={<ClockIcon className="size-3" />}>While this page is open</Badge>
+          <Badge icon={<ClockIcon />}>While this page is open</Badge>
         ) : (
-          expiresAt && <Badge icon={<ClockIcon className="size-3" />}>{formatRemaining(expiresAt, now)}</Badge>
+          expiresAt && <Badge icon={<ClockIcon />}>{formatRemaining(expiresAt, now)}</Badge>
         )}
       </div>
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
