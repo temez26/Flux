@@ -14,10 +14,22 @@ export default function Toaster() {
       {toasts.list.map((t) => (
         <div
           key={t.id}
-          className="flex animate-[toast-in_.2s_ease-out] items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-medium shadow-lg"
+          className="pointer-events-auto flex animate-[toast-in_.2s_ease-out] items-center gap-2 rounded-xl border border-line bg-surface py-2.5 pr-2 pl-4 text-sm font-medium shadow-lg"
         >
           {t.tone === "ok" ? <CheckIcon className="size-4 text-ok" /> : <AlertIcon className="size-4 text-err" />}
           {t.message}
+          {t.action && (
+            <button
+              type="button"
+              onClick={() => {
+                toasts.dismiss(t.id);
+                t.action?.run();
+              }}
+              className="-my-1 rounded-lg px-2 py-1 font-semibold text-accent transition hover:bg-hover"
+            >
+              {t.action.label}
+            </button>
+          )}
         </div>
       ))}
     </div>
