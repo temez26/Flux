@@ -15,6 +15,7 @@ import {
   ClockIcon,
   DownloadIcon,
   FileTypeIcon,
+  DeviceIcon,
   FolderIcon,
   GlobeIcon,
   LockIcon,
@@ -32,6 +33,10 @@ const VISIBILITY = [
   { label: "Private", value: "private", icon: <LockIcon className="size-4" /> },
   { label: "Public", value: "public", icon: <GlobeIcon className="size-4" /> },
 ];
+const DELIVERY = [
+  { label: "Upload", value: "server", icon: <UploadIcon className="size-4" /> },
+  { label: "This device", value: "device", icon: <DeviceIcon className="size-4" /> },
+];
 const EXPIRY_KEY = "flux.expiry";
 const LIST_POLL_MS = 15_000;
 const folderInputProps = { webkitdirectory: "" } as InputHTMLAttributes<HTMLInputElement>;
@@ -47,14 +52,16 @@ function storedExpiry(): number {
 
 export default function Home() {
   const [expiresIn, setExpiresIn] = useState(storedExpiry);
-  // Deliberately not remembered: publishing should always be a conscious choice.
+  // Deliberately not remembered: publishing should always be a conscious choice, and so
+  // should sharing from this device, which only lasts as long as the page stays open.
   const [isPublic, setIsPublic] = useState(false);
+  const [hosted, setHosted] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
-  const options = useRef({ expiresIn, isPublic });
+  const options = useRef({ expiresIn, isPublic, hosted });
   const canPickFolder = window.matchMedia("(pointer: fine)").matches;
   const picker = useFilePicker();
   const status = busy ?? (picker.waiting ? "Getting your files…" : null);
@@ -68,7 +75,7 @@ export default function Home() {
       setBusy(`Preparing ${plural(files.length, "file")}…`);
       // Reading every file's metadata blocks the main thread, so let the spinner land first.
       await nextPaint();
-      const code = await send(files, options.current.expiresIn, options.current.isPublic);
+      const code = await send(files, options.current.expiresIn, options.current.isPublic, options.current.hosted);
       navigate(`/${formatCode(code)}`);
     } catch (err) {
       setError(errorMessage(err));
@@ -123,6 +130,11 @@ export default function Home() {
   function chooseVisibility(value: string) {
     options.current.isPublic = value === "public";
     setIsPublic(value === "public");
+  }
+
+  function chooseDelivery(value: string) {
+    options.current.hosted = value === "device";
+    setHosted(value === "device");
   }
 
   const pick = (kind: "files" | "folder") => (e: { stopPropagation(): void }) => {
@@ -187,13 +199,25 @@ export default function Home() {
           )}
         </div>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <Field label="Who can open it" hint={isPublic ? "Listed on this page for anyone who opens Flux." : "Only people with the code or link."}>
-            <Segmented label="Visibility" value={isPublic ? "public" : "private"} options={VISIBILITY} onChange={chooseVisibility} />
+        <div className="mt-5 space-y-4">
+          <Field
+            label="Where the files live"
+            hint={
+              hosted
+                ? "Nothing is uploaded. Keep this page open until the files have been received."
+                : "Files are stored on the server, so the link works after you close this page."
+            }
+          >
+            <Segmented label="Delivery" value={hosted ? "device" : "server"} options={DELIVERY} onChange={chooseDelivery} />
           </Field>
-          <Field label="Delete after" hint="Files are removed automatically.">
-            <Segmented label="Expiry" value={expiresIn} options={EXPIRY} onChange={chooseExpiry} />
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Who can open it" hint={isPublic ? "Listed on this page for anyone who opens Flux." : "Only people with the code or link."}>
+              <Segmented label="Visibility" value={isPublic ? "public" : "private"} options={VISIBILITY} onChange={chooseVisibility} />
+            </Field>
+            <Field label={hosted ? "Link expires after" : "Delete after"} hint={hosted ? "The code stops working then." : "Files are removed automatically."}>
+              <Segmented label="Expiry" value={expiresIn} options={EXPIRY} onChange={chooseExpiry} />
+            </Field>
+          </div>
         </div>
 
         {error && (
@@ -256,7 +280,17 @@ function PublicList() {
             icon={t.files > 1 ? <FolderIcon className="size-4.5" /> : <FileTypeIcon path={t.title} className="size-4.5" />}
             title={t.title}
             detail={`${plural(t.files, "file")} · ${formatBytes(t.size)} · ${formatRemaining(t.expiresAt, now)}`}
-            badge={!t.complete && <Badge tone="accent" icon={<Spinner className="size-3" />}>Uploading</Badge>}
+            badge={
+              t.hosted ? (
+                <Badge icon={<DeviceIcon className="size-3" />}>From a device</Badge>
+              ) : (
+                !t.complete && (
+                  <Badge tone="accent" icon={<Spinner className="size-3" />}>
+                    Uploading
+                  </Badge>
+                )
+              )
+            }
           />
         ))
       ) : (
@@ -317,6 +351,18 @@ const small = "size-3";
 
 function ownedBadge(code: string, summary: Summary | undefined): ReactNode {
   if (!summary) return null;
+  // A hosted transfer only exists while this tab is serving it, so that is what to report.
+  if (summary.hosted) {
+    return live.has(code) ? (
+      <Badge tone="ok" icon={<DeviceIcon className={small} />}>
+        Sharing
+      </Badge>
+    ) : (
+      <Badge tone="warn" icon={<AlertIcon className={small} />}>
+        Not shared
+      </Badge>
+    );
+  }
   if (summary.complete) {
     return (
       <Badge tone="ok" icon={<CheckIcon className={small} />}>

@@ -103,7 +103,7 @@ fn content_disposition(name: &str, inline: bool) -> HeaderValue {
         .unwrap_or_else(|_| HeaderValue::from_static(disposition))
 }
 
-fn respond(request: &HeaderMap, parts: Vec<Part>, etag: String, mime: &str, name: &str, inline: bool) -> Response {
+pub fn respond(request: &HeaderMap, parts: Vec<Part>, etag: String, mime: &str, name: &str, inline: bool) -> Response {
     // Previews revisit the same files, and their content never changes under one ETag.
     if request.get(header::IF_NONE_MATCH).is_some_and(|v| v.as_bytes() == etag.as_bytes()) {
         return (

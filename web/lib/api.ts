@@ -13,6 +13,8 @@ export interface TransferMeta {
   code: string;
   createdAt: string;
   expiresAt: string;
+  /** Served from the sender's device: the server has the file list but none of the bytes. */
+  hosted: boolean;
   files: FileMeta[];
 }
 
@@ -35,6 +37,7 @@ export interface Summary {
   title: string;
   createdAt: string;
   expiresAt: string;
+  hosted: boolean;
   files: number;
   size: number;
   complete: boolean;
@@ -51,6 +54,8 @@ export class ApiError extends Error {
 
 const transferUrl = (code: string) => `/api/transfers/${code}`;
 export const fileUrl = (code: string, idx: number) => `${transferUrl(code)}/files/${idx}`;
+/** Small, server-generated preview of an image file. */
+export const thumbUrl = (code: string, idx: number) => `${fileUrl(code, idx)}/thumb`;
 /** Served inline for the browser's PDF viewer; the server only allows this for PDFs. */
 export const inlineUrl = (code: string, idx: number) => `${fileUrl(code, idx)}?inline`;
 export const zipUrl =(code: string) => `${transferUrl(code)}/zip`;
@@ -79,11 +84,11 @@ async function orNull<T>(promise: Promise<T>): Promise<T | null> {
   }
 }
 
-export function createTransfer(files: NewFile[], expiresIn: number, isPublic: boolean) {
+export function createTransfer(files: NewFile[], expiresIn: number, isPublic: boolean, hosted: boolean) {
   return request<Created>("/api/transfers", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ files, expiresIn, public: isPublic }),
+    body: JSON.stringify({ files, expiresIn, public: isPublic, hosted }),
   });
 }
 

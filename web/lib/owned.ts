@@ -4,6 +4,8 @@ export interface Owned {
   expiresAt: string;
   /** Listed in the public space. */
   public?: boolean;
+  /** Served from this device; nothing was uploaded. */
+  hosted?: boolean;
   count: number;
   size: number;
   createdAt: number;

@@ -182,6 +182,12 @@ async fn write_chunk(
 ) -> Result<Response> {
     let transfer = transfers::find(&state.db, &code).await?;
     transfers::authorize(&headers, &transfer)?;
+    // A hosted transfer was accepted without checking for room to store it, so it must not
+    // become a way to store anything. Not 409: that status carries the real offset and the
+    // client retries it at once, which here would spin forever.
+    if transfer.hosted {
+        return Err(AppError(StatusCode::FORBIDDEN, "this transfer is served from the sender's device"));
+    }
     let (size, hash): (i64, Option<Vec<u8>>) =
         sqlx::query_as("SELECT size, hash FROM files WHERE transfer_id = $1 AND idx = $2")
             .bind(transfer.id)
