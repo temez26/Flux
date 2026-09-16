@@ -29,6 +29,10 @@ const PUBLIC_LIST_LIMIT: i64 = 100;
 const MAX_TITLE: usize = 80;
 const MAX_CONTRIBUTOR: usize = 60;
 const COLLECTION_TITLE: &str = "Collected files";
+/// A text transfer is a message, not a document: generous for that, and small enough to send
+/// whole on every save.
+const MAX_NOTE_BYTES: usize = 1 << 20;
+const NOTE_TITLE: &str = "Text";
 /// Ceiling on one request, so a wide listing can be paged through but never asked for whole.
 const PUBLIC_LIST_MAX: i64 = 500;
 /// Stands in for a LIKE wildcard, so a title containing % or _ searches for those characters.
@@ -49,6 +53,11 @@ pub struct Transfer {
     pub downloads: i32,
     /// A collection no longer taking files.
     pub closed: bool,
+    /// The text of a text transfer, which has no files.
+    pub note: Option<String>,
+    /// Whether anyone with the code may edit the text, not only its owner.
+    pub editable: bool,
+    pub note_version: i32,
 }
 
 pub fn normalize_code(raw: &str) -> String {
@@ -57,7 +66,7 @@ pub fn normalize_code(raw: &str) -> String {
 
 pub async fn find(db: &sqlx::PgPool, code: &str) -> Result<Transfer> {
     sqlx::query_as(
-        "SELECT id, code, token_hash, created_at, expires_at, hosted, collect, title, downloads, closed FROM transfers
+        "SELECT id, code, token_hash, created_at, expires_at, hosted, collect, title, downloads, closed, note, editable, note_version FROM transfers
          WHERE code = $1 AND expires_at > now()",
     )
     .bind(normalize_code(code))
@@ -172,6 +181,20 @@ pub struct NewTransfer {
     /// What a collection is called; an ordinary transfer is named after its files.
     #[serde(default)]
     title: Option<String>,
+    /// A text transfer: this text, and no files.
+    #[serde(default)]
+    note: Option<String>,
+    /// For a text transfer, whether anyone with the code may edit it.
+    #[serde(default)]
+    editable: bool,
+}
+
+/// A text transfer is called by its first line, the way a note app lists notes.
+fn note_title(text: &str) -> String {
+    let line = text.lines().map(str::trim).find(|line| !line.is_empty()).unwrap_or_default();
+    let title: String = line.chars().filter(|c| !c.is_control()).take(MAX_TITLE).collect();
+    let title = title.trim();
+    if title.is_empty() { NOTE_TITLE.to_owned() } else { title.to_owned() }
 }
 
 fn collection_title(title: Option<&str>) -> String {
@@ -281,14 +304,18 @@ async fn insert_files(
 }
 
 pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -> Result<Json<Created>> {
-    let counted = if req.collect {
+    let counted = match (&req.note, req.collect) {
+        // Text lives with the transfer on the server, so there is nothing to upload or serve.
+        (Some(_), _) => req.files.is_empty() && !req.hosted && !req.collect,
         // A collection starts empty, and its files are uploaded here by whoever adds them.
-        req.files.is_empty() && !req.hosted
-    } else {
-        !req.files.is_empty() && req.files.len() <= MAX_FILES
+        (None, true) => req.files.is_empty() && !req.hosted,
+        (None, false) => !req.files.is_empty() && req.files.len() <= MAX_FILES,
     };
     if !counted {
         return Err(AppError::bad_request("invalid file count"));
+    }
+    if req.note.as_ref().is_some_and(|note| note.len() > MAX_NOTE_BYTES) {
+        return Err(AppError::bad_request("text is too long"));
     }
     if !EXPIRY_CHOICES.contains(&req.expires_in) {
         return Err(AppError::bad_request("invalid expiry"));
@@ -302,15 +329,19 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
     let token = hex(&rand::random::<[u8; 32]>());
     let token_hash = blake3::hash(token.as_bytes());
     let expires_at = Utc::now() + chrono::Duration::seconds(req.expires_in);
-    let title = if req.collect { collection_title(req.title.as_deref()) } else { title(&req.files) };
+    let title = match (&req.note, req.collect) {
+        (Some(note), _) => note_title(note),
+        (None, true) => collection_title(req.title.as_deref()),
+        (None, false) => title(&req.files),
+    };
 
     let mut tx = state.db.begin().await?;
     let mut code = None;
     for _ in 0..8 {
         let candidate = random_code();
         let inserted = sqlx::query(
-            "INSERT INTO transfers (id, code, token_hash, expires_at, public, title, hosted, collect, next_idx)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            "INSERT INTO transfers (id, code, token_hash, expires_at, public, title, hosted, collect, next_idx, note, editable)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              ON CONFLICT (code) DO NOTHING",
         )
         .bind(id)
@@ -322,6 +353,8 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
         .bind(req.hosted)
         .bind(req.collect)
         .bind(req.files.len() as i32)
+        .bind(&req.note)
+        .bind(req.note.is_some() && req.editable)
         .execute(&mut *tx)
         .await?;
         if inserted.rows_affected() == 1 {
@@ -332,7 +365,7 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
     let code = code.ok_or(AppError::INTERNAL)?;
     insert_files(&mut tx, id, 0, req.files, None).await?;
 
-    if !req.hosted {
+    if !req.hosted && req.note.is_none() {
         tokio::fs::create_dir_all(state.data_dir.join(id.to_string())).await?;
     }
     tx.commit().await?;
@@ -347,6 +380,8 @@ pub struct Update {
     expires_in: Option<i64>,
     /// Stop a collection taking files, or start it again.
     closed: Option<bool>,
+    /// Let anyone with the code edit a text transfer, or only its owner.
+    editable: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -354,6 +389,7 @@ pub struct Update {
 pub struct Updated {
     expires_at: DateTime<Utc>,
     closed: bool,
+    editable: bool,
 }
 
 /// Changes what its owner may change about a transfer after making it.
@@ -373,14 +409,73 @@ pub async fn update(
     if req.closed.is_some() && !transfer.collect {
         return Err(AppError::bad_request("only a collection can be closed"));
     }
+    if req.editable.is_some() && transfer.note.is_none() {
+        return Err(AppError::bad_request("only text can be made editable"));
+    }
     let closed = req.closed.unwrap_or(transfer.closed);
-    sqlx::query("UPDATE transfers SET expires_at = $2, closed = $3 WHERE id = $1")
+    let editable = req.editable.unwrap_or(transfer.editable);
+    sqlx::query("UPDATE transfers SET expires_at = $2, closed = $3, editable = $4 WHERE id = $1")
         .bind(transfer.id)
         .bind(expires_at)
         .bind(closed)
+        .bind(editable)
         .execute(&state.db)
         .await?;
-    Ok(Json(Updated { expires_at, closed }))
+    Ok(Json(Updated { expires_at, closed, editable }))
+}
+
+#[derive(Deserialize)]
+pub struct NoteEdit {
+    text: String,
+    /// The version the text was edited from.
+    version: i32,
+}
+
+#[derive(Serialize)]
+pub struct NoteState {
+    text: String,
+    version: i32,
+}
+
+/// Replaces a text transfer's text: its owner may always, anyone with the code may while the
+/// owner allows it. A save names the version it was edited from, so two people editing at once
+/// can't silently overwrite each other — the later save is refused with the text as it now is.
+pub async fn save_note(
+    State(state): State<Shared>,
+    Path(code): Path<String>,
+    headers: HeaderMap,
+    Json(req): Json<NoteEdit>,
+) -> Result<Response> {
+    let transfer = find(&state.db, &code).await?;
+    if transfer.note.is_none() {
+        return Err(AppError::NOT_FOUND);
+    }
+    let owner = bearer(&headers).is_some_and(|token| token_matches(token, &transfer));
+    if !owner && !transfer.editable {
+        return Err(AppError(StatusCode::FORBIDDEN, "this text is read-only"));
+    }
+    if req.text.len() > MAX_NOTE_BYTES {
+        return Err(AppError::bad_request("text is too long"));
+    }
+
+    let saved: Option<i32> = sqlx::query_scalar(
+        "UPDATE transfers SET note = $2, title = $3, note_version = note_version + 1
+         WHERE id = $1 AND note_version = $4 RETURNING note_version",
+    )
+    .bind(transfer.id)
+    .bind(&req.text)
+    .bind(note_title(&req.text))
+    .bind(req.version)
+    .fetch_optional(&state.db)
+    .await?;
+    if let Some(version) = saved {
+        return Ok(Json(NoteState { text: req.text, version }).into_response());
+    }
+    let (text, version): (Option<String>, i32) = sqlx::query_as("SELECT note, note_version FROM transfers WHERE id = $1")
+        .bind(transfer.id)
+        .fetch_one(&state.db)
+        .await?;
+    Ok((StatusCode::CONFLICT, Json(NoteState { text: text.unwrap_or_default(), version })).into_response())
 }
 
 #[derive(Deserialize)]
@@ -494,6 +589,11 @@ struct FileInfo {
 pub struct TransferInfo {
     code: String,
     title: String,
+    /// The text of a text transfer; absent for files.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    note: Option<String>,
+    editable: bool,
+    note_version: i32,
     collect: bool,
     downloads: i32,
     closed: bool,
@@ -553,6 +653,9 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
     let body = serde_json::to_vec(&TransferInfo {
         code: transfer.code,
         title: transfer.title,
+        note: transfer.note,
+        editable: transfer.editable,
+        note_version: transfer.note_version,
         collect: transfer.collect,
         downloads: transfer.downloads,
         closed: transfer.closed,
@@ -578,8 +681,9 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
 }
 
 const SUMMARY_SQL: &str = "SELECT t.code, t.title, t.created_at, t.expires_at, t.hosted, t.collect, t.downloads, t.closed,
+        t.note IS NOT NULL AS note,
         count(f.idx) AS files,
-        coalesce(sum(f.size), 0)::bigint AS size,
+        CASE WHEN t.note IS NULL THEN coalesce(sum(f.size), 0) ELSE octet_length(t.note) END::bigint AS size,
         -- Nothing is pending for a hosted transfer: its bytes were never coming here.
         t.hosted OR count(f.idx) = count(f.hash) AS complete
      FROM transfers t LEFT JOIN files f ON f.transfer_id = t.id";
@@ -595,6 +699,8 @@ pub struct Summary {
     collect: bool,
     downloads: i32,
     closed: bool,
+    /// A text transfer rather than files.
+    note: bool,
     files: i64,
     size: i64,
     complete: bool,
@@ -773,6 +879,14 @@ mod tests {
     }
 
     #[test]
+    fn a_text_is_called_by_its_first_line() {
+        assert_eq!(note_title("Wifi password\nhunter2"), "Wifi password");
+        assert_eq!(note_title("\n\n   Shopping list  \nmilk"), "Shopping list", "past blank lines");
+        assert_eq!(note_title("   \n\t"), NOTE_TITLE);
+        assert_eq!(note_title(&"x".repeat(200)).chars().count(), MAX_TITLE);
+    }
+
+    #[test]
     fn a_contributor_name_makes_one_folder_and_no_more() {
         assert_eq!(contributor_folder("Bob's iPhone").as_deref(), Some("Bob's iPhone"));
         assert_eq!(contributor_folder("a/b\\c").as_deref(), Some("abc"), "no nesting, no escaping upwards");
@@ -795,6 +909,9 @@ mod tests {
             title: String::new(),
             downloads: 0,
             closed: false,
+            note: None,
+            editable: false,
+            note_version: 0,
         };
         let with = |value: &str| {
             let mut headers = HeaderMap::new();
