@@ -10,25 +10,37 @@ export type HashRequest =
 export type HashReply = { seq: number; hash: string } | { seq: number; done: true } | { seq: number; error: string };
 
 const hashers = new Map<number, IHasher>();
+// hash-wasm instantiates WebAssembly behind a global lock on every create, which is two
+// orders of magnitude dearer than resetting one that already exists — enough to stall a
+// run of small files on its own. Finished hashers come back here to be used again.
+const idle: IHasher[] = [];
 
 async function hasherFor(id: number): Promise<IHasher> {
   let hasher = hashers.get(id);
   if (!hasher) {
-    hasher = await createBLAKE3();
+    hasher = idle.pop()?.init() ?? (await createBLAKE3());
     hashers.set(id, hasher);
   }
   return hasher;
 }
 
+function retire(id: number) {
+  const hasher = hashers.get(id);
+  if (!hasher) return;
+  hashers.delete(id);
+  idle.push(hasher);
+}
+
 async function handle(req: HashRequest): Promise<HashReply> {
   if (req.op === "release") {
-    hashers.delete(req.id);
+    retire(req.id);
     return { seq: req.seq, done: true };
   }
   const hasher = await hasherFor(req.id);
   if (req.op === "digest") {
-    hashers.delete(req.id);
-    return { seq: req.seq, hash: hasher.digest("hex") };
+    const hash = hasher.digest("hex");
+    retire(req.id);
+    return { seq: req.seq, hash };
   }
   hasher.update(new Uint8Array(req.buffer, req.offset, req.length));
   return { seq: req.seq, done: true };
