@@ -8,6 +8,7 @@ import { formatBytes, formatCode, formatDuration, plural } from "@/lib/format";
 import { useLeaveGuard, useTitle, useWakeLock } from "@/lib/hooks";
 import { canPreview } from "@/lib/preview";
 import { Receiver, type ReceiveItem } from "@/lib/receive";
+import { getReceived, markReceived } from "@/lib/received";
 import { memorySink, saveMethod, streamSink, type SaveMethod } from "@/lib/save";
 import { singleTarget, zipTarget } from "@/lib/zip";
 import { FileBrowser, FileRow } from "../FileList";
@@ -36,6 +37,8 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   // big to save in a single go can still be taken a file at a time.
   const [direct] = useState(() => (initial.ready ? undefined : new DirectClient(meta.code)));
   const [receiver, setReceiver] = useState<Receiver>();
+  /** Files already downloaded from this transfer on this device, from an earlier visit or a lost tab. */
+  const [saved, setSaved] = useState(() => getReceived(meta.code));
   const [error, setError] = useState<string>();
   const [previewing, setPreviewing] = useState<number | null>(null);
   const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
@@ -65,6 +68,7 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   const senderMissing = meta.hosted && !directOpen;
   const tooLargeHere = whole === null;
   const unreachable = direct?.state === "unavailable";
+  const remaining = meta.files.filter((f) => !saved.has(f.idx));
 
   /** Receives `files` from the sender's device, as one file or as a zip of several. */
   async function startDirect(files: FileMeta[]) {
@@ -78,6 +82,15 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
       const sink = method === "stream" ? await streamSink(name, one?.size) : memorySink(name);
       const target = one ? singleTarget(sink) : zipTarget(sink);
       const next = new Receiver(meta, direct, target, new Set(files.map((f) => f.idx)));
+      // Only a finished receive has actually put anything on disk: a zip lands as one file
+      // at the very end, so a run that failed part way through saved none of it.
+      const stop = next.subscribe(() => {
+        if (!next.finished) return;
+        stop();
+        if (next.error) return;
+        markReceived(meta.code, meta.expiresAt, files.map((f) => f.idx));
+        setSaved(getReceived(meta.code));
+      });
       next.start();
       setReceiver(next);
     } catch (err) {
@@ -117,6 +130,15 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
             {single
               ? "This browser can't save a file this large from another device. Ask the sender to upload it to the server instead."
               : "This browser can't save the whole transfer in one go. Take the files one at a time below, or ask the sender to upload it to the server instead."}
+          </Notice>
+        )}
+        {remaining.length > 0 && remaining.length < meta.files.length && (
+          <Notice tone="ok" icon={<CheckIcon />} className="mt-4">
+            {plural(meta.files.length - remaining.length, "file")} of {meta.files.length.toLocaleString()} already saved on this
+            device.{" "}
+            <button type="button" onClick={() => startDirect(remaining)} disabled={!viaDirect} className="font-medium underline disabled:no-underline disabled:opacity-60">
+              Download the remaining {remaining.length.toLocaleString()}
+            </button>
           </Notice>
         )}
         {senderMissing && !tooLargeHere && (
@@ -183,7 +205,15 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
               <FileRow
                 path={meta.files[i].path}
                 size={meta.files[i].size}
-                badge={<Badge icon={<DeviceIcon />}>On the sender</Badge>}
+                badge={
+                  saved.has(meta.files[i].idx) ? (
+                    <Badge tone="ok" icon={<CheckIcon />}>
+                      Saved
+                    </Badge>
+                  ) : (
+                    <Badge icon={<DeviceIcon />}>On the sender</Badge>
+                  )
+                }
                 actions={
                   <IconButton
                     label={`Download ${basename(meta.files[i].path)}`}
