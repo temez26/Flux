@@ -1,4 +1,4 @@
-import { appendFiles, createCollection, createTransfer, deleteFile, type NewFile, type TransferMeta } from "./api";
+import { appendFiles, createCollection, createNote, createTransfer, deleteFile, type NewFile, type TransferMeta } from "./api";
 import { getDevice } from "./device";
 import { DirectHost } from "./direct";
 import { basename, uniquePaths, type Picked } from "./files";
@@ -84,6 +84,21 @@ export async function removeFile(code: string, token: string, idx: number, size:
   const owned = getOwned(code);
   if (owned) saveOwned(code, { ...owned, count: Math.max(0, owned.count - 1), size: Math.max(0, owned.size - size) });
   live.get(code)?.uploader?.forget(idx);
+}
+
+/** Sends text, which stays on the server where it can be edited, and returns its code. */
+export async function sendNote(text: string, editable: boolean, expiresIn: number, isPublic: boolean): Promise<string> {
+  const created = await createNote(text, editable, expiresIn, isPublic);
+  saveOwned(created.code, {
+    token: created.token,
+    expiresAt: created.expiresAt,
+    public: isPublic,
+    note: true,
+    count: 0,
+    size: new TextEncoder().encode(text).length,
+    createdAt: Date.now(),
+  });
+  return created.code;
 }
 
 /** Opens a collection for other people to send files into, and returns its code. */

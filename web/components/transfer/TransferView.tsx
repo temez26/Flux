@@ -9,6 +9,7 @@ import { Message, Notice, Spinner } from "../ui";
 import { CollectPanel } from "./CollectPanel";
 import { ContributePanel } from "./ContributePanel";
 import { HostedPanel } from "./HostedPanel";
+import { NotePanel } from "./NotePanel";
 import { OwnerPanel } from "./OwnerPanel";
 import { ReceiverPanel } from "./ReceiverPanel";
 import { SenderPanel } from "./SenderPanel";
@@ -62,7 +63,9 @@ export default function TransferView({ code }: { code: string }) {
           Lost connection to the server. Retrying…
         </Notice>
       )}
-      {meta.collect ? (
+      {meta.note !== undefined ? (
+        <NotePanel meta={meta} token={owned?.token} />
+      ) : meta.collect ? (
         owned ? (
           <CollectPanel meta={meta} token={owned.token} />
         ) : (

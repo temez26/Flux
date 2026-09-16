@@ -2,7 +2,7 @@
 
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { formatBytes, formatCode, plural } from "@/lib/format";
-import { Nearby, type Peer, type SocketLike } from "@/lib/nearby";
+import { Nearby, type Offer, type Peer, type SocketLike } from "@/lib/nearby";
 import { notify } from "@/lib/notify";
 import { navigate } from "@/lib/router";
 import { toast } from "@/lib/toast";
@@ -10,6 +10,9 @@ import { CloseIcon, DeviceIcon, DownloadIcon } from "./icons";
 import { Button, IconButton } from "./ui";
 
 let instance: Nearby | undefined;
+
+/** A text transfer is offered with no files, and is described as what it is. */
+const offerDetail = (offer: Offer) => (offer.files ? `${plural(offer.files, "file")} · ${formatBytes(offer.size)}` : "Text");
 
 /** The page's one connection to the other devices, opened the first time anything needs it. */
 export function getNearby(): Nearby {
@@ -20,7 +23,7 @@ export function getNearby(): Nearby {
     },
     ({ from, accepted }) => toast(accepted ? `${from.name} is opening it` : `${from.name} declined`, accepted ? "ok" : "err"),
     (offer) =>
-      notify(`${offer.from.name} wants to send you files`, `${offer.title} · ${plural(offer.files, "file")} · ${formatBytes(offer.size)}`, `offer-${offer.code}`),
+      notify(`${offer.from.name} wants to send you ${offer.files ? "files" : "text"}`, `${offer.title} · ${offerDetail(offer)}`, `offer-${offer.code}`),
   ));
 }
 
@@ -52,7 +55,7 @@ export function IncomingOffers() {
               {offer.from.name} wants to send you {offer.title}
             </p>
             <p className="truncate text-xs text-muted">
-              {plural(offer.files, "file")} · {formatBytes(offer.size)}
+              {offerDetail(offer)}
             </p>
           </div>
           <Button

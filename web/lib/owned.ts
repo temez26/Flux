@@ -10,6 +10,8 @@ export interface Owned {
   hosted?: boolean;
   /** A collection this device opened for others to send files into. */
   collect?: boolean;
+  /** Text rather than files. */
+  note?: boolean;
   count: number;
   size: number;
   createdAt: number;

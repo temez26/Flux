@@ -11,6 +11,8 @@ function transfer(files: { path: string; size: number; hash?: string }[]): Trans
     collect: false,
     downloads: 0,
     closed: false,
+    editable: false,
+    noteVersion: 0,
     createdAt: "",
     expiresAt: "",
     hosted: false,
