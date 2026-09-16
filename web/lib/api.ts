@@ -60,7 +60,25 @@ export const thumbUrl = (code: string, idx: number) => `${fileUrl(code, idx)}/th
 export const renderUrl = (code: string, idx: number) => `${thumbUrl(code, idx)}?full`;
 /** Served inline for the browser's PDF viewer; the server only allows this for PDFs. */
 export const inlineUrl = (code: string, idx: number) => `${fileUrl(code, idx)}?inline`;
-export const zipUrl =(code: string) => `${transferUrl(code)}/zip`;
+/**
+ * File indices as the ranges the zip endpoint reads, such as "0-12,15". A folder's files sit
+ * next to each other in a listing, so selecting one costs a few characters, not thousands.
+ */
+export function selectionSpec(idxs: number[]): string {
+  const sorted = [...new Set(idxs)].sort((a, b) => a - b);
+  const ranges: string[] = [];
+  for (let i = 0; i < sorted.length; ) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    ranges.push(i === j ? String(sorted[i]) : `${sorted[i]}-${sorted[j]}`);
+    i = j + 1;
+  }
+  return ranges.join(",");
+}
+
+/** The whole transfer as a zip, or just the files in `idxs`. */
+export const zipUrl = (code: string, idxs?: number[]) =>
+  idxs ? `${transferUrl(code)}/zip?files=${selectionSpec(idxs)}` : `${transferUrl(code)}/zip`;
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
