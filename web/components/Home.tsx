@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { EXPIRY_OPTIONS, errorMessage, getSummary, listPublic, type Summary } from "@/lib/api";
 import { fromClipboard, fromDataTransfer, fromText, type Picked } from "@/lib/files";
 import { formatBytes, formatCode, formatLifetime, formatRemaining, normalizeCode, plural } from "@/lib/format";
 import { nextPaint, useNow, usePolling } from "@/lib/hooks";
-import { listOwned, removeOwned } from "@/lib/owned";
+import { listOwned, ownedVersion, removeOwned, subscribeOwned } from "@/lib/owned";
+import { clearRecent, forgetRecent, listRecent, recentVersion, subscribeRecent } from "@/lib/recent";
+import { getReceived } from "@/lib/received";
 import { navigate } from "@/lib/router";
 import { offerTitle, type Peer } from "@/lib/nearby";
 import { collect, live, send } from "@/lib/session";
@@ -346,6 +348,7 @@ export default function Home() {
       </Card>
 
       <OwnedList />
+      <RecentList />
     </div>
   );
 }
@@ -545,6 +548,58 @@ function ReceiveForm() {
   );
 }
 
+/** Transfers this device opened someone else's code for, to get back to without the code. */
+function RecentList() {
+  useSyncExternalStore(subscribeRecent, recentVersion, recentVersion);
+  const recent = listRecent();
+  const summaries = useSummaries(() => listRecent().map(([code]) => code), forgetRecent);
+
+  if (!recent.length) return null;
+  return (
+    <Card>
+      <SectionTitle
+        icon={<DownloadIcon className="size-4.5" />}
+        aside={
+          <button type="button" onClick={clearRecent} className="text-sm text-muted transition hover:text-fg">
+            Clear
+          </button>
+        }
+      >
+        Recently received
+      </SectionTitle>
+      {recent.map(([code, r]) => {
+        const summary = summaries[code];
+        const files = summary?.files ?? r.files;
+        const size = summary?.size ?? r.size;
+        const saved = files > 0 && getReceived(code).size >= files;
+        return (
+          <TransferRow
+            key={code}
+            code={code}
+            icon={r.collect || files > 1 ? <FolderIcon className="size-4.5" /> : <FileTypeIcon path={r.title} className="size-4.5" />}
+            title={summary?.title ?? r.title}
+            detail={[
+              plural(files, "file"),
+              formatBytes(size),
+              // How long a device keeps sharing is its sender's business, not the code's expiry.
+              r.hosted ? "From the sender's device" : formatRemaining(summary?.expiresAt ?? r.expiresAt),
+            ].join(" · ")}
+            badge={
+              saved ? (
+                <Badge tone="ok" icon={<CheckIcon />}>
+                  Saved
+                </Badge>
+              ) : (
+                summary?.collect && <Badge icon={<FolderIcon />}>{summary.closed ? "Closed" : "Collection"}</Badge>
+              )
+            }
+          />
+        );
+      })}
+    </Card>
+  );
+}
+
 function ownedBadge(code: string, summary: Summary | undefined): ReactNode {
   if (!summary) return null;
   if (summary.collect) {
@@ -594,21 +649,28 @@ function ownedBadge(code: string, summary: Summary | undefined): ReactNode {
   );
 }
 
-function OwnedList() {
-  const [owned, setOwned] = useState(listOwned);
+/**
+ * Keeps the summary of each listed transfer current, and forgets any the server no longer has,
+ * so a list of remembered codes shows what is really there.
+ */
+function useSummaries(codes: () => string[], forget: (code: string) => void): Record<string, Summary> {
   const [summaries, setSummaries] = useState<Record<string, Summary>>({});
-
-  // Checks each transfer made on this device, so deleted ones disappear and states are real.
   usePolling(async () => {
-    const results = await Promise.all(listOwned().map(async ([code]) => [code, await getSummary(code)] as const));
+    const results = await Promise.all(codes().map(async (code) => [code, await getSummary(code)] as const));
     const found: Record<string, Summary> = {};
     for (const [code, summary] of results) {
       if (summary) found[code] = summary;
-      else removeOwned(code);
+      else forget(code);
     }
-    setOwned(listOwned());
     setSummaries(found);
   }, LIST_POLL_MS);
+  return summaries;
+}
+
+function OwnedList() {
+  useSyncExternalStore(subscribeOwned, ownedVersion, ownedVersion);
+  const owned = listOwned();
+  const summaries = useSummaries(() => listOwned().map(([code]) => code), removeOwned);
 
   if (!owned.length) return null;
   return (

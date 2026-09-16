@@ -15,7 +15,7 @@ import { FileBrowser, FileRow } from "../FileList";
 import { AlertIcon, BackIcon, CheckIcon, ClockIcon, CloseIcon, DeviceIcon, DownloadIcon, PauseIcon, PlayIcon, ZapIcon } from "../icons";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
 import { Badge, Button, Card, ConfirmButton, IconButton, Notice, ProgressBar, Spinner, StatusCard, buttonClass, type StatusProps } from "../ui";
-import { MetaRow, MetaTile, Pinned, SelectionDownload, TransferHeading, inFlight, pageTitle, percent, subscribeNothing, summarize, versionZero } from "./common";
+import { MetaRow, MetaTile, Pinned, SelectionDownload, TransferHeading, inFlight, pageTitle, percent, subscribeNothing, summarize, useRememberRecent, versionZero } from "./common";
 
 function checksumsUrl(meta: TransferMeta): string {
   // b3sum-compatible, so a download can be verified with `b3sum -c`.
@@ -42,6 +42,7 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
   useSyncExternalStore(direct?.subscribe ?? subscribeNothing, direct?.getVersion ?? versionZero, versionZero);
   useTitle(pageTitle(meta.code));
+  useRememberRecent(meta);
 
   useEffect(() => () => direct?.close(), [direct]);
 

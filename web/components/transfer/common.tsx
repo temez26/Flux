@@ -1,12 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { countDownload, deleteTransfer, errorMessage, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
 import { basename } from "@/lib/files";
 import { formatBytes, formatCode, formatRemaining, plural } from "@/lib/format";
 import { reloadTransfer, useNow } from "@/lib/hooks";
 import { removeOwned } from "@/lib/owned";
 import { canPreview } from "@/lib/preview";
+import { rememberRecent } from "@/lib/recent";
 import { navigate } from "@/lib/router";
 import { end, removeFile } from "@/lib/session";
 import { toast } from "@/lib/toast";
@@ -18,6 +19,16 @@ import { Badge, ConfirmIconButton, Spinner, buttonClass } from "../ui";
 /** Stand-ins for a store that doesn't exist yet, for useSyncExternalStore. */
 export const subscribeNothing = () => () => {};
 export const versionZero = () => 0;
+
+/** Lists a transfer someone else made among this device's recently received, kept up to date as it changes. */
+export function useRememberRecent(meta: TransferMeta) {
+  const { code, title, expiresAt, hosted, collect } = meta;
+  const files = meta.files.length;
+  const size = meta.files.reduce((sum, f) => sum + f.size, 0);
+  useEffect(() => {
+    rememberRecent(code, { title, files, size, expiresAt, hosted, collect });
+  }, [code, title, files, size, expiresAt, hosted, collect]);
+}
 
 export const pageTitle = (code: string) => `${formatCode(code)} · Flux`;
 

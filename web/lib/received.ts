@@ -1,3 +1,5 @@
+import { storedByCode } from "./stored";
+
 /**
  * Files already saved from a transfer on this device.
  *
@@ -11,44 +13,19 @@ export interface Saved {
   idxs: number[];
 }
 
-const KEY = "flux.received";
-
-function read(): Record<string, Saved> {
-  try {
-    const all: Record<string, Saved> = JSON.parse(localStorage.getItem(KEY) ?? "{}");
-    const now = Date.now();
-    for (const [code, saved] of Object.entries(all)) {
-      if (!(Date.parse(saved.expiresAt) > now)) delete all[code];
-    }
-    return all;
-  } catch {
-    return {};
-  }
-}
-
-function write(all: Record<string, Saved>) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(all));
-  } catch {
-    // Storage unavailable (private mode); this tab then remembers nothing.
-  }
-}
+const store = storedByCode<Saved>("flux.received");
 
 export function getReceived(code: string): ReadonlySet<number> {
-  return new Set(read()[code]?.idxs ?? []);
+  return new Set(store.read()[code]?.idxs ?? []);
 }
 
 /** Records `idxs` as saved, on top of whatever was already known for this transfer. */
 export function markReceived(code: string, expiresAt: string, idxs: number[]) {
-  const all = read();
+  const all = store.read();
   const merged = new Set(all[code]?.idxs ?? []);
   for (const idx of idxs) merged.add(idx);
   all[code] = { expiresAt, idxs: [...merged].sort((a, b) => a - b) };
-  write(all);
+  store.write(all);
 }
 
-export function forgetReceived(code: string) {
-  const all = read();
-  delete all[code];
-  write(all);
-}
+export const forgetReceived = store.remove;
