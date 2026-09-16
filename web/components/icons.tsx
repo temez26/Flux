@@ -46,6 +46,7 @@ export const SpinnerIcon = (p: IconProps) => <Icon d="M21 12a9 9 0 1 1-6.2-8.56"
 export const SearchIcon = (p: IconProps) => <Icon d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35" {...p} />;
 export const ListIcon = (p: IconProps) => <Icon d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" {...p} />;
 export const GridIcon = (p: IconProps) => <Icon d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" {...p} />;
+export const TextIcon = (p: IconProps) => <Icon d="M4 6h16M4 12h16M4 18h10" {...p} />;
 export const DeviceIcon = (p: IconProps) => <Icon d="M7 3h10a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2" {...p} />;
 export const LinkIcon = (p: IconProps) => (
   <Icon d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" {...p} />

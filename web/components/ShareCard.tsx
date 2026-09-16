@@ -2,24 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { encode } from "uqr";
+import { copyText } from "@/lib/clipboard";
 import { formatCode, formatRemaining } from "@/lib/format";
 import { useNow } from "@/lib/hooks";
 import { getOwned } from "@/lib/owned";
 import { toast } from "@/lib/toast";
 import { ClockIcon, CopyIcon, GlobeIcon, LinkIcon, LockIcon, QrIcon } from "./icons";
 import { Badge, Button, Card, IconButton } from "./ui";
-
-async function copyText(text: string) {
-  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
-  // Plain-HTTP LAN deployments have no Clipboard API.
-  const area = document.createElement("textarea");
-  area.value = text;
-  area.style.cssText = "position:fixed;opacity:0";
-  document.body.appendChild(area);
-  area.select();
-  document.execCommand("copy");
-  area.remove();
-}
 
 function QrCode({ text }: { text: string }) {
   const { path, size } = useMemo(() => {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { errorMessage, getSummary, listPublic, type Summary } from "@/lib/api";
-import { fromDataTransfer, type Picked } from "@/lib/files";
+import { fromDataTransfer, fromText, type Picked } from "@/lib/files";
 import { formatBytes, formatCode, formatLifetime, formatRemaining, normalizeCode, plural } from "@/lib/format";
 import { nextPaint, useNow, usePolling } from "@/lib/hooks";
 import { listOwned, removeOwned } from "@/lib/owned";
@@ -23,6 +23,7 @@ import {
   LockIcon,
   PauseIcon,
   SearchIcon,
+  TextIcon,
   UploadIcon,
 } from "./icons";
 import { getNearby, NearbyDevices } from "./nearby";
@@ -71,6 +72,8 @@ export default function Home() {
   const [dragging, setDragging] = useState(false);
   /** A nearby device the next files are offered to, instead of only handing out a code. */
   const [target, setTarget] = useState<Peer | null>(null);
+  /** Text being written to send instead of files; null while choosing files. */
+  const [text, setText] = useState<string | null>(null);
   const options = useRef({ expiresIn, isPublic, hosted, target: null as Peer | null });
   const folders = canPickFolder();
 
@@ -173,7 +176,11 @@ export default function Home() {
   function chooseDevice(peer: Peer) {
     if (target?.device === peer.device) return chooseTarget(null);
     chooseTarget(peer);
-    picker.open("files");
+    if (text === null) picker.open("files");
+  }
+
+  function sendText() {
+    if (text?.trim()) void start(fromText(text));
   }
 
   // The drop zone around these buttons opens the file picker too.
@@ -195,45 +202,81 @@ export default function Home() {
 
       <Card>
         <SectionTitle icon={<UploadIcon className="size-4.5" />}>Send</SectionTitle>
-        <div
-          onClick={() => !busy && picker.open("files")}
-          className={`flex min-h-48 cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-6 text-center transition ${
-            status ? "cursor-default border-line" : "border-line hover:border-accent/60 hover:bg-hover/50"
-          }`}
-        >
-          {status ? (
-            <>
-              <Spinner className="size-7 text-accent" />
-              <p className="font-medium">{status}</p>
-              {picker.stalled && (
-                <p className="max-w-xs text-sm text-muted">
-                  Still nothing. Phones quietly give up on very large selections — try a few hundred files at a time.
-                </p>
-              )}
-            </>
-          ) : (
-            <>
-              <div>
-                <p className="font-semibold">
-                  {target ? `Choose what to send to ${target.name}` : folders ? "Drop files or folders here" : "Send photos, videos or any files"}
-                </p>
-                <p className="mt-1 text-sm text-muted">Any size, any number of files</p>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                <Button variant="primary" onClick={pick("files")}>
-                  <UploadIcon className="size-4" />
-                  Choose files
-                </Button>
-                {folders && (
-                  <Button onClick={pick("folder")}>
-                    <FolderIcon className="size-4" />
-                    Choose folder
-                  </Button>
+        {text !== null && !status ? (
+          <div className="rounded-2xl border-2 border-line p-3 focus-within:border-accent/60">
+            <textarea
+              autoFocus
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) sendText();
+              }}
+              placeholder="Paste a link, a note, a password…"
+              aria-label="Text to send"
+              spellCheck={false}
+              className="block min-h-40 w-full resize-y bg-transparent text-base outline-none placeholder:text-muted/60"
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button variant="primary" onClick={sendText} disabled={!text.trim()}>
+                <TextIcon className="size-4" />
+                {target ? `Send text to ${target.name}` : "Send text"}
+              </Button>
+              <Button variant="ghost" onClick={() => setText(null)}>
+                Send files instead
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={() => !busy && picker.open("files")}
+            className={`flex min-h-48 cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-6 text-center transition ${
+              status ? "cursor-default border-line" : "border-line hover:border-accent/60 hover:bg-hover/50"
+            }`}
+          >
+            {status ? (
+              <>
+                <Spinner className="size-7 text-accent" />
+                <p className="font-medium">{status}</p>
+                {picker.stalled && (
+                  <p className="max-w-xs text-sm text-muted">
+                    Still nothing. Phones quietly give up on very large selections — try a few hundred files at a time.
+                  </p>
                 )}
-              </div>
-            </>
-          )}
-        </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className="font-semibold">
+                    {target ? `Choose what to send to ${target.name}` : folders ? "Drop files or folders here" : "Send photos, videos or any files"}
+                  </p>
+                  <p className="mt-1 text-sm text-muted">Any size, any number of files</p>
+                </div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button variant="primary" onClick={pick("files")}>
+                    <UploadIcon className="size-4" />
+                    Choose files
+                  </Button>
+                  {folders && (
+                    <Button onClick={pick("folder")}>
+                      <FolderIcon className="size-4" />
+                      Choose folder
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setText("");
+                    }}
+                  >
+                    <TextIcon className="size-4" />
+                    Send text
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {target && (
           <p className="mt-3 flex items-center gap-2 text-sm">

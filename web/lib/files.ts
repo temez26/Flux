@@ -28,6 +28,18 @@ export function fromFileList(list: FileList | null): Picked[] {
   return finish(Array.from(list, (file) => ({ file, path: cleanPath(file.webkitRelativePath || file.name) })));
 }
 
+/**
+ * Typed or pasted text as a file to send. It is named after its first line, so the listing,
+ * the offer and the receiver's download all say what it is rather than "text.txt".
+ */
+export function fromText(text: string): Picked[] {
+  const firstLine = text.trim().split(/\r?\n/)[0] ?? "";
+  // Characters a filesystem somewhere would refuse, and a path separator the server would split on.
+  const name = firstLine.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "").trim().slice(0, 40).trim();
+  const path = `${name || "Text"}.txt`;
+  return [{ path, file: new File([text], path, { type: "text/plain" }) }];
+}
+
 /** Collects dropped files, descending into dropped folders. */
 export function fromDataTransfer(data: DataTransfer): Promise<Picked[]> {
   // Entries must be taken synchronously; the DataTransfer is emptied once the event returns.

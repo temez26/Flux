@@ -4,14 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { formatBytes } from "@/lib/format";
 import { readSlides, readWorkbook, renderDocx } from "@/lib/office";
 import { loadText, TEXT_PREVIEW_BYTES } from "@/lib/preview";
-import { InlineFrame, Loading, Note, Panel, Unavailable, scrollArea, useLoad, type Status, type ViewProps } from "./chrome";
+import { CopyButton, InlineFrame, Loading, Note, Panel, Unavailable, scrollArea, useLoad, type Status, type ViewProps } from "./chrome";
 
 export function TextView(view: ViewProps) {
   const { data, failed } = useLoad(view.url, loadText);
   if (failed) return <Unavailable {...view} message="This file couldn't be loaded" />;
   if (!data) return <Loading inline={view.inline} />;
   return (
-    <Panel inline={view.inline} onExpand={view.onExpand}>
+    // Copying part of a file would pass for all of it, so only a complete one offers to.
+    <Panel inline={view.inline} onExpand={view.onExpand} aside={data.text && !data.truncated ? <CopyButton text={data.text} /> : undefined}>
       {data.truncated && <Note>Showing the first {formatBytes(TEXT_PREVIEW_BYTES)}. Download the file to see all of it.</Note>}
       <pre className={`${scrollArea} p-4 font-mono text-[13px] leading-relaxed break-words whitespace-pre-wrap [tab-size:4] sm:p-6`}>
         {data.text || <span className="text-muted">This file is empty.</span>}
