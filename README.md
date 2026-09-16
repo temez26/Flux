@@ -39,6 +39,26 @@ sudo chown -R 65532:65532 /mnt/storage/flux
 
 - Use **HTTPS**. Installing the app, offline start and direct downloads need it.
 - Publish **UDP 3478** straight to the host. Sending from a device needs it, and a reverse proxy won't carry it.
+- The container has to see the **real address** of each device, or every one of them looks
+  like the same machine and they can't connect. Check it after deploying:
+
+```bash
+python3 - <<'EOF'
+import socket, struct, os
+m = struct.pack(">HHI", 1, 0, 0x2112A442) + os.urandom(12)
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(5)
+s.sendto(m, ("YOUR-FLUX-HOST", 3478))
+d, _ = s.recvfrom(1024)
+v = d[24:32]
+print("this device looks like",
+      socket.inet_ntoa(bytes(a ^ b for a, b in zip(v[4:8], (0x2112A442).to_bytes(4, "big")))))
+EOF
+```
+
+  Run it on a phone or laptop on your network. It should print that device's own address. If
+  it prints a gateway address such as `172.17.0.1` instead, Docker is rewriting the source:
+  add `network_mode: host` to the `flux` service. Docker Desktop on macOS and Windows always
+  rewrites it, so device-to-device needs a Linux host.
 - Allow request bodies of at least **8 MiB** and turn off request buffering.
 - Allow **WebSocket** upgrades (used for direct transfers).
 
