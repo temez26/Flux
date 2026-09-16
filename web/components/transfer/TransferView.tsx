@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useTitle, useTransferMeta } from "@/lib/hooks";
-import { getOwned, removeOwned } from "@/lib/owned";
+import { useEffect, useState } from "react";
+import { useOwned, useTitle, useTransferMeta } from "@/lib/hooks";
+import { removeOwned } from "@/lib/owned";
 import { live } from "@/lib/session";
 import { AlertIcon, ClockIcon } from "../icons";
 import { Message, Notice, Spinner } from "../ui";
@@ -20,7 +20,8 @@ import { pageTitle } from "./common";
  */
 export default function TransferView({ code }: { code: string }) {
   const [session, setSession] = useState(() => live.get(code));
-  const owned = useMemo(() => getOwned(code), [code]);
+  // Followed rather than read once: keeping a transfer longer changes when its sender stops.
+  const owned = useOwned(code);
   const { meta, offline } = useTransferMeta(code, !session);
   // Panels set their own title (with progress); this covers the loading and error screens.
   useTitle(session || meta ? undefined : pageTitle(code));

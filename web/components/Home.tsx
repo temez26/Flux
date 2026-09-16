@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { errorMessage, getSummary, listPublic, type Summary } from "@/lib/api";
+import { EXPIRY_OPTIONS, errorMessage, getSummary, listPublic, type Summary } from "@/lib/api";
 import { fromDataTransfer, fromText, type Picked } from "@/lib/files";
 import { formatBytes, formatCode, formatLifetime, formatRemaining, normalizeCode, plural } from "@/lib/format";
 import { nextPaint, useNow, usePolling } from "@/lib/hooks";
@@ -30,11 +30,7 @@ import { getNearby, NearbyDevices } from "./nearby";
 import { canPickFolder, useFilePickers } from "./picker";
 import { Badge, Button, Card, Field, Notice, SectionTitle, Segmented, Spinner } from "./ui";
 
-const EXPIRY = [
-  { label: "1 hour", value: 3600 },
-  { label: "1 day", value: 86_400 },
-  { label: "7 days", value: 604_800 },
-];
+const EXPIRY = EXPIRY_OPTIONS;
 const VISIBILITY = [
   { label: "Private", value: "private", icon: <LockIcon className="size-4" /> },
   { label: "Public", value: "public", icon: <GlobeIcon className="size-4" /> },

@@ -56,6 +56,13 @@ export class ApiError extends Error {
   }
 }
 
+/** How long a transfer can be kept, the only lengths the server accepts. */
+export const EXPIRY_OPTIONS = [
+  { label: "1 hour", value: 3600 },
+  { label: "1 day", value: 86_400 },
+  { label: "7 days", value: 604_800 },
+];
+
 const transferUrl = (code: string) => `/api/transfers/${code}`;
 export const fileUrl = (code: string, idx: number) => `${transferUrl(code)}/files/${idx}`;
 /** Small, server-generated preview of an image file. */
@@ -165,6 +172,15 @@ export function getTransfer(code: string): Promise<TransferMeta | null> {
 
 export function getSummary(code: string): Promise<Summary | null> {
   return orNull(request<Summary>(`${transferUrl(code)}/summary`));
+}
+
+/** Changes a transfer its owner holds the token for; `expiresIn` counts from now. */
+export function updateTransfer(code: string, token: string, changes: { expiresIn?: number }) {
+  return request<{ expiresAt: string }>(transferUrl(code), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...auth(token) },
+    body: JSON.stringify(changes),
+  });
 }
 
 export function deleteTransfer(code: string, token: string) {

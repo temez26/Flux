@@ -101,7 +101,10 @@ fn app(state: Shared, web_dir: &std::path::Path) -> Router {
         )
         .route(
             "/transfers/{code}",
-            get(transfers::get).layer(CompressionLayer::new()).delete(transfers::delete),
+            get(transfers::get)
+                .layer(CompressionLayer::new())
+                .patch(transfers::update)
+                .delete(transfers::delete),
         )
         .route(
             "/transfers/{code}/files",

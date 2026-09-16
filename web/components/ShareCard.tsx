@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { EXPIRY_OPTIONS, errorMessage, updateTransfer } from "@/lib/api";
 import { encode } from "uqr";
 import { copyText } from "@/lib/clipboard";
 import { formatCode, formatRemaining } from "@/lib/format";
-import { useNow } from "@/lib/hooks";
-import { getOwned } from "@/lib/owned";
+import { reloadTransfer, useNow, useOwned } from "@/lib/hooks";
+import { saveOwned } from "@/lib/owned";
 import { toast } from "@/lib/toast";
 import { ClockIcon, CopyIcon, GlobeIcon, LinkIcon, LockIcon, QrIcon } from "./icons";
 import { Badge, Button, Card, IconButton } from "./ui";
@@ -28,7 +29,11 @@ function QrCode({ text }: { text: string }) {
 export function ShareCard({ code, expiresAt, hosted }: { code: string; expiresAt?: string; hosted?: boolean }) {
   const now = useNow(60_000);
   const [showQr, setShowQr] = useState(false);
-  const isPublic = useMemo(() => getOwned(code)?.public, [code]);
+  const owned = useOwned(code);
+  const isPublic = owned?.public;
+  // What this device last set wins over what the page was handed, which can be a poll behind.
+  const expires = owned?.expiresAt ?? expiresAt;
+  const [choosing, setChoosing] = useState(false);
   const formatted = formatCode(code);
   const link = `${window.location.origin}/${formatted}`;
   const canShare = typeof navigator.share === "function" && window.matchMedia("(pointer: coarse)").matches;
@@ -39,6 +44,19 @@ export function ShareCard({ code, expiresAt, hosted }: { code: string; expiresAt
       toast(`${what} copied`);
     } catch {
       toast(`Couldn't copy the ${what.toLowerCase()}`, "err");
+    }
+  }
+
+  async function keep(seconds: number, label: string) {
+    if (!owned) return;
+    try {
+      const { expiresAt } = await updateTransfer(code, owned.token, { expiresIn: seconds });
+      saveOwned(code, { ...owned, expiresAt });
+      reloadTransfer(code);
+      setChoosing(false);
+      toast(`Kept for ${label} from now`);
+    } catch (err) {
+      toast(errorMessage(err), "err");
     }
   }
 
@@ -56,10 +74,25 @@ export function ShareCard({ code, expiresAt, hosted }: { code: string; expiresAt
         </Badge>
         {hosted ? (
           <Badge icon={<ClockIcon />}>While this page is open</Badge>
+        ) : owned && expires ? (
+          <button type="button" onClick={() => setChoosing(!choosing)} aria-expanded={choosing} className="rounded-full transition hover:brightness-95">
+            <Badge icon={<ClockIcon />}>{formatRemaining(expires, now)} · Change</Badge>
+          </button>
         ) : (
-          expiresAt && <Badge icon={<ClockIcon />}>{formatRemaining(expiresAt, now)}</Badge>
+          expires && <Badge icon={<ClockIcon />}>{formatRemaining(expires, now)}</Badge>
         )}
       </div>
+      {choosing && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted">Keep it for</span>
+          {EXPIRY_OPTIONS.map(({ label, value }) => (
+            <Button key={value} className="min-h-9 px-3" onClick={() => keep(value, label)}>
+              {label}
+            </Button>
+          ))}
+          <span className="text-muted">from now</span>
+        </div>
+      )}
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 rounded-xl border border-line bg-bg py-1 pr-1 pl-4">

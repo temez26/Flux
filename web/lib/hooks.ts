@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getTransfer, type TransferMeta } from "./api";
 import { notify } from "./notify";
+import { getOwned, ownedVersion, subscribeOwned } from "./owned";
 
 const noSubscribe = () => () => {};
 
@@ -118,6 +119,19 @@ export function useNotifyWhen(when: boolean, title: string, body?: string) {
     if (when && !previous.current) void notify(title, body);
     previous.current = when;
   }, [when, title, body]);
+}
+
+/** This device's record of owning a transfer, kept current as it changes. */
+export function useOwned(code: string) {
+  useSyncExternalStore(subscribeOwned, ownedVersion, ownedVersion);
+  return getOwned(code);
+}
+
+const reloads = new Map<string, Set<() => void>>();
+
+/** Asks every page following a transfer to load it again now, rather than at its next poll. */
+export function reloadTransfer(code: string) {
+  for (const reload of reloads.get(code) ?? []) reload();
 }
 
 export function useMounted(): boolean {
@@ -273,10 +287,18 @@ export function useTransferMeta(code: string, enabled: boolean) {
         timer = window.setTimeout(load, OFFLINE_POLL_MS);
       }
     };
+    const now = () => {
+      window.clearTimeout(timer);
+      void load();
+    };
+    const followers = reloads.get(code) ?? new Set();
+    reloads.set(code, followers.add(now));
     void load();
     return () => {
       alive = false;
       window.clearTimeout(timer);
+      followers.delete(now);
+      if (!followers.size) reloads.delete(code);
     };
   }, [code, enabled]);
 

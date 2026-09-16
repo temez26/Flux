@@ -338,6 +338,41 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Update {
+    /// Keep the transfer this long from now, whatever was chosen when it was made.
+    expires_in: Option<i64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Updated {
+    expires_at: DateTime<Utc>,
+}
+
+/// Changes what its owner may change about a transfer after making it.
+pub async fn update(
+    State(state): State<Shared>,
+    Path(code): Path<String>,
+    headers: HeaderMap,
+    Json(req): Json<Update>,
+) -> Result<Json<Updated>> {
+    let transfer = find(&state.db, &code).await?;
+    authorize(&headers, &transfer)?;
+    let expires_at = match req.expires_in {
+        Some(seconds) if EXPIRY_CHOICES.contains(&seconds) => Utc::now() + chrono::Duration::seconds(seconds),
+        Some(_) => return Err(AppError::bad_request("invalid expiry")),
+        None => transfer.expires_at,
+    };
+    sqlx::query("UPDATE transfers SET expires_at = $2 WHERE id = $1")
+        .bind(transfer.id)
+        .bind(expires_at)
+        .execute(&state.db)
+        .await?;
+    Ok(Json(Updated { expires_at }))
+}
+
+#[derive(Deserialize)]
 pub struct NewFiles {
     files: Vec<NewFile>,
     /// Who is adding to a collection; their files go into a folder by that name.
