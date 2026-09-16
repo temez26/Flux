@@ -30,6 +30,18 @@ export function formatRemaining(expiresAt: string, now = Date.now()): string {
   return `Expires in ${Math.round(s / 86_400)} days`;
 }
 
+/**
+ * How long a transfer lasts, for a listing holding both kinds.
+ *
+ * One served from this device has an expiry on the server, but that is only how long the
+ * code is reserved: the transfer itself ends with the tab serving it. Reporting the expiry
+ * would promise days for something that may already be over.
+ */
+export function formatLifetime(expiresAt: string, hosted: boolean, serving: boolean, now = Date.now()): string {
+  if (!hosted) return formatRemaining(expiresAt, now);
+  return serving ? "While this page is open" : "Ended when the page closed";
+}
+
 export function plural(count: number, word: string): string {
   return `${count.toLocaleString()} ${word}${count === 1 ? "" : "s"}`;
 }

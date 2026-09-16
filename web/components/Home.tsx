@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { errorMessage, getSummary, listPublic, type Summary } from "@/lib/api";
 import { fromDataTransfer, type Picked } from "@/lib/files";
-import { formatBytes, formatCode, formatRemaining, normalizeCode, plural } from "@/lib/format";
+import { formatBytes, formatCode, formatLifetime, formatRemaining, normalizeCode, plural } from "@/lib/format";
 import { nextPaint, useNow, usePolling } from "@/lib/hooks";
 import { listOwned, removeOwned } from "@/lib/owned";
 import { navigate } from "@/lib/router";
@@ -411,7 +411,7 @@ function OwnedList() {
           mono
           icon={o.public ? <GlobeIcon className="size-4.5" /> : <LockIcon className="size-4.5" />}
           title={formatCode(code)}
-          detail={`${plural(o.count, "file")} · ${formatBytes(o.size)} · ${formatRemaining(o.expiresAt)}`}
+          detail={`${plural(o.count, "file")} · ${formatBytes(o.size)} · ${formatLifetime(o.expiresAt, !!o.hosted, live.has(code))}`}
           badge={ownedBadge(code, summaries[code])}
         />
       ))}
