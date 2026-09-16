@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { EXPIRY_OPTIONS, errorMessage, getSummary, listPublic, type Summary } from "@/lib/api";
-import { fromDataTransfer, fromText, type Picked } from "@/lib/files";
+import { fromClipboard, fromDataTransfer, fromText, type Picked } from "@/lib/files";
 import { formatBytes, formatCode, formatLifetime, formatRemaining, normalizeCode, plural } from "@/lib/format";
 import { nextPaint, useNow, usePolling } from "@/lib/hooks";
 import { listOwned, removeOwned } from "@/lib/owned";
@@ -145,6 +145,26 @@ export default function Home() {
     };
   }, [start]);
 
+  // Pasting a copied screenshot or file sends it the way dropping it would, and pasted text
+  // opens the text box. A paste into a field on the page is left to that field.
+  useEffect(() => {
+    const paste = (e: ClipboardEvent) => {
+      const into = e.target instanceof Element ? e.target : null;
+      if (!e.clipboardData || into?.closest("input, textarea, [contenteditable]")) return;
+      if (e.clipboardData.files.length) {
+        e.preventDefault();
+        void start(fromClipboard(e.clipboardData.files));
+        return;
+      }
+      const pasted = e.clipboardData.getData("text/plain");
+      if (!pasted.trim()) return;
+      e.preventDefault();
+      setText((current) => (current ?? "") + pasted);
+    };
+    window.addEventListener("paste", paste);
+    return () => window.removeEventListener("paste", paste);
+  }, [start]);
+
   function chooseExpiry(seconds: number) {
     setExpiresIn(seconds);
     options.current.expiresIn = seconds;
@@ -245,7 +265,7 @@ export default function Home() {
                   <p className="font-semibold">
                     {target ? `Choose what to send to ${target.name}` : folders ? "Drop files or folders here" : "Send photos, videos or any files"}
                   </p>
-                  <p className="mt-1 text-sm text-muted">Any size, any number of files</p>
+                  <p className="mt-1 text-sm text-muted">{folders ? "Any size, any number of files — or paste them" : "Any size, any number of files"}</p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
                   <Button variant="primary" onClick={pick("files")}>
