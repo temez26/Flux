@@ -11,6 +11,9 @@ export interface FileMeta {
 
 export interface TransferMeta {
   code: string;
+  title: string;
+  /** A collection: anyone with the code may add files, not only whoever created it. */
+  collect: boolean;
   createdAt: string;
   expiresAt: string;
   /** Served from the sender's device: the server has the file list but none of the bytes. */
@@ -38,6 +41,7 @@ export interface Summary {
   createdAt: string;
   expiresAt: string;
   hosted: boolean;
+  collect: boolean;
   files: number;
   size: number;
   complete: boolean;
@@ -112,6 +116,15 @@ export function createTransfer(files: NewFile[], expiresIn: number, isPublic: bo
   });
 }
 
+/** An empty transfer for other people to send files into. */
+export function createCollection(expiresIn: number, title?: string) {
+  return request<Created>("/api/transfers", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ files: [], expiresIn, collect: true, title }),
+  });
+}
+
 /** Where this deployment's STUN responder listens, so peers can find each other. */
 export function getConfig() {
   return request<{ stunPort: number | null }>("/api/config");
@@ -127,6 +140,25 @@ export function listPublic(options: { q?: string; limit?: number } = {}) {
 }
 
 /** Revalidated with the server's ETag, so polling an unchanged transfer is cheap. */
+export interface AddedFile {
+  idx: number;
+  /** Differs from the path asked for when the transfer already held one by that name. */
+  path: string;
+}
+
+/**
+ * Adds files to a transfer, answering with the index and final path of each, in order. The
+ * owner's token adds to any transfer; to a collection anyone may add, under a folder named by
+ * `from`, and gets back a token for uploading what they added — to send again with more.
+ */
+export function appendFiles(code: string, token: string | undefined, files: NewFile[], from?: string) {
+  return request<{ files: AddedFile[]; token?: string }>(`${transferUrl(code)}/files`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? auth(token) : {}) },
+    body: JSON.stringify({ files, from }),
+  });
+}
+
 export function getTransfer(code: string): Promise<TransferMeta | null> {
   return orNull(request<TransferMeta>(transferUrl(code), { cache: "no-cache" }));
 }

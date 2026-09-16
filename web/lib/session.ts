@@ -1,7 +1,8 @@
-import { createTransfer, type TransferMeta } from "./api";
+import { appendFiles, createCollection, createTransfer, type NewFile, type TransferMeta } from "./api";
+import { getDevice } from "./device";
 import { DirectHost } from "./direct";
 import { basename, uniquePaths, type Picked } from "./files";
-import { saveOwned } from "./owned";
+import { getOwned, saveOwned } from "./owned";
 import { Uploader, type Entry } from "./upload";
 
 // How long the server upload keeps yielding after a direct receiver's last request.
@@ -15,6 +16,8 @@ export interface Session {
   host: DirectHost;
   /** The files this tab is serving, in listing order. */
   entries: Entry[];
+  /** What this tab holds of them, by index, to upload or to hand a direct receiver. */
+  files: Map<number, File>;
   /** A receiver got everything directly, so the server upload was paused as unnecessary. */
   delivered: boolean;
 }
@@ -22,16 +25,18 @@ export interface Session {
 /** Transfers started in this tab. They keep running while the user moves between views. */
 export const live = new Map<string, Session>();
 
+const describe = ({ path, file }: Picked): NewFile => ({ path, size: file.size, type: file.type, modified: file.lastModified || null });
+
 function start(code: string, token: string, entries: Entry[], hosted: boolean): Session {
-  const files = new Map(entries.flatMap((e) => (e.file ? [[e.idx, e.file] as const] : [])));
   const uploader = hosted ? undefined : new Uploader(code, token, entries);
   const session: Session = {
     code,
     token,
     uploader,
     entries,
+    files: new Map(entries.flatMap((e) => (e.file ? [[e.idx, e.file] as const] : []))),
     delivered: false,
-    host: new DirectHost(code, token, (idx) => files.get(idx), {
+    host: new DirectHost(code, token, (idx) => session.files.get(idx), {
       activity: () => uploader?.hold(DIRECT_IDLE_MS),
       delivered: () => {
         session.delivered = true;
@@ -47,7 +52,7 @@ function start(code: string, token: string, entries: Entry[], hosted: boolean): 
 export async function send(picked: Picked[], expiresIn: number, isPublic: boolean, hosted: boolean): Promise<string> {
   const files = uniquePaths(picked);
   const created = await createTransfer(
-    files.map(({ path, file }) => ({ path, size: file.size, type: file.type, modified: file.lastModified || null })),
+    files.map(describe),
     expiresIn,
     isPublic,
     hosted,
@@ -68,6 +73,67 @@ export async function send(picked: Picked[], expiresIn: number, isPublic: boolea
     hosted,
   );
   return created.code;
+}
+
+/** Opens a collection for other people to send files into, and returns its code. */
+export async function collect(expiresIn: number, title?: string): Promise<string> {
+  const created = await createCollection(expiresIn, title);
+  saveOwned(created.code, { token: created.token, expiresAt: created.expiresAt, collect: true, count: 0, size: 0, createdAt: Date.now() });
+  return created.code;
+}
+
+/** Uploads this tab has added to collections, by code. Like sessions, they outlive the page showing them. */
+export const contributions = new Map<string, Uploader>();
+
+/**
+ * Adds files to someone else's collection. They go into a folder named after this device, and
+ * a second batch joins the first — same token, same queue — so what this device sent stays one
+ * upload to follow.
+ */
+export async function contribute(code: string, picked: Picked[]): Promise<Uploader> {
+  const files = uniquePaths(picked);
+  const existing = contributions.get(code);
+  const current = existing && !existing.gone ? existing : undefined;
+  const { files: added, token } = await appendFiles(code, current?.token, files.map(describe), getDevice().name);
+  const entries: Entry[] = added.map((f, i) => ({ idx: f.idx, path: f.path, size: files[i].file.size, file: files[i].file }));
+  if (current) {
+    current.add(entries);
+    return current;
+  }
+  if (!token) throw new Error("The server didn't hand back an upload token");
+  existing?.dispose();
+  const uploader = new Uploader(code, token, entries);
+  contributions.set(code, uploader);
+  uploader.start();
+  return uploader;
+}
+
+/**
+ * Adds files to a transfer this device created. One still uploading in this tab takes them
+ * into its queue; otherwise a new upload starts for the additions, beside the files the server
+ * already holds — which is why `meta` is needed then.
+ */
+export async function addFiles(code: string, token: string, picked: Picked[], meta?: TransferMeta): Promise<Session> {
+  const files = uniquePaths(picked);
+  const { files: added } = await appendFiles(code, token, files.map(describe));
+  const entries: Entry[] = added.map((f, i) => ({ idx: f.idx, path: f.path, size: files[i].file.size, file: files[i].file }));
+
+  const owned = getOwned(code);
+  if (owned) {
+    saveOwned(code, { ...owned, count: owned.count + entries.length, size: owned.size + entries.reduce((sum, e) => sum + e.size, 0) });
+  }
+
+  const session = live.get(code);
+  if (session?.uploader && !session.uploader.gone) {
+    for (const e of entries) session.files.set(e.idx, e.file!);
+    session.entries.push(...entries);
+    session.uploader.add(entries);
+    return session;
+  }
+  if (!meta) throw new Error("This transfer isn't open in this tab");
+  end(code);
+  const held = meta.files.map((f) => ({ idx: f.idx, path: f.path, size: f.size, done: f.hash !== null }));
+  return start(code, token, [...held, ...entries], false);
 }
 
 /** What a re-picked selection covers of a transfer that still needs uploading. */

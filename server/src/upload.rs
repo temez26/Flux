@@ -181,7 +181,7 @@ async fn write_chunk(
     stream: &mut BodyDataStream,
 ) -> Result<Response> {
     let transfer = transfers::find(&state.db, &code).await?;
-    transfers::authorize(&headers, &transfer)?;
+    transfers::authorize_file(&state.db, &headers, &transfer, idx).await?;
     // A hosted transfer was accepted without checking for room to store it, so it must not
     // become a way to store anything. Not 409: that status carries the real offset and the
     // client retries it at once, which here would spin forever.

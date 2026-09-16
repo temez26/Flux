@@ -117,6 +117,17 @@ async function networkFirst(request) {
   }
 }
 
+// Tapping a notification brings back the page it came from, or opens Flux if that has closed.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      const open = windows.find((w) => "focus" in w);
+      return open ? open.focus() : self.clients.openWindow("/");
+    }),
+  );
+});
+
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timeout")), ms);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getTransfer, type TransferMeta } from "./api";
+import { notify } from "./notify";
 
 const noSubscribe = () => () => {};
 
@@ -105,6 +106,18 @@ export function useFilePicker() {
   }, [show]);
 
   return { waiting, stalled, arm, settle };
+}
+
+/**
+ * Notifies each time `when` turns true — but not for a state the page opened in, which the
+ * person opening it can already see.
+ */
+export function useNotifyWhen(when: boolean, title: string, body?: string) {
+  const previous = useRef(when);
+  useEffect(() => {
+    if (when && !previous.current) void notify(title, body);
+    previous.current = when;
+  }, [when, title, body]);
 }
 
 export function useMounted(): boolean {
@@ -250,7 +263,8 @@ export function useTransferMeta(code: string, enabled: boolean) {
         setMeta(next);
         setOffline(false);
         if (!next) return;
-        const interval = next.files.some((f) => f.hash === null) ? UPLOADING_POLL_MS : READY_POLL_MS;
+        // A collection can gain files at any moment, however finished it looks.
+        const interval = next.collect || next.files.some((f) => f.hash === null) ? UPLOADING_POLL_MS : READY_POLL_MS;
         const untilExpiry = Date.parse(next.expiresAt) - Date.now() + 1000;
         timer = window.setTimeout(load, Math.max(0, Math.min(interval, untilExpiry)));
       } catch {

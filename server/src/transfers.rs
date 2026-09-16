@@ -26,6 +26,9 @@ const EXPIRY_CHOICES: [i64; 3] = [3600, 86_400, 604_800];
 const MAX_FILES: usize = 100_000;
 const MAX_PATH_LEN: usize = 1024;
 const PUBLIC_LIST_LIMIT: i64 = 100;
+const MAX_TITLE: usize = 80;
+const MAX_CONTRIBUTOR: usize = 60;
+const COLLECTION_TITLE: &str = "Collected files";
 /// Ceiling on one request, so a wide listing can be paged through but never asked for whole.
 const PUBLIC_LIST_MAX: i64 = 500;
 /// Stands in for a LIKE wildcard, so a title containing % or _ searches for those characters.
@@ -40,6 +43,9 @@ pub struct Transfer {
     pub expires_at: DateTime<Utc>,
     /// Served from the sender's device; the server never holds the bytes.
     pub hosted: bool,
+    /// Open to files from anyone with the code, not only from its owner.
+    pub collect: bool,
+    pub title: String,
 }
 
 pub fn normalize_code(raw: &str) -> String {
@@ -48,7 +54,7 @@ pub fn normalize_code(raw: &str) -> String {
 
 pub async fn find(db: &sqlx::PgPool, code: &str) -> Result<Transfer> {
     sqlx::query_as(
-        "SELECT id, code, token_hash, created_at, expires_at, hosted FROM transfers
+        "SELECT id, code, token_hash, created_at, expires_at, hosted, collect, title FROM transfers
          WHERE code = $1 AND expires_at > now()",
     )
     .bind(normalize_code(code))
@@ -57,23 +63,49 @@ pub async fn find(db: &sqlx::PgPool, code: &str) -> Result<Transfer> {
     .ok_or(AppError::NOT_FOUND)
 }
 
-pub fn token_matches(token: &str, transfer: &Transfer) -> bool {
-    <[u8; 32]>::try_from(transfer.token_hash.as_slice())
+fn bearer(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+}
+
+fn hash_matches(token: &str, stored: &[u8]) -> bool {
+    <[u8; 32]>::try_from(stored)
         // blake3::Hash equality is constant-time.
         .is_ok_and(|stored| blake3::hash(token.as_bytes()) == blake3::Hash::from(stored))
 }
 
+pub fn token_matches(token: &str, transfer: &Transfer) -> bool {
+    hash_matches(token, &transfer.token_hash)
+}
+
 pub fn authorize(headers: &HeaderMap, transfer: &Transfer) -> Result<()> {
-    let token = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .ok_or(AppError::UNAUTHORIZED)?;
-    if token_matches(token, transfer) {
-        Ok(())
-    } else {
-        Err(AppError::UNAUTHORIZED)
+    match bearer(headers) {
+        Some(token) if token_matches(token, transfer) => Ok(()),
+        _ => Err(AppError::UNAUTHORIZED),
     }
+}
+
+/// Whether a request may write to or remove one file: its transfer's owner may, and in a
+/// collection so may whoever added that file.
+pub async fn authorize_file(db: &sqlx::PgPool, headers: &HeaderMap, transfer: &Transfer, idx: i32) -> Result<()> {
+    let token = bearer(headers).ok_or(AppError::UNAUTHORIZED)?;
+    if token_matches(token, transfer) {
+        return Ok(());
+    }
+    if transfer.collect {
+        let stored: Option<Option<Vec<u8>>> =
+            sqlx::query_scalar("SELECT upload_token_hash FROM files WHERE transfer_id = $1 AND idx = $2")
+                .bind(transfer.id)
+                .bind(idx)
+                .fetch_optional(db)
+                .await?;
+        if stored.flatten().is_some_and(|hash| hash_matches(token, &hash)) {
+            return Ok(());
+        }
+    }
+    Err(AppError::UNAUTHORIZED)
 }
 
 pub fn file_path(state: &Shared, transfer: Uuid, idx: i32) -> PathBuf {
@@ -131,6 +163,29 @@ pub struct NewTransfer {
     /// Keep nothing but the file list: the sender serves the bytes itself.
     #[serde(default)]
     hosted: bool,
+    /// A collection, created empty for others to add files to.
+    #[serde(default)]
+    collect: bool,
+    /// What a collection is called; an ordinary transfer is named after its files.
+    #[serde(default)]
+    title: Option<String>,
+}
+
+fn collection_title(title: Option<&str>) -> String {
+    let title: String = title.unwrap_or_default().chars().filter(|c| !c.is_control()).take(MAX_TITLE).collect();
+    let title = title.trim();
+    if title.is_empty() { COLLECTION_TITLE.to_owned() } else { title.to_owned() }
+}
+
+/// A contributor's name as the one folder their files go into, or None if nothing usable is left.
+fn contributor_folder(name: &str) -> Option<String> {
+    let name: String = name
+        .chars()
+        .filter(|c| !c.is_control() && !matches!(c, '/' | '\\'))
+        .take(MAX_CONTRIBUTOR)
+        .collect();
+    let name = name.trim();
+    (!name.is_empty() && name != "." && name != "..").then(|| name.to_owned())
 }
 
 #[derive(Serialize)]
@@ -141,44 +196,118 @@ pub struct Created {
     expires_at: DateTime<Utc>,
 }
 
-pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -> Result<Json<Created>> {
-    if req.files.is_empty() || req.files.len() > MAX_FILES {
-        return Err(AppError::bad_request("invalid file count"));
-    }
-    if !EXPIRY_CHOICES.contains(&req.expires_in) {
-        return Err(AppError::bad_request("invalid expiry"));
-    }
-    let mut seen = HashSet::with_capacity(req.files.len());
+/// The declared size of a batch of files, once every entry is one the server can store.
+fn checked_total(files: &[NewFile]) -> Result<u64> {
+    let mut seen = HashSet::with_capacity(files.len());
     let mut total: u64 = 0;
-    for file in &req.files {
+    for file in files {
         if file.size < 0 || !valid_path(&file.path) || !seen.insert(file.path.as_str()) {
             return Err(AppError::bad_request("invalid file entry"));
         }
         total = total.saturating_add(file.size as u64);
     }
-    if !req.hosted && let Some(free) = available_space(&state.data_dir) {
-        // Free space already accounts for every byte written so far, but not for the ones
-        // transfers accepted earlier are still expecting. Without holding those back, two
-        // large transfers created moments apart both pass and then fight over the same room.
-        let promised = outstanding(&state).await?;
-        if total > free.saturating_sub(promised) {
-            return Err(AppError(StatusCode::INSUFFICIENT_STORAGE, "not enough free space on server"));
-        }
+    Ok(total)
+}
+
+async fn ensure_room(state: &Shared, total: u64) -> Result<()> {
+    let Some(free) = available_space(&state.data_dir) else { return Ok(()) };
+    // Free space already accounts for every byte written so far, but not for the ones
+    // transfers accepted earlier are still expecting. Without holding those back, two large
+    // transfers created moments apart both pass and then fight over the same room.
+    let promised = outstanding(state).await?;
+    if total > free.saturating_sub(promised) {
+        return Err(AppError(StatusCode::INSUFFICIENT_STORAGE, "not enough free space on server"));
+    }
+    Ok(())
+}
+
+/// "photo.jpg" becomes "photo (1).jpg" while its name is taken — the way the page renames
+/// duplicates within one selection, applied to files the transfer already holds.
+fn unique_path(path: &str, taken: &HashSet<String>) -> String {
+    if !taken.contains(path) {
+        return path.to_owned();
+    }
+    let name = path.rfind('/').map_or(0, |slash| slash + 1);
+    // A leading dot starts a hidden file's name, not its extension.
+    let split = match path[name..].rfind('.') {
+        Some(dot) if dot > 0 => name + dot,
+        _ => path.len(),
+    };
+    (1..)
+        .map(|n| format!("{} ({n}){}", &path[..split], &path[split..]))
+        .find(|candidate| !taken.contains(candidate))
+        .expect("an unused name is always found")
+}
+
+async fn insert_files(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transfer: Uuid,
+    first_idx: i32,
+    files: Vec<NewFile>,
+    upload_token_hash: Option<&[u8]>,
+) -> Result<()> {
+    let count = files.len();
+    let (mut idxs, mut paths, mut sizes, mut mimes, mut modified) = (
+        Vec::with_capacity(count),
+        Vec::with_capacity(count),
+        Vec::with_capacity(count),
+        Vec::with_capacity(count),
+        Vec::with_capacity(count),
+    );
+    for (offset, file) in files.into_iter().enumerate() {
+        idxs.push(first_idx + offset as i32);
+        paths.push(file.path);
+        sizes.push(file.size);
+        mimes.push(if file.mime.is_empty() { "application/octet-stream".to_owned() } else { file.mime });
+        modified.push(file.modified);
+    }
+    sqlx::query(
+        "INSERT INTO files (transfer_id, idx, path, size, mime, modified, upload_token_hash)
+         SELECT $1, u.*, $7::bytea FROM UNNEST($2::int[], $3::text[], $4::bigint[], $5::text[], $6::bigint[]) AS u",
+    )
+    .bind(transfer)
+    .bind(&idxs)
+    .bind(&paths)
+    .bind(&sizes)
+    .bind(&mimes)
+    .bind(&modified)
+    .bind(upload_token_hash)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -> Result<Json<Created>> {
+    let counted = if req.collect {
+        // A collection starts empty, and its files are uploaded here by whoever adds them.
+        req.files.is_empty() && !req.hosted
+    } else {
+        !req.files.is_empty() && req.files.len() <= MAX_FILES
+    };
+    if !counted {
+        return Err(AppError::bad_request("invalid file count"));
+    }
+    if !EXPIRY_CHOICES.contains(&req.expires_in) {
+        return Err(AppError::bad_request("invalid expiry"));
+    }
+    let total = checked_total(&req.files)?;
+    if !req.hosted {
+        ensure_room(&state, total).await?;
     }
 
     let id = Uuid::new_v4();
     let token = hex(&rand::random::<[u8; 32]>());
     let token_hash = blake3::hash(token.as_bytes());
     let expires_at = Utc::now() + chrono::Duration::seconds(req.expires_in);
-    let title = title(&req.files);
+    let title = if req.collect { collection_title(req.title.as_deref()) } else { title(&req.files) };
 
     let mut tx = state.db.begin().await?;
     let mut code = None;
     for _ in 0..8 {
         let candidate = random_code();
         let inserted = sqlx::query(
-            "INSERT INTO transfers (id, code, token_hash, expires_at, public, title, hosted)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+            "INSERT INTO transfers (id, code, token_hash, expires_at, public, title, hosted, collect, next_idx)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              ON CONFLICT (code) DO NOTHING",
         )
         .bind(id)
@@ -188,6 +317,8 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
         .bind(req.public)
         .bind(&title)
         .bind(req.hosted)
+        .bind(req.collect)
+        .bind(req.files.len() as i32)
         .execute(&mut *tx)
         .await?;
         if inserted.rows_affected() == 1 {
@@ -196,34 +327,7 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
         }
     }
     let code = code.ok_or(AppError::INTERNAL)?;
-
-    let count = req.files.len();
-    let (mut idxs, mut paths, mut sizes, mut mimes, mut modified) = (
-        Vec::with_capacity(count),
-        Vec::with_capacity(count),
-        Vec::with_capacity(count),
-        Vec::with_capacity(count),
-        Vec::with_capacity(count),
-    );
-    for (idx, file) in req.files.into_iter().enumerate() {
-        idxs.push(idx as i32);
-        paths.push(file.path);
-        sizes.push(file.size);
-        mimes.push(if file.mime.is_empty() { "application/octet-stream".to_owned() } else { file.mime });
-        modified.push(file.modified);
-    }
-    sqlx::query(
-        "INSERT INTO files (transfer_id, idx, path, size, mime, modified)
-         SELECT $1, * FROM UNNEST($2::int[], $3::text[], $4::bigint[], $5::text[], $6::bigint[])",
-    )
-    .bind(id)
-    .bind(&idxs)
-    .bind(&paths)
-    .bind(&sizes)
-    .bind(&mimes)
-    .bind(&modified)
-    .execute(&mut *tx)
-    .await?;
+    insert_files(&mut tx, id, 0, req.files, None).await?;
 
     if !req.hosted {
         tokio::fs::create_dir_all(state.data_dir.join(id.to_string())).await?;
@@ -231,6 +335,95 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
     tx.commit().await?;
 
     Ok(Json(Created { code, token, expires_at }))
+}
+
+#[derive(Deserialize)]
+pub struct NewFiles {
+    files: Vec<NewFile>,
+    /// Who is adding to a collection; their files go into a folder by that name.
+    #[serde(default)]
+    from: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct AddedFile {
+    idx: i32,
+    /// Differs from the path asked for when that one was already taken.
+    path: String,
+}
+
+#[derive(Serialize)]
+pub struct Added {
+    files: Vec<AddedFile>,
+    /// For someone adding to a collection: what lets them upload, or cancel, what they added.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    token: Option<String>,
+}
+
+/// Adds files to a transfer: one its owner created earlier, so a file forgotten the first time
+/// doesn't mean a new code for everyone it was already shared with, or a collection anyone with
+/// the code may add to. The files come back in the order asked for, with the index each was given.
+pub async fn add_files(
+    State(state): State<Shared>,
+    Path(code): Path<String>,
+    headers: HeaderMap,
+    Json(mut req): Json<NewFiles>,
+) -> Result<Json<Added>> {
+    let transfer = find(&state.db, &code).await?;
+    let owner = bearer(&headers).is_some_and(|token| token_matches(token, &transfer));
+    // Someone adding to a collection gets a token of their own — or keeps the one they hold,
+    // coming back to add more — so the uploads they can finish or cancel are only theirs.
+    let contributor = match (owner, transfer.collect) {
+        (true, _) => None,
+        (false, true) => Some(bearer(&headers).map_or_else(|| hex(&rand::random::<[u8; 32]>()), str::to_owned)),
+        (false, false) => return Err(AppError::UNAUTHORIZED),
+    };
+    if let Some(folder) = contributor.as_ref().and(req.from.as_deref()).and_then(contributor_folder) {
+        for file in &mut req.files {
+            file.path = format!("{folder}/{}", file.path);
+        }
+    }
+    if transfer.hosted {
+        return Err(AppError(StatusCode::FORBIDDEN, "this transfer is served from the sender's device"));
+    }
+    if req.files.is_empty() {
+        return Err(AppError::bad_request("invalid file count"));
+    }
+    let total = checked_total(&req.files)?;
+    ensure_room(&state, total).await?;
+
+    let mut tx = state.db.begin().await?;
+    // Taking the indices first also locks the transfer's row, so a second addition waits here
+    // and then sees this one's paths, rather than both picking the same names. A removed
+    // file's index is never handed out again.
+    let first: i32 = sqlx::query_scalar("UPDATE transfers SET next_idx = next_idx + $2 WHERE id = $1 RETURNING next_idx - $2")
+        .bind(transfer.id)
+        .bind(req.files.len() as i32)
+        .fetch_one(&mut *tx)
+        .await?;
+    let existing: Vec<String> = sqlx::query_scalar("SELECT path FROM files WHERE transfer_id = $1")
+        .bind(transfer.id)
+        .fetch_all(&mut *tx)
+        .await?;
+    if existing.len() + req.files.len() > MAX_FILES {
+        return Err(AppError::bad_request("invalid file count"));
+    }
+
+    let mut taken: HashSet<String> = existing.into_iter().collect();
+    let mut files = req.files;
+    for file in &mut files {
+        file.path = unique_path(&file.path, &taken);
+        taken.insert(file.path.clone());
+    }
+    let added = files
+        .iter()
+        .enumerate()
+        .map(|(offset, file)| AddedFile { idx: first + offset as i32, path: file.path.clone() })
+        .collect();
+    let token_hash = contributor.as_ref().map(|token| blake3::hash(token.as_bytes()));
+    insert_files(&mut tx, transfer.id, first, files, token_hash.as_ref().map(|hash| hash.as_bytes().as_slice())).await?;
+    tx.commit().await?;
+    Ok(Json(Added { files: added, token: contributor }))
 }
 
 #[derive(Serialize)]
@@ -250,6 +443,8 @@ struct FileInfo {
 #[serde(rename_all = "camelCase")]
 pub struct TransferInfo {
     code: String,
+    title: String,
+    collect: bool,
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
     hosted: bool,
@@ -305,6 +500,8 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
 
     let body = serde_json::to_vec(&TransferInfo {
         code: transfer.code,
+        title: transfer.title,
+        collect: transfer.collect,
         created_at: transfer.created_at,
         expires_at: transfer.expires_at,
         hosted: transfer.hosted,
@@ -326,12 +523,12 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
     Ok(response)
 }
 
-const SUMMARY_SQL: &str = "SELECT t.code, t.title, t.created_at, t.expires_at, t.hosted,
+const SUMMARY_SQL: &str = "SELECT t.code, t.title, t.created_at, t.expires_at, t.hosted, t.collect,
         count(f.idx) AS files,
         coalesce(sum(f.size), 0)::bigint AS size,
         -- Nothing is pending for a hosted transfer: its bytes were never coming here.
         t.hosted OR count(f.idx) = count(f.hash) AS complete
-     FROM transfers t JOIN files f ON f.transfer_id = t.id";
+     FROM transfers t LEFT JOIN files f ON f.transfer_id = t.id";
 
 #[derive(Serialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
@@ -341,6 +538,7 @@ pub struct Summary {
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
     hosted: bool,
+    collect: bool,
     files: i64,
     size: i64,
     complete: bool,
@@ -417,7 +615,7 @@ pub async fn delete_file(
     headers: HeaderMap,
 ) -> Result<StatusCode> {
     let transfer = find(&state.db, &code).await?;
-    authorize(&headers, &transfer)?;
+    authorize_file(&state.db, &headers, &transfer, idx).await?;
     sqlx::query("DELETE FROM files WHERE transfer_id = $1 AND idx = $2")
         .bind(transfer.id)
         .bind(idx)
@@ -495,6 +693,68 @@ fn available_space(_: &std::path::Path) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_collection_is_called_what_its_owner_says_or_something_plain() {
+        assert_eq!(collection_title(Some("  Holiday photos ")), "Holiday photos");
+        assert_eq!(collection_title(None), COLLECTION_TITLE);
+        assert_eq!(collection_title(Some("\n\t ")), COLLECTION_TITLE);
+        assert_eq!(collection_title(Some(&"x".repeat(200))).chars().count(), MAX_TITLE);
+    }
+
+    #[test]
+    fn a_contributor_name_makes_one_folder_and_no_more() {
+        assert_eq!(contributor_folder("Bob's iPhone").as_deref(), Some("Bob's iPhone"));
+        assert_eq!(contributor_folder("a/b\\c").as_deref(), Some("abc"), "no nesting, no escaping upwards");
+        for unusable in ["", "   ", ".", "..", "/"] {
+            assert_eq!(contributor_folder(unusable), None, "{unusable:?}");
+        }
+    }
+
+    #[test]
+    fn only_the_owners_token_authorizes() {
+        let token = "owner-token";
+        let transfer = Transfer {
+            id: Uuid::nil(),
+            code: "abcdefgh".into(),
+            token_hash: blake3::hash(token.as_bytes()).as_bytes().to_vec(),
+            created_at: Utc::now(),
+            expires_at: Utc::now(),
+            hosted: false,
+            collect: true,
+            title: String::new(),
+        };
+        let with = |value: &str| {
+            let mut headers = HeaderMap::new();
+            headers.insert(header::AUTHORIZATION, value.parse().unwrap());
+            headers
+        };
+        assert!(authorize(&with("Bearer owner-token"), &transfer).is_ok());
+        assert!(authorize(&with("Bearer someone-else"), &transfer).is_err());
+        assert!(authorize(&with("owner-token"), &transfer).is_err(), "only as a bearer token");
+        assert!(authorize(&HeaderMap::new(), &transfer).is_err());
+    }
+
+    fn file(path: &str, size: i64) -> NewFile {
+        NewFile { path: path.into(), size, mime: String::new(), modified: None }
+    }
+
+    #[test]
+    fn renames_a_path_already_taken() {
+        let taken: HashSet<String> = ["photo.jpg", "photo (1).jpg", "trip/.env", "notes"].map(String::from).into();
+        assert_eq!(unique_path("new.jpg", &taken), "new.jpg", "a free name is kept");
+        assert_eq!(unique_path("photo.jpg", &taken), "photo (2).jpg", "past every name in use");
+        assert_eq!(unique_path("trip/.env", &taken), "trip/.env (1)", "a hidden file has no extension");
+        assert_eq!(unique_path("notes", &taken), "notes (1)");
+    }
+
+    #[test]
+    fn refuses_a_batch_the_server_couldnt_store() {
+        assert_eq!(checked_total(&[file("a", 10), file("b/c", 5)]).ok(), Some(15));
+        for bad in [vec![file("a", -1)], vec![file("../a", 1)], vec![file("a", 1), file("a", 2)]] {
+            assert!(checked_total(&bad).is_err());
+        }
+    }
 
     #[test]
     fn searches_for_wildcards_as_ordinary_characters() {

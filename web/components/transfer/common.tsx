@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { deleteTransfer, fileUrl, type FileMeta, type TransferMeta } from "@/lib/api";
+import { deleteTransfer, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
 import { basename } from "@/lib/files";
 import { formatBytes, formatCode, formatRemaining, plural } from "@/lib/format";
 import { useNow } from "@/lib/hooks";
@@ -14,6 +14,10 @@ import { FileRow, FileTile } from "../FileList";
 import { CheckIcon, ClockIcon, DownloadIcon, FileTypeIcon, FolderIcon } from "../icons";
 import { FileThumb } from "../preview/Preview";
 import { Badge, Spinner, buttonClass } from "../ui";
+
+/** Stand-ins for a store that doesn't exist yet, for useSyncExternalStore. */
+export const subscribeNothing = () => () => {};
+export const versionZero = () => 0;
 
 export const pageTitle = (code: string) => `${formatCode(code)} · Flux`;
 
@@ -165,5 +169,43 @@ export function MetaTile({ file, code, onPreview }: { file: FileMeta; code: stri
         )
       }
     />
+  );
+}
+
+/** A request line a reverse proxy will still accept, with room to spare. */
+const MAX_URL = 4000;
+
+/** Downloads chosen files that the server holds: one directly, several as a zip. */
+export function SelectionDownload({ code, files }: { code: string; files: FileMeta[] }) {
+  const primary = buttonClass("primary", "min-h-9");
+  if (files.some((f) => !f.hash)) {
+    return (
+      <button type="button" disabled className={primary}>
+        Waiting for uploads
+      </button>
+    );
+  }
+  if (files.length === 1) {
+    return (
+      <a href={fileUrl(code, files[0].idx)} download className={primary}>
+        <DownloadIcon className="size-4" />
+        Download
+      </a>
+    );
+  }
+  const url = zipUrl(code, files.map((f) => f.idx));
+  // Scattered picks can't be written as a handful of ranges; a folder always can.
+  if (url.length > MAX_URL) {
+    return (
+      <button type="button" disabled className={primary}>
+        Too many separate files — narrow it down
+      </button>
+    );
+  }
+  return (
+    <a href={url} download className={primary}>
+      <DownloadIcon className="size-4" />
+      Download {files.length.toLocaleString()} as .zip
+    </a>
   );
 }
