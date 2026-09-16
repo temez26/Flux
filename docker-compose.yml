@@ -5,9 +5,13 @@ services:
     restart: unless-stopped
     ports:
       - "${FLUX_PORT:-8080}:8080"
+      # Lets two devices find each other for a direct transfer. Must be published as-is:
+      # the port a page is told to use is the one it dials.
+      - "${FLUX_STUN_PORT:-3478}:3478/udp"
     environment:
       DATABASE_URL: postgres://flux:${POSTGRES_PASSWORD:-flux}@db:5432/flux
       RUST_LOG: ${RUST_LOG:-info}
+      FLUX_STUN_PORT: ${FLUX_STUN_PORT:-3478}
     volumes:
       - flux-data:/data
     depends_on:

@@ -2,6 +2,7 @@ mod cleanup;
 mod download;
 mod error;
 mod signal;
+mod stun;
 mod thumbs;
 mod transfers;
 mod upload;
@@ -28,6 +29,8 @@ pub struct AppState {
     pub data_dir: PathBuf,
     pub uploads: upload::Registry,
     pub rooms: signal::Rooms,
+    /// Where pages should look for this server's STUN responder, if it started.
+    pub stun_port: Option<u16>,
 }
 
 pub type Shared = Arc<AppState>;
@@ -51,11 +54,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db = PgPoolOptions::new().max_connections(16).connect(&database_url).await?;
     sqlx::migrate!().run(&db).await?;
 
+    // Set FLUX_STUN_PORT=0 to leave it off; direct transfers then depend on the browsers
+    // resolving each other's mDNS names, which many networks don't do.
+    let stun_port: u16 = env_or("FLUX_STUN_PORT", "3478").parse().unwrap_or(3478);
+    let stun = match stun_port {
+        0 => None,
+        port => match tokio::net::UdpSocket::bind(("0.0.0.0", port)).await {
+            Ok(socket) => {
+                tracing::info!("stun responder on 0.0.0.0:{port}");
+                stun::spawn(socket);
+                Some(port)
+            }
+            Err(err) => {
+                tracing::warn!("no stun responder on {port}: {err}; direct transfers may not connect");
+                None
+            }
+        },
+    };
+
     let state = Arc::new(AppState {
         db,
         data_dir,
         uploads: Default::default(),
         rooms: Default::default(),
+        stun_port: stun,
     });
     cleanup::remove_orphans(&state).await?;
     cleanup::spawn(state.clone());
@@ -90,6 +112,7 @@ fn app(state: Shared, web_dir: &std::path::Path) -> Router {
         .route("/transfers/{code}/summary", get(transfers::summary))
         .route("/transfers/{code}/signal", get(signal::connect))
         .route("/public", get(transfers::list_public).layer(CompressionLayer::new()))
+        .route("/config", get(stun::config))
         .fallback(|| async { error::AppError::NOT_FOUND })
         .with_state(state);
 

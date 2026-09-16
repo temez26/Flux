@@ -25,6 +25,7 @@ Update with `git pull && docker compose up -d --build`. Files and metadata persi
 | Variable            | Default | Purpose                                         |
 | ------------------- | ------- | ----------------------------------------------- |
 | `FLUX_PORT`         | `8080`  | Host port                                       |
+| `FLUX_STUN_PORT`    | `3478`  | UDP port devices use to find each other for a direct transfer (`0` disables) |
 | `POSTGRES_PASSWORD` | `flux`  | Database password (used when the database is first created) |
 | `RUST_LOG`          | `info`  | Log level                                       |
 
@@ -37,6 +38,7 @@ sudo chown -R 65532:65532 /mnt/storage/flux
 ## Reverse proxy
 
 - Use **HTTPS**. Installing the app, offline start and direct downloads need it.
+- Publish **UDP 3478** straight to the host. Sending from a device needs it, and a reverse proxy won't carry it.
 - Allow request bodies of at least **8 MiB** and turn off request buffering.
 - Allow **WebSocket** upgrades (used for direct transfers).
 

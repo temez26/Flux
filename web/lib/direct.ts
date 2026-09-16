@@ -1,3 +1,4 @@
+import { getConfig } from "./api";
 import { createHasher, type Hasher } from "./hash";
 import { Emitter, Observable } from "./observable";
 import { Signal, type SignalData, type SignalMessage } from "./signal";
@@ -38,10 +39,23 @@ interface Peer {
   signal(data: SignalData): Promise<void>;
 }
 
-function createPeer(onCandidate: (candidate: RTCIceCandidateInit) => void): Peer {
-  // Devices on the same network reach each other through host candidates, so no
-  // third-party STUN or TURN server is ever contacted.
-  const pc = new RTCPeerConnection({ iceServers: [] });
+/**
+ * This server's own STUN responder, asked for once. Browsers offer only an `<uuid>.local`
+ * name for a machine's real address, and a network that won't resolve that between two
+ * devices leaves a direct transfer with nothing to connect to. Asking a server on the same
+ * network which address it sees produces one that works, without involving anyone else.
+ */
+let servers: Promise<RTCIceServer[]> | undefined;
+
+function iceServers(): Promise<RTCIceServer[]> {
+  return (servers ??= getConfig()
+    .then(({ stunPort }) => (stunPort ? [{ urls: `stun:${window.location.hostname}:${stunPort}` }] : []))
+    // Without it there are still the mDNS candidates, which work on some networks.
+    .catch(() => []));
+}
+
+function createPeer(servers: RTCIceServer[], onCandidate: (candidate: RTCIceCandidateInit) => void): Peer {
+  const pc = new RTCPeerConnection({ iceServers: servers });
   const early: RTCIceCandidateInit[] = [];
   pc.onicecandidate = (e) => {
     if (e.candidate) onCandidate(e.candidate.toJSON());
@@ -129,7 +143,7 @@ export class DirectHost extends Observable {
     try {
       if (msg.data.sdp?.type === "offer") {
         this.peers.get(from)?.pc.close();
-        const peer = createPeer((candidate) => this.signal.send({ t: "signal", to: from, data: { candidate } }));
+        const peer = createPeer(await iceServers(), (candidate) => this.signal.send({ t: "signal", to: from, data: { candidate } }));
         this.peers.set(from, peer);
         peer.pc.ondatachannel = (e) => this.serve(e.channel, frameSize(peer.pc));
         await peer.signal(msg.data);
@@ -378,7 +392,7 @@ export class DirectClient extends Emitter {
     this.teardown();
     this.attempts++;
     this.setState("connecting");
-    const peer = createPeer((candidate) => this.signal.send({ t: "signal", data: { candidate } }));
+    const peer = createPeer(await iceServers(), (candidate) => this.signal.send({ t: "signal", data: { candidate } }));
     const channel = peer.pc.createDataChannel("flux", { ordered: true });
     this.peer = peer;
     this.channel = channel;
