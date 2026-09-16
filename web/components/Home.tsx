@@ -11,6 +11,7 @@ import { getReceived } from "@/lib/received";
 import { navigate } from "@/lib/router";
 import { offerTitle, type Peer } from "@/lib/nearby";
 import { collect, live, send } from "@/lib/session";
+import { takeShared } from "@/lib/share";
 import { toast } from "@/lib/toast";
 import {
   AlertIcon,
@@ -72,6 +73,8 @@ export default function Home() {
   const [target, setTarget] = useState<Peer | null>(null);
   /** Text being written to send instead of files; null while choosing files. */
   const [text, setText] = useState<string | null>(null);
+  /** Files another app shared to Flux, waiting to be told where to go. */
+  const [shared, setShared] = useState<Picked[] | null>(null);
   const options = useRef({ expiresIn, isPublic, hosted, target: null as Peer | null });
   const folders = canPickFolder();
 
@@ -147,6 +150,16 @@ export default function Home() {
     };
   }, [start]);
 
+  // Arriving from another app's Share sheet: pick up what it shared, once, and tidy the address.
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has("shared")) return;
+    window.history.replaceState(window.history.state, "", "/");
+    void takeShared().then((received) => {
+      if (received?.files.length) setShared(received.files);
+      else if (received?.text) setText(received.text);
+    });
+  }, []);
+
   // Pasting a copied screenshot or file sends it the way dropping it would, and pasted text
   // opens the text box. A paste into a field on the page is left to that field.
   useEffect(() => {
@@ -194,7 +207,15 @@ export default function Home() {
   function chooseDevice(peer: Peer) {
     if (target?.device === peer.device) return chooseTarget(null);
     chooseTarget(peer);
-    if (text === null) picker.open("files");
+    // Something already waiting goes straight to the device; otherwise choosing one comes first.
+    if (shared) sendShared();
+    else if (text === null) picker.open("files");
+  }
+
+  function sendShared() {
+    if (!shared) return;
+    setShared(null);
+    void start(shared);
   }
 
   function sendText() {
@@ -220,7 +241,29 @@ export default function Home() {
 
       <Card>
         <SectionTitle icon={<UploadIcon className="size-4.5" />}>Send</SectionTitle>
-        {text !== null && !status ? (
+        {shared && !status ? (
+          <div className="rounded-2xl border-2 border-accent/60 bg-accent/5 p-5">
+            <p className="font-semibold">{plural(shared.length, "file")} shared to Flux</p>
+            <p className="mt-1 truncate text-sm text-muted">
+              {formatBytes(shared.reduce((sum, p) => sum + p.file.size, 0))} ·{" "}
+              {shared
+                .slice(0, 2)
+                .map((p) => p.path)
+                .join(", ")}
+              {shared.length > 2 ? ` and ${(shared.length - 2).toLocaleString()} more` : ""}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button variant="primary" onClick={sendShared}>
+                <UploadIcon className="size-4" />
+                {target ? `Send to ${target.name}` : "Send"}
+              </Button>
+              <Button variant="ghost" onClick={() => setShared(null)}>
+                Cancel
+              </Button>
+            </div>
+            <p className="mt-3 text-xs text-muted">Or choose a nearby device below to send straight to it.</p>
+          </div>
+        ) : text !== null && !status ? (
           <div className="rounded-2xl border-2 border-line p-3 focus-within:border-accent/60">
             <textarea
               autoFocus

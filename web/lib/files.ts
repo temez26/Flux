@@ -23,7 +23,7 @@ function finish(picked: Picked[]): Picked[] {
     .sort((a, b) => collator.compare(a.path, b.path));
 }
 
-export function fromFileList(list: FileList | null): Picked[] {
+export function fromFileList(list: ArrayLike<File> | null): Picked[] {
   if (!list) return [];
   return finish(Array.from(list, (file) => ({ file, path: cleanPath(file.webkitRelativePath || file.name) })));
 }
