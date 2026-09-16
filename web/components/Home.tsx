@@ -38,6 +38,9 @@ const DELIVERY = [
   { label: "This device", value: "device", icon: <DeviceIcon className="size-4" /> },
 ];
 const EXPIRY_KEY = "flux.expiry";
+// A share from this device ends with the page, so its code only needs to outlast any
+// plausible sitting; the row holds a file list and nothing else.
+const HOSTED_EXPIRY = 604_800;
 const LIST_POLL_MS = 15_000;
 const folderInputProps = { webkitdirectory: "" } as InputHTMLAttributes<HTMLInputElement>;
 
@@ -75,7 +78,7 @@ export default function Home() {
       setBusy(`Preparing ${plural(files.length, "file")}…`);
       // Reading every file's metadata blocks the main thread, so let the spinner land first.
       await nextPaint();
-      const code = await send(files, options.current.expiresIn, options.current.isPublic, options.current.hosted);
+      const code = await send(files, options.current.hosted ? HOSTED_EXPIRY : options.current.expiresIn, options.current.isPublic, options.current.hosted);
       navigate(`/${formatCode(code)}`);
     } catch (err) {
       setError(errorMessage(err));
@@ -204,7 +207,7 @@ export default function Home() {
             label="Where the files live"
             hint={
               hosted
-                ? "Nothing is uploaded. Keep this page open until the files have been received."
+                ? "Nothing is uploaded, and the code works only while this page is open."
                 : "Files are stored on the server, so the link works after you close this page."
             }
           >
@@ -214,9 +217,11 @@ export default function Home() {
             <Field label="Who can open it" hint={isPublic ? "Listed on this page for anyone who opens Flux." : "Only people with the code or link."}>
               <Segmented label="Visibility" value={isPublic ? "public" : "private"} options={VISIBILITY} onChange={chooseVisibility} />
             </Field>
-            <Field label={hosted ? "Link expires after" : "Delete after"} hint={hosted ? "The code stops working then." : "Files are removed automatically."}>
-              <Segmented label="Expiry" value={expiresIn} options={EXPIRY} onChange={chooseExpiry} />
-            </Field>
+            {!hosted && (
+              <Field label="Delete after" hint="Files are removed automatically.">
+                <Segmented label="Expiry" value={expiresIn} options={EXPIRY} onChange={chooseExpiry} />
+              </Field>
+            )}
           </div>
         </div>
 
