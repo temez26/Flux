@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vitest";
 import JSZip from "jszip";
-import type { ByteSink } from "./save.ts";
-import { singleTarget, zipTarget, type Entry } from "./zip.ts";
+import type { ByteSink } from "./save";
+import { singleTarget, zipTarget, type Entry } from "./zip";
 
 const LOCAL_SIG = 0x04034b50;
 const DESCRIPTOR_SIG = 0x08074b50;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { afterEach, test } from "node:test";
-import { saveMethod } from "./save.ts";
+import { afterEach, test } from "vitest";
+import { saveMethod } from "./save";
 
 const GIB = 1024 ** 3;
 const DOWNLOAD_PREFIX = "/_flux/download/";
