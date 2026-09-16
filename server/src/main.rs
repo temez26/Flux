@@ -1,6 +1,7 @@
 mod cleanup;
 mod download;
 mod error;
+mod health;
 mod nearby;
 mod signal;
 mod stun;
@@ -43,6 +44,12 @@ fn env_or(key: &str, default: &str) -> String {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let addr: SocketAddr = env_or("FLUX_ADDR", "0.0.0.0:8080").parse()?;
+    // Docker's healthcheck runs this; the distroless image has nothing else to ask with.
+    if std::env::args().nth(1).as_deref() == Some("healthcheck") {
+        std::process::exit(if health::probe(addr) { 0 } else { 1 });
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .init();
@@ -50,7 +57,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_url = std::env::var("DATABASE_URL").map_err(|_| "DATABASE_URL must be set")?;
     let data_dir = PathBuf::from(env_or("FLUX_DATA_DIR", "data"));
     let web_dir = PathBuf::from(env_or("FLUX_WEB_DIR", "../web/out"));
-    let addr: SocketAddr = env_or("FLUX_ADDR", "0.0.0.0:8080").parse()?;
 
     tokio::fs::create_dir_all(&data_dir).await?;
     let db = PgPoolOptions::new().max_connections(16).connect(&database_url).await?;
@@ -87,6 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("listening on {addr}");
+    health::watch(addr);
     axum::serve(listener, app(state, &web_dir))
         .with_graceful_shutdown(shutdown_signal())
         .await?;
