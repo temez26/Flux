@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { deleteTransfer, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
+import { countDownload, deleteTransfer, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
 import { basename } from "@/lib/files";
 import { formatBytes, formatCode, formatRemaining, plural } from "@/lib/format";
 import { useNow } from "@/lib/hooks";
@@ -112,7 +112,20 @@ export function TransferHeading({ meta, badges }: { meta: TransferMeta; badges?:
 }
 
 /** A file as the server knows it: uploaded, part-way there, or still expected. */
-export function MetaRow({ file, code, downloadable, onPreview }: { file: FileMeta; code: string; downloadable: boolean; onPreview: (idx: number) => void }) {
+/** `counted` records a download taken from the row, for anyone who isn't the transfer's owner. */
+export function MetaRow({
+  file,
+  code,
+  downloadable,
+  counted = false,
+  onPreview,
+}: {
+  file: FileMeta;
+  code: string;
+  downloadable: boolean;
+  counted?: boolean;
+  onPreview: (idx: number) => void;
+}) {
   if (file.hash) {
     return (
       <FileRow
@@ -129,7 +142,13 @@ export function MetaRow({ file, code, downloadable, onPreview }: { file: FileMet
         }
         actions={
           downloadable && (
-            <a href={fileUrl(code, file.idx)} download className={buttonClass("ghost", "min-h-10 px-3 text-accent")} aria-label={`Download ${basename(file.path)}`}>
+            <a
+              href={fileUrl(code, file.idx)}
+              download
+              onClick={counted ? () => countDownload(code) : undefined}
+              className={buttonClass("ghost", "min-h-10 px-3 text-accent")}
+              aria-label={`Download ${basename(file.path)}`}
+            >
               <DownloadIcon className="size-4" />
             </a>
           )
@@ -176,7 +195,8 @@ export function MetaTile({ file, code, onPreview }: { file: FileMeta; code: stri
 const MAX_URL = 4000;
 
 /** Downloads chosen files that the server holds: one directly, several as a zip. */
-export function SelectionDownload({ code, files }: { code: string; files: FileMeta[] }) {
+export function SelectionDownload({ code, files, counted = false }: { code: string; files: FileMeta[]; counted?: boolean }) {
+  const count = counted ? () => countDownload(code) : undefined;
   const primary = buttonClass("primary", "min-h-9");
   if (files.some((f) => !f.hash)) {
     return (
@@ -187,7 +207,7 @@ export function SelectionDownload({ code, files }: { code: string; files: FileMe
   }
   if (files.length === 1) {
     return (
-      <a href={fileUrl(code, files[0].idx)} download className={primary}>
+      <a href={fileUrl(code, files[0].idx)} download onClick={count} className={primary}>
         <DownloadIcon className="size-4" />
         Download
       </a>
@@ -203,7 +223,7 @@ export function SelectionDownload({ code, files }: { code: string; files: FileMe
     );
   }
   return (
-    <a href={url} download className={primary}>
+    <a href={url} download onClick={count} className={primary}>
       <DownloadIcon className="size-4" />
       Download {files.length.toLocaleString()} as .zip
     </a>

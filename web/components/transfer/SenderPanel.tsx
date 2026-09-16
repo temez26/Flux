@@ -88,6 +88,7 @@ export function SenderPanel({ session, uploader, expiresAt }: { session: Session
     ["Files", `${counts.done.toLocaleString()} / ${files.toLocaleString()}`],
     ["Uploaded", `${formatBytes(sent)} / ${formatBytes(total)}`],
   ];
+  if (finished && meta) stats.push(["Downloads", meta.downloads.toLocaleString()]);
   if (running && !uploader.held) {
     stats.push(["Speed", speed > 0 ? `${formatBytes(speed)}/s` : "–"], ["Time left", speed > 0 ? formatDuration((total - sent) / speed) : "–"]);
   }

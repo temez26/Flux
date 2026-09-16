@@ -604,7 +604,14 @@ function OwnedList() {
             mono
             icon={o.collect ? <FolderIcon className="size-4.5" /> : o.public ? <GlobeIcon className="size-4.5" /> : <LockIcon className="size-4.5" />}
             title={o.collect && summary ? `${formatCode(code)} · ${summary.title}` : formatCode(code)}
-            detail={`${plural(count, "file")} · ${formatBytes(size)} · ${formatLifetime(o.expiresAt, !!o.hosted, live.has(code))}`}
+            detail={[
+              plural(count, "file"),
+              formatBytes(size),
+              summary?.downloads ? plural(summary.downloads, "download") : null,
+              formatLifetime(o.expiresAt, !!o.hosted, live.has(code)),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
             badge={ownedBadge(code, summary)}
           />
         );

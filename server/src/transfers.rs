@@ -46,6 +46,7 @@ pub struct Transfer {
     /// Open to files from anyone with the code, not only from its owner.
     pub collect: bool,
     pub title: String,
+    pub downloads: i32,
 }
 
 pub fn normalize_code(raw: &str) -> String {
@@ -54,7 +55,7 @@ pub fn normalize_code(raw: &str) -> String {
 
 pub async fn find(db: &sqlx::PgPool, code: &str) -> Result<Transfer> {
     sqlx::query_as(
-        "SELECT id, code, token_hash, created_at, expires_at, hosted, collect, title FROM transfers
+        "SELECT id, code, token_hash, created_at, expires_at, hosted, collect, title, downloads FROM transfers
          WHERE code = $1 AND expires_at > now()",
     )
     .bind(normalize_code(code))
@@ -480,6 +481,7 @@ pub struct TransferInfo {
     code: String,
     title: String,
     collect: bool,
+    downloads: i32,
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
     hosted: bool,
@@ -537,6 +539,7 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
         code: transfer.code,
         title: transfer.title,
         collect: transfer.collect,
+        downloads: transfer.downloads,
         created_at: transfer.created_at,
         expires_at: transfer.expires_at,
         hosted: transfer.hosted,
@@ -558,7 +561,7 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
     Ok(response)
 }
 
-const SUMMARY_SQL: &str = "SELECT t.code, t.title, t.created_at, t.expires_at, t.hosted, t.collect,
+const SUMMARY_SQL: &str = "SELECT t.code, t.title, t.created_at, t.expires_at, t.hosted, t.collect, t.downloads,
         count(f.idx) AS files,
         coalesce(sum(f.size), 0)::bigint AS size,
         -- Nothing is pending for a hosted transfer: its bytes were never coming here.
@@ -574,6 +577,7 @@ pub struct Summary {
     expires_at: DateTime<Utc>,
     hosted: bool,
     collect: bool,
+    downloads: i32,
     files: i64,
     size: i64,
     complete: bool,
@@ -630,6 +634,20 @@ pub async fn summary(State(state): State<Shared>, Path(code): Path<String>) -> R
         .await?
         .ok_or(AppError::NOT_FOUND)?;
     Ok(Json(summary))
+}
+
+/// Counts one download of a transfer. Called by the page a download starts from, which is the
+/// only place that knows one did: a preview requests the same files, and a direct download
+/// never reaches the server at all.
+pub async fn count_download(State(state): State<Shared>, Path(code): Path<String>) -> Result<StatusCode> {
+    let counted = sqlx::query("UPDATE transfers SET downloads = downloads + 1 WHERE code = $1 AND expires_at > now()")
+        .bind(normalize_code(&code))
+        .execute(&state.db)
+        .await?;
+    if counted.rows_affected() == 0 {
+        return Err(AppError::NOT_FOUND);
+    }
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn delete(
@@ -758,6 +776,7 @@ mod tests {
             hosted: false,
             collect: true,
             title: String::new(),
+            downloads: 0,
         };
         let with = |value: &str| {
             let mut headers = HeaderMap::new();

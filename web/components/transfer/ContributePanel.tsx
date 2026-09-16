@@ -115,9 +115,9 @@ export function ContributePanel({ meta }: { meta: TransferMeta }) {
       {meta.files.length ? (
         <FileBrowser
           paths={paths}
-          renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable onPreview={setPreviewing} />}
+          renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable counted onPreview={setPreviewing} />}
           renderTile={(i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />}
-          select={(indices) => <SelectionDownload code={meta.code} files={indices.map((i) => meta.files[i])} />}
+          select={(indices) => <SelectionDownload code={meta.code} files={indices.map((i) => meta.files[i])} counted />}
         />
       ) : (
         <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">Nothing here yet — yours can be the first.</p>

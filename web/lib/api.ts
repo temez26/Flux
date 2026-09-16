@@ -14,6 +14,8 @@ export interface TransferMeta {
   title: string;
   /** A collection: anyone with the code may add files, not only whoever created it. */
   collect: boolean;
+  /** Downloads started from a page, of all or part of the transfer. */
+  downloads: number;
   createdAt: string;
   expiresAt: string;
   /** Served from the sender's device: the server has the file list but none of the bytes. */
@@ -42,6 +44,7 @@ export interface Summary {
   expiresAt: string;
   hosted: boolean;
   collect: boolean;
+  downloads: number;
   files: number;
   size: number;
   complete: boolean;
@@ -172,6 +175,11 @@ export function getTransfer(code: string): Promise<TransferMeta | null> {
 
 export function getSummary(code: string): Promise<Summary | null> {
   return orNull(request<Summary>(`${transferUrl(code)}/summary`));
+}
+
+/** Records that a download of this transfer started. Best effort: it never holds a download up. */
+export function countDownload(code: string) {
+  void fetch(`${transferUrl(code)}/downloads`, { method: "POST", keepalive: true }).catch(() => {});
 }
 
 /** Changes a transfer its owner holds the token for; `expiresIn` counts from now. */

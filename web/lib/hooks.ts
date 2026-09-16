@@ -277,8 +277,9 @@ export function useTransferMeta(code: string, enabled: boolean) {
         setMeta(next);
         setOffline(false);
         if (!next) return;
-        // A collection can gain files at any moment, however finished it looks.
-        const interval = next.collect || next.files.some((f) => f.hash === null) ? UPLOADING_POLL_MS : READY_POLL_MS;
+        // A collection can gain files at any moment, however finished it looks. A transfer
+        // served from a device never gets hashes, which would otherwise read as always uploading.
+        const interval = next.collect || (!next.hosted && next.files.some((f) => f.hash === null)) ? UPLOADING_POLL_MS : READY_POLL_MS;
         const untilExpiry = Date.parse(next.expiresAt) - Date.now() + 1000;
         timer = window.setTimeout(load, Math.max(0, Math.min(interval, untilExpiry)));
       } catch {

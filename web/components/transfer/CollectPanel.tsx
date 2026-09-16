@@ -37,6 +37,7 @@ export function CollectPanel({ meta, token }: { meta: TransferMeta; token: strin
     ["Size", formatBytes(size)],
   ];
   if (arriving) stats.push(["Arriving", arriving.toLocaleString()]);
+  stats.push(["Downloads", meta.downloads.toLocaleString()]);
 
   return (
     <div className="space-y-4">

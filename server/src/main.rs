@@ -120,6 +120,7 @@ fn app(state: Shared, web_dir: &std::path::Path) -> Router {
         .route("/transfers/{code}/files/{idx}/thumb", get(thumbs::thumb))
         .route("/transfers/{code}/zip", get(download::zip))
         .route("/transfers/{code}/summary", get(transfers::summary))
+        .route("/transfers/{code}/downloads", post(transfers::count_download))
         .route("/transfers/{code}/signal", get(signal::connect))
         .route("/nearby", get(nearby::connect))
         .route("/public", get(transfers::list_public).layer(CompressionLayer::new()))

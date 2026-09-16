@@ -71,10 +71,12 @@ export function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; toke
             ? [
                 ["Files", meta.files.length.toLocaleString()],
                 ["Size", formatBytes(size)],
+                ["Downloads", meta.downloads.toLocaleString()],
               ]
             : [
                 ["Files", `${complete.toLocaleString()} / ${meta.files.length.toLocaleString()}`],
                 ["Uploaded", `${formatBytes(received)} / ${formatBytes(size)}`],
+                ["Downloads", meta.downloads.toLocaleString()],
               ]
         }
         actions={
