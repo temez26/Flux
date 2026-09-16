@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { errorMessage } from "@/lib/api";
 import { formatBytes, formatCode, formatDuration, plural } from "@/lib/format";
 import { useLeaveGuard, useNotifyWhen, useNow, useTitle, useTransferMeta, useWakeLock } from "@/lib/hooks";
 import { canPreview } from "@/lib/preview";
 import type { Item, Uploader } from "@/lib/upload";
-import type { Session } from "@/lib/session";
+import { addFiles, type Session } from "@/lib/session";
+import { toast } from "@/lib/toast";
 import { FileBrowser, FileRow } from "../FileList";
-import { AlertIcon, CheckIcon, ClockIcon, CloseIcon, PauseIcon, PlayIcon, RetryIcon, ZapIcon } from "../icons";
+import { AlertIcon, CheckIcon, ClockIcon, CloseIcon, PauseIcon, PlayIcon, PlusIcon, RetryIcon, ZapIcon } from "../icons";
+import { useFilePickers } from "../picker";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
 import { ShareCard } from "../ShareCard";
 import { Badge, Button, ConfirmButton, IconButton, Spinner, StatusCard, type StatusProps } from "../ui";
@@ -48,7 +51,22 @@ export function SenderPanel({ session, uploader, expiresAt }: { session: Session
   const previewable = useMemo(() => new Set(meta?.files.filter(canPreview).map((f) => f.idx) ?? []), [meta]);
   const single = meta?.files.length === 1 ? meta.files[0] : null;
   const metaPaths = useMemo(() => meta?.files.map((f) => f.path) ?? [], [meta]);
-  const itemPaths = useMemo(() => uploader.items.map((i) => i.path), [uploader]);
+  // Files added part way through lengthen the same list, so its length is part of what it depends on.
+  const itemCount = uploader.items.length;
+  const itemPaths = useMemo(() => uploader.items.slice(0, itemCount).map((i) => i.path), [uploader, itemCount]);
+  const [adding, setAdding] = useState(false);
+  const adder = useFilePickers(async (picked) => {
+    if (!picked.length) return;
+    setAdding(true);
+    try {
+      await addFiles(uploader.code, uploader.token, picked);
+      toast(`Added ${plural(picked.length, "file")}`);
+    } catch (err) {
+      toast(errorMessage(err), "err");
+    } finally {
+      setAdding(false);
+    }
+  });
   useWakeLock(running || serving);
   useLeaveGuard(!finished || serving);
   const code = formatCode(uploader.code);
@@ -96,6 +114,12 @@ export function SenderPanel({ session, uploader, expiresAt }: { session: Session
                 Retry failed
               </Button>
             )}
+            {!uploader.gone && (
+              <Button onClick={() => adder.open("files")} disabled={adding}>
+                {adding || adder.waiting ? <Spinner className="size-4" /> : <PlusIcon className="size-4" />}
+                Add files
+              </Button>
+            )}
           </>
         }
         danger={
@@ -104,6 +128,7 @@ export function SenderPanel({ session, uploader, expiresAt }: { session: Session
           </ConfirmButton>
         }
       >
+        {adder.inputs}
         {serving && (
           <div className="mt-4">
             <Badge tone="ok" icon={<ZapIcon />}>

@@ -127,6 +127,21 @@ export function listPublic(options: { q?: string; limit?: number } = {}) {
 }
 
 /** Revalidated with the server's ETag, so polling an unchanged transfer is cheap. */
+export interface AddedFile {
+  idx: number;
+  /** Differs from the path asked for when the transfer already held one by that name. */
+  path: string;
+}
+
+/** Adds files to a transfer, answering with the index and final path of each, in order. */
+export function appendFiles(code: string, token: string, files: NewFile[]) {
+  return request<{ files: AddedFile[] }>(`${transferUrl(code)}/files`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...auth(token) },
+    body: JSON.stringify({ files }),
+  });
+}
+
 export function getTransfer(code: string): Promise<TransferMeta | null> {
   return orNull(request<TransferMeta>(transferUrl(code), { cache: "no-cache" }));
 }

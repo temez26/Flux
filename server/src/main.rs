@@ -104,6 +104,10 @@ fn app(state: Shared, web_dir: &std::path::Path) -> Router {
             get(transfers::get).layer(CompressionLayer::new()).delete(transfers::delete),
         )
         .route(
+            "/transfers/{code}/files",
+            post(transfers::add_files).layer(DefaultBodyLimit::max(64 << 20)),
+        )
+        .route(
             "/transfers/{code}/files/{idx}",
             patch(upload::chunk)
                 .layer(DefaultBodyLimit::disable())

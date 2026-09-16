@@ -77,6 +77,24 @@ class HttpError extends Error {
 
 const emptyCounts = (): Record<Status, number> => ({ pending: 0, active: 0, done: 0, failed: 0, canceled: 0 });
 
+function taskFor(e: Entry): Task {
+  return {
+    item: {
+      idx: e.idx,
+      path: e.path,
+      size: e.size,
+      sent: e.done ? e.size : 0,
+      status: e.done ? "done" : e.file ? "pending" : "failed",
+      error: e.done || e.file ? undefined : "Add this file again to resume",
+    },
+    file: e.file,
+    offset: 0,
+    hashed: 0,
+    attempts: 0,
+    busy: 0,
+  };
+}
+
 /**
  * Upload queue: a few files in flight at once, each sent in resumable chunks and hashed
  * with BLAKE3 on the way so the server can verify it end to end. Files are independent,
@@ -101,21 +119,7 @@ export class Uploader extends Observable {
     entries: Entry[],
   ) {
     super();
-    this.tasks = entries.map((e) => ({
-      item: {
-        idx: e.idx,
-        path: e.path,
-        size: e.size,
-        sent: e.done ? e.size : 0,
-        status: e.done ? "done" : e.file ? "pending" : "failed",
-        error: e.done || e.file ? undefined : "Add this file again to resume",
-      },
-      file: e.file,
-      offset: 0,
-      hashed: 0,
-      attempts: 0,
-      busy: 0,
-    }));
+    this.tasks = entries.map(taskFor);
     this.items = this.tasks.map((t) => t.item);
     this.refresh();
     window.addEventListener("online", this.onOnline);
@@ -142,6 +146,17 @@ export class Uploader extends Observable {
   }
 
   start() {
+    this.pump();
+  }
+
+  /** Takes on files added to the transfer after it began; they queue behind everything else. */
+  add(entries: Entry[]) {
+    if (this.gone) return;
+    for (const task of entries.map(taskFor)) {
+      this.tasks.push(task);
+      this.items.push(task.item);
+    }
+    this.refresh();
     this.pump();
   }
 

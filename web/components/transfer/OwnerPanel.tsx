@@ -5,10 +5,11 @@ import type { TransferMeta } from "@/lib/api";
 import { basename } from "@/lib/files";
 import { formatBytes, plural } from "@/lib/format";
 import { useTitle } from "@/lib/hooks";
-import { matchPicked, resume, type Match, type Session } from "@/lib/session";
+import { errorMessage } from "@/lib/api";
+import { addFiles, matchPicked, resume, type Match, type Session } from "@/lib/session";
 import { toast } from "@/lib/toast";
 import { FileBrowser, FileRow } from "../FileList";
-import { AlertIcon, CheckIcon, DeviceIcon, FolderIcon, UploadIcon } from "../icons";
+import { AlertIcon, CheckIcon, DeviceIcon, FolderIcon, PlusIcon, UploadIcon } from "../icons";
 import { canPickFolder, useFilePickers } from "../picker";
 import { PreviewDialog } from "../preview/Preview";
 import { ShareCard } from "../ShareCard";
@@ -29,6 +30,17 @@ export function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; toke
   const [shortfall, setShortfall] = useState<Match>();
   const picker = useFilePickers((picked) => {
     if (!picked.length) return;
+    // Once everything is uploaded, picking files adds to the transfer rather than resuming it.
+    if (ready) {
+      addFiles(meta.code, token, picked, meta).then(
+        (session) => {
+          toast(`Added ${plural(picked.length, "file")}`);
+          onResume(session);
+        },
+        (err) => toast(errorMessage(err), "err"),
+      );
+      return;
+    }
     const match = matchPicked(meta, picked);
     setShortfall(match.missing.length ? match : undefined);
     // Starting an upload where nothing lined up would just hand back a screen of failures.
@@ -66,7 +78,22 @@ export function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; toke
               ]
         }
         actions={
-          !ready && (
+          ready ? (
+            !meta.hosted && (
+              <>
+                <Button onClick={() => picker.open("files")}>
+                  {picker.waiting ? <Spinner className="size-4" /> : <PlusIcon className="size-4" />}
+                  {picker.waiting ? "Getting your files…" : "Add more files"}
+                </Button>
+                {folders && (
+                  <Button onClick={() => picker.open("folder")}>
+                    <FolderIcon className="size-4" />
+                    Add folder
+                  </Button>
+                )}
+              </>
+            )
+          ) : (
             <>
               <Button variant="primary" onClick={() => picker.open("files")}>
                 {picker.waiting ? <Spinner className="size-4" /> : meta.hosted ? <DeviceIcon className="size-4" /> : <UploadIcon className="size-4" />}
