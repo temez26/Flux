@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { basename } from "@/lib/files";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, plural } from "@/lib/format";
 import { FileTypeIcon, GridIcon, ListIcon, SearchIcon } from "./icons";
 import { Badge, ProgressBar, type Tone } from "./ui";
 
@@ -225,7 +225,9 @@ export function FileBrowser({
       </div>
       {/* The heading carries the count too, but only a live region reports it changing. */}
       <p role="status" className="sr-only">
-        {matches ? `${count.toLocaleString()} of ${paths.length.toLocaleString()} files match “${needle}”` : `${count.toLocaleString()} files`}
+        {matches
+          ? `${count.toLocaleString()} of ${plural(paths.length, "file")} ${count === 1 ? "matches" : "match"} “${needle}”`
+          : plural(count, "file")}
       </p>
       {count === 0 ? (
         <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">No files match that search.</p>

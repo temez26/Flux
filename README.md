@@ -6,6 +6,7 @@ code. Receivers take single files or the lot as one zip.
 - Very large files and thousands of them, resumable (pause, retry, cancel)
 - BLAKE3 integrity check end to end
 - Upload to the server, or send straight from your device
+- Send to another device on your network without a code
 - Optional public listing on the home page
 - Expires after 1 hour, 1 day or 7 days
 - Installable, mobile-first web app
@@ -84,7 +85,7 @@ cd web && npm install && npm run dev    # UI on :3000, proxies /api to :8080
 yields an archive that looks fine until someone opens it somewhere else.
 
 `server/` — Rust API (axum, sqlx, PostgreSQL), also serves the web app. A module per concern:
-`upload`, `download`, `zip`, `thumbs`, `signal`, `stun`, `cleanup`.
+`upload`, `download`, `zip`, `thumbs`, `signal`, `nearby`, `stun`, `cleanup`.
 
 `web/` — Next.js, static export. `lib/` is the transfer engine and never imports a component.
 `components/` renders it: `transfer/` a file per panel, `preview/` a file per viewer family,
