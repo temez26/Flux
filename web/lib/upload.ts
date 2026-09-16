@@ -190,10 +190,17 @@ export class Uploader extends Observable {
   cancel(idx: number) {
     const t = this.tasks.find((t) => t.item.idx === idx);
     if (!t || t.item.status === "done" || t.item.status === "canceled") return;
+    this.forget(idx);
+    deleteFile(this.code, this.token, idx).catch(() => {});
+  }
+
+  /** Drops a file the server no longer holds, whatever state it had reached here. */
+  forget(idx: number) {
+    const t = this.tasks.find((t) => t.item.idx === idx);
+    if (!t || t.item.status === "canceled") return;
     t.item.status = "canceled";
     this.discardHasher(t);
     this.interrupt(t);
-    deleteFile(this.code, this.token, idx).catch(() => {});
     this.changed();
   }
 

@@ -1,4 +1,4 @@
-import { appendFiles, createCollection, createTransfer, type NewFile, type TransferMeta } from "./api";
+import { appendFiles, createCollection, createTransfer, deleteFile, type NewFile, type TransferMeta } from "./api";
 import { getDevice } from "./device";
 import { DirectHost } from "./direct";
 import { basename, uniquePaths, type Picked } from "./files";
@@ -73,6 +73,17 @@ export async function send(picked: Picked[], expiresIn: number, isPublic: boolea
     hosted,
   );
   return created.code;
+}
+
+/**
+ * Removes one file from a transfer this device owns, and from what the device knows of it: its
+ * record of the transfer, and an upload in this tab that would otherwise still count the file.
+ */
+export async function removeFile(code: string, token: string, idx: number, size: number) {
+  await deleteFile(code, token, idx);
+  const owned = getOwned(code);
+  if (owned) saveOwned(code, { ...owned, count: Math.max(0, owned.count - 1), size: Math.max(0, owned.size - size) });
+  live.get(code)?.uploader?.forget(idx);
 }
 
 /** Opens a collection for other people to send files into, and returns its code. */

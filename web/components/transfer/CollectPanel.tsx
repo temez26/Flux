@@ -11,7 +11,7 @@ import { DownloadIcon, FolderIcon, LockIcon } from "../icons";
 import { PreviewDialog } from "../preview/Preview";
 import { ShareCard } from "../ShareCard";
 import { Button, ConfirmButton, StatusCard, buttonClass } from "../ui";
-import { MetaRow, MetaTile, SelectionDownload, pageTitle, removeTransfer, summarize } from "./common";
+import { MetaRow, MetaTile, SelectionDownload, pageTitle, removeOwnedFile, removeTransfer, summarize } from "./common";
 
 /**
  * A collection this device opened: the code to hand out, and everything that has arrived,
@@ -86,7 +86,15 @@ export function CollectPanel({ meta, token }: { meta: TransferMeta; token: strin
       {meta.files.length ? (
         <FileBrowser
           paths={paths}
-          renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable onPreview={setPreviewing} />}
+          renderRow={(i) => (
+            <MetaRow
+              file={meta.files[i]}
+              code={meta.code}
+              downloadable
+              onPreview={setPreviewing}
+              onRemove={() => removeOwnedFile(meta.code, token, meta.files[i])}
+            />
+          )}
           renderTile={(i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />}
           select={(indices) => <SelectionDownload code={meta.code} files={indices.map((i) => meta.files[i])} />}
         />

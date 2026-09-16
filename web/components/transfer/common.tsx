@@ -1,19 +1,19 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { countDownload, deleteTransfer, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
+import { countDownload, deleteTransfer, errorMessage, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
 import { basename } from "@/lib/files";
 import { formatBytes, formatCode, formatRemaining, plural } from "@/lib/format";
-import { useNow } from "@/lib/hooks";
+import { reloadTransfer, useNow } from "@/lib/hooks";
 import { removeOwned } from "@/lib/owned";
 import { canPreview } from "@/lib/preview";
 import { navigate } from "@/lib/router";
-import { end } from "@/lib/session";
+import { end, removeFile } from "@/lib/session";
 import { toast } from "@/lib/toast";
 import { FileRow, FileTile } from "../FileList";
-import { CheckIcon, ClockIcon, DownloadIcon, FileTypeIcon, FolderIcon } from "../icons";
+import { CheckIcon, ClockIcon, DownloadIcon, FileTypeIcon, FolderIcon, TrashIcon } from "../icons";
 import { FileThumb } from "../preview/Preview";
-import { Badge, Spinner, buttonClass } from "../ui";
+import { Badge, ConfirmIconButton, Spinner, buttonClass } from "../ui";
 
 /** Stand-ins for a store that doesn't exist yet, for useSyncExternalStore. */
 export const subscribeNothing = () => () => {};
@@ -34,6 +34,17 @@ const UNDO_MS = 7000;
  * the window then leaves the transfer whole and still listed, which is a far better way to
  * be wrong than leaving one alive that its owner can no longer see or reach.
  */
+/** Removes a file from a transfer this device owns, once its row's second tap arrives. */
+export function removeOwnedFile(code: string, token: string, file: FileMeta) {
+  removeFile(code, token, file.idx, file.size).then(
+    () => {
+      reloadTransfer(code);
+      toast(`Removed ${basename(file.path)}`);
+    },
+    (err) => toast(errorMessage(err), "err"),
+  );
+}
+
 export function removeTransfer(code: string, token: string) {
   navigate("/", true);
   const timer = window.setTimeout(() => {
@@ -119,13 +130,21 @@ export function MetaRow({
   downloadable,
   counted = false,
   onPreview,
+  onRemove,
 }: {
   file: FileMeta;
   code: string;
   downloadable: boolean;
   counted?: boolean;
   onPreview: (idx: number) => void;
+  /** Offered to the transfer's owner, finished upload or not. */
+  onRemove?: () => void;
 }) {
+  const remove = onRemove && (
+    <ConfirmIconButton label={`Remove ${basename(file.path)}`} onConfirm={onRemove}>
+      <TrashIcon className="size-4" />
+    </ConfirmIconButton>
+  );
   if (file.hash) {
     return (
       <FileRow
@@ -141,16 +160,21 @@ export function MetaRow({
           )
         }
         actions={
-          downloadable && (
-            <a
-              href={fileUrl(code, file.idx)}
-              download
-              onClick={counted ? () => countDownload(code) : undefined}
-              className={buttonClass("ghost", "min-h-10 px-3 text-accent")}
-              aria-label={`Download ${basename(file.path)}`}
-            >
-              <DownloadIcon className="size-4" />
-            </a>
+          (downloadable || remove) && (
+            <>
+              {downloadable && (
+                <a
+                  href={fileUrl(code, file.idx)}
+                  download
+                  onClick={counted ? () => countDownload(code) : undefined}
+                  className={buttonClass("ghost", "min-h-10 px-3 text-accent")}
+                  aria-label={`Download ${basename(file.path)}`}
+                >
+                  <DownloadIcon className="size-4" />
+                </a>
+              )}
+              {remove}
+            </>
           )
         }
       />
@@ -167,9 +191,10 @@ export function MetaRow({
         </Badge>
       }
       progress={pct}
+      actions={remove}
     />
   ) : (
-    <FileRow path={file.path} size={file.size} badge={<Badge icon={<ClockIcon />}>Waiting</Badge>} />
+    <FileRow path={file.path} size={file.size} badge={<Badge icon={<ClockIcon />}>Waiting</Badge>} actions={remove} />
   );
 }
 
