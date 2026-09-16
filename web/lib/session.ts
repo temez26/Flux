@@ -8,8 +8,13 @@ import { Uploader, type Entry } from "./upload";
 const DIRECT_IDLE_MS = 5000;
 
 export interface Session {
-  uploader: Uploader;
+  code: string;
+  token: string;
+  /** Absent when the transfer is served from this device and nothing is being uploaded. */
+  uploader?: Uploader;
   host: DirectHost;
+  /** The files this tab is serving, in listing order. */
+  entries: Entry[];
   /** A receiver got everything directly, so the server upload was paused as unnecessary. */
   delivered: boolean;
 }
@@ -17,36 +22,41 @@ export interface Session {
 /** Transfers started in this tab. They keep running while the user moves between views. */
 export const live = new Map<string, Session>();
 
-function start(code: string, token: string, entries: Entry[]): Session {
+function start(code: string, token: string, entries: Entry[], hosted: boolean): Session {
   const files = new Map(entries.flatMap((e) => (e.file ? [[e.idx, e.file] as const] : [])));
-  const uploader = new Uploader(code, token, entries);
+  const uploader = hosted ? undefined : new Uploader(code, token, entries);
   const session: Session = {
+    code,
+    token,
     uploader,
+    entries,
     delivered: false,
     host: new DirectHost(code, token, (idx) => files.get(idx), {
-      activity: () => uploader.hold(DIRECT_IDLE_MS),
+      activity: () => uploader?.hold(DIRECT_IDLE_MS),
       delivered: () => {
         session.delivered = true;
-        if (!uploader.snapshot.finished) uploader.pause();
+        if (uploader && !uploader.snapshot.finished) uploader.pause();
       },
     }),
   };
   live.set(code, session);
-  uploader.start();
+  uploader?.start();
   return session;
 }
 
-export async function send(picked: Picked[], expiresIn: number, isPublic: boolean): Promise<string> {
+export async function send(picked: Picked[], expiresIn: number, isPublic: boolean, hosted: boolean): Promise<string> {
   const files = uniquePaths(picked);
   const created = await createTransfer(
     files.map(({ path, file }) => ({ path, size: file.size, type: file.type, modified: file.lastModified || null })),
     expiresIn,
     isPublic,
+    hosted,
   );
   saveOwned(created.code, {
     token: created.token,
     expiresAt: created.expiresAt,
     public: isPublic,
+    hosted,
     count: files.length,
     size: files.reduce((sum, p) => sum + p.file.size, 0),
     createdAt: Date.now(),
@@ -55,6 +65,7 @@ export async function send(picked: Picked[], expiresIn: number, isPublic: boolea
     created.code,
     created.token,
     files.map(({ path, file }, idx) => ({ idx, path, size: file.size, file })),
+    hosted,
   );
   return created.code;
 }
@@ -71,12 +82,13 @@ export function resume(meta: TransferMeta, token: string, picked: Picked[]): Ses
       const file = exact?.size === f.size ? exact : byName.get(`${basename(f.path)}\n${f.size}`);
       return { idx: f.idx, path: f.path, size: f.size, done: f.hash !== null, file: f.hash ? undefined : file };
     }),
+    meta.hosted,
   );
 }
 
 export function end(code: string) {
   const session = live.get(code);
-  session?.uploader.dispose();
+  session?.uploader?.dispose();
   session?.host.close();
   live.delete(code);
 }
