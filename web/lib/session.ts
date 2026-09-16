@@ -70,20 +70,47 @@ export async function send(picked: Picked[], expiresIn: number, isPublic: boolea
   return created.code;
 }
 
-/** Continues an interrupted upload with files the sender picked again, matched by path and size. */
-export function resume(meta: TransferMeta, token: string, picked: Picked[]): Session {
+/** What a re-picked selection covers of a transfer that still needs uploading. */
+export interface Match {
+  entries: Entry[];
+  /** Paths still needed that this selection didn't provide. */
+  missing: string[];
+  /** How many still-needed files it did provide. */
+  matched: number;
+  /** How many the server already holds in full. */
+  complete: number;
+}
+
+/**
+ * Lines a re-picked selection up against a transfer, by path first and then by name and
+ * size — the sender may well have dropped the same folder in under a different name.
+ *
+ * What doesn't line up is reported rather than quietly left out: every unmatched file
+ * becomes a failed row, and a whole screen of them says nothing about why.
+ */
+export function matchPicked(meta: TransferMeta, picked: Picked[]): Match {
   const byPath = new Map(picked.map((p) => [p.path, p.file]));
   const byName = new Map(picked.map((p) => [`${basename(p.path)}\n${p.file.size}`, p.file]));
-  return start(
-    meta.code,
-    token,
-    meta.files.map((f) => {
-      const exact = byPath.get(f.path);
-      const file = exact?.size === f.size ? exact : byName.get(`${basename(f.path)}\n${f.size}`);
-      return { idx: f.idx, path: f.path, size: f.size, done: f.hash !== null, file: f.hash ? undefined : file };
-    }),
-    meta.hosted,
-  );
+  const missing: string[] = [];
+  let matched = 0;
+  let complete = 0;
+
+  const entries = meta.files.map((f) => {
+    const done = f.hash !== null;
+    const exact = byPath.get(f.path);
+    const file = done ? undefined : (exact?.size === f.size ? exact : byName.get(`${basename(f.path)}\n${f.size}`));
+    if (done) complete++;
+    else if (file) matched++;
+    else missing.push(f.path);
+    return { idx: f.idx, path: f.path, size: f.size, done, file };
+  });
+
+  return { entries, missing, matched, complete };
+}
+
+/** Continues an interrupted upload with the files a `matchPicked` selection lined up. */
+export function resume(meta: TransferMeta, token: string, match: Match): Session {
+  return start(meta.code, token, match.entries, meta.hosted);
 }
 
 export function end(code: string) {
