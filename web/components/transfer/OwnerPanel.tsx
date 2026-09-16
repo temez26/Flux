@@ -2,15 +2,17 @@
 
 import { useMemo, useState } from "react";
 import type { TransferMeta } from "@/lib/api";
-import { formatBytes } from "@/lib/format";
+import { basename } from "@/lib/files";
+import { formatBytes, plural } from "@/lib/format";
 import { useTitle } from "@/lib/hooks";
-import { resume, type Session } from "@/lib/session";
+import { matchPicked, resume, type Match, type Session } from "@/lib/session";
+import { toast } from "@/lib/toast";
 import { FileBrowser, FileRow } from "../FileList";
 import { AlertIcon, CheckIcon, DeviceIcon, FolderIcon, UploadIcon } from "../icons";
 import { canPickFolder, useFilePickers } from "../picker";
 import { PreviewDialog } from "../preview/Preview";
 import { ShareCard } from "../ShareCard";
-import { Badge, Button, ConfirmButton, Spinner, StatusCard, type StatusProps } from "../ui";
+import { Badge, Button, ConfirmButton, Notice, Spinner, StatusCard, type StatusProps } from "../ui";
 import { MetaRow, MetaTile, pageTitle, percent, removeTransfer, summarize } from "./common";
 
 /**
@@ -23,8 +25,18 @@ export function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; toke
   const [previewing, setPreviewing] = useState<number | null>(null);
   const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
   const folders = canPickFolder();
+  /** A selection that didn't cover everything still needed, kept so it can be explained. */
+  const [shortfall, setShortfall] = useState<Match>();
   const picker = useFilePickers((picked) => {
-    if (picked.length) onResume(resume(meta, token, picked));
+    if (!picked.length) return;
+    const match = matchPicked(meta, picked);
+    setShortfall(match.missing.length ? match : undefined);
+    // Starting an upload where nothing lined up would just hand back a screen of failures.
+    if (!match.matched) return;
+    if (match.missing.length) {
+      toast(`${match.matched.toLocaleString()} of ${(match.matched + match.missing.length).toLocaleString()} files matched`, "err");
+    }
+    onResume(resume(meta, token, match));
   });
   useTitle(pageTitle(meta.code));
 
@@ -72,6 +84,13 @@ export function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; toke
         danger={<ConfirmButton onConfirm={() => removeTransfer(meta.code, token)}>Delete transfer</ConfirmButton>}
       >
         {picker.inputs}
+        {shortfall && !shortfall.matched && (
+          <Notice tone="warn" icon={<AlertIcon />} className="mt-4">
+            None of the {plural(shortfall.missing.length, "file")} still needed were in what you picked. Choose the same files or
+            folder you sent — still missing {shortfall.missing.slice(0, 3).map(basename).join(", ")}
+            {shortfall.missing.length > 3 ? ` and ${(shortfall.missing.length - 3).toLocaleString()} more` : ""}.
+          </Notice>
+        )}
       </StatusCard>
       <FileBrowser
         paths={paths}

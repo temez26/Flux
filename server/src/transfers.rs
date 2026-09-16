@@ -5,7 +5,7 @@ use std::{
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
@@ -26,6 +26,10 @@ const EXPIRY_CHOICES: [i64; 3] = [3600, 86_400, 604_800];
 const MAX_FILES: usize = 100_000;
 const MAX_PATH_LEN: usize = 1024;
 const PUBLIC_LIST_LIMIT: i64 = 100;
+/// Ceiling on one request, so a wide listing can be paged through but never asked for whole.
+const PUBLIC_LIST_MAX: i64 = 500;
+/// Stands in for a LIKE wildcard, so a title containing % or _ searches for those characters.
+const LIKE_ESCAPE: char = '!';
 
 #[derive(sqlx::FromRow)]
 pub struct Transfer {
@@ -342,13 +346,45 @@ pub struct Summary {
     complete: bool,
 }
 
-/// Public transfers, newest first.
-pub async fn list_public(State(state): State<Shared>) -> Result<Json<Vec<Summary>>> {
+/// Wraps text as a LIKE pattern with its own wildcards demoted to ordinary characters.
+fn like_pattern(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 2);
+    out.push('%');
+    for c in text.chars() {
+        if c == '%' || c == '_' || c == LIKE_ESCAPE {
+            out.push(LIKE_ESCAPE);
+        }
+        out.push(c);
+    }
+    out.push('%');
+    out
+}
+
+#[derive(Deserialize)]
+pub struct PublicQuery {
+    /// Matches the transfer's title, which is the dropped folder or the first file's name.
+    q: Option<String>,
+    limit: Option<i64>,
+}
+
+/// Public transfers, newest first, narrowed by `q` and capped at `limit`.
+pub async fn list_public(
+    State(state): State<Shared>,
+    Query(query): Query<PublicQuery>,
+) -> Result<Json<Vec<Summary>>> {
+    let limit = query.limit.unwrap_or(PUBLIC_LIST_LIMIT).clamp(1, PUBLIC_LIST_MAX);
+    let search = query
+        .q
+        .as_deref()
+        .map(str::trim)
+        .filter(|q| !q.is_empty())
+        .map(like_pattern);
     let sql = format!(
         "{SUMMARY_SQL} WHERE t.public AND t.expires_at > now()
+           AND ($2::text IS NULL OR t.title ILIKE $2 ESCAPE '{LIKE_ESCAPE}')
          GROUP BY t.id ORDER BY t.created_at DESC LIMIT $1"
     );
-    let transfers = sqlx::query_as(&sql).bind(PUBLIC_LIST_LIMIT).fetch_all(&state.db).await?;
+    let transfers = sqlx::query_as(&sql).bind(limit).bind(search).fetch_all(&state.db).await?;
     Ok(Json(transfers))
 }
 
@@ -459,6 +495,15 @@ fn available_space(_: &std::path::Path) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn searches_for_wildcards_as_ordinary_characters() {
+        assert_eq!(like_pattern("holiday"), "%holiday%");
+        // Otherwise a title of "100%" would be unsearchable and "_" would match anything.
+        assert_eq!(like_pattern("100%"), "%100!%%");
+        assert_eq!(like_pattern("a_b"), "%a!_b%");
+        assert_eq!(like_pattern("!"), "%!!%", "the escape character escapes itself");
+    }
 
     #[test]
     fn counts_uploads_and_ignores_the_thumbnail_cache() {

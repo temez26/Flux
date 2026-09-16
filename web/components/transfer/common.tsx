@@ -19,12 +19,35 @@ export const pageTitle = (code: string) => `${formatCode(code)} · Flux`;
 
 export const percent = (part: number, whole: number) => (whole ? Math.floor((part / whole) * 100) : 100);
 
-export async function removeTransfer(code: string, token: string) {
-  end(code);
-  removeOwned(code);
+/** How long deleting a transfer can be taken back. */
+const UNDO_MS = 7000;
+
+/**
+ * Deletes a transfer, after a moment in which it can be taken back — it is the one action
+ * in the app that nothing else can put right.
+ *
+ * Nothing local is given up until the deletion actually goes through. A tab closed inside
+ * the window then leaves the transfer whole and still listed, which is a far better way to
+ * be wrong than leaving one alive that its owner can no longer see or reach.
+ */
+export function removeTransfer(code: string, token: string) {
   navigate("/", true);
-  toast("Transfer deleted");
-  await deleteTransfer(code, token).catch(() => {});
+  const timer = window.setTimeout(() => {
+    end(code);
+    removeOwned(code);
+    void deleteTransfer(code, token).catch(() => {});
+  }, UNDO_MS);
+
+  toast("Transfer deleted", "ok", {
+    durationMs: UNDO_MS,
+    action: {
+      label: "Undo",
+      run: () => {
+        window.clearTimeout(timer);
+        navigate(`/${formatCode(code)}`);
+      },
+    },
+  });
 }
 
 export function summarize(files: FileMeta[]) {

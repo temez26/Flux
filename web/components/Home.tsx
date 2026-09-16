@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { errorMessage, getSummary, listPublic, type Summary } from "@/lib/api";
 import { fromDataTransfer, type Picked } from "@/lib/files";
-import { formatBytes, formatCode, formatRemaining, normalizeCode, plural } from "@/lib/format";
+import { formatBytes, formatCode, formatLifetime, formatRemaining, normalizeCode, plural } from "@/lib/format";
 import { nextPaint, useNow, usePolling } from "@/lib/hooks";
 import { listOwned, removeOwned } from "@/lib/owned";
 import { navigate } from "@/lib/router";
@@ -20,6 +20,7 @@ import {
   GlobeIcon,
   LockIcon,
   PauseIcon,
+  SearchIcon,
   UploadIcon,
 } from "./icons";
 import { canPickFolder, useFilePickers } from "./picker";
@@ -43,6 +44,9 @@ const EXPIRY_KEY = "flux.expiry";
 // plausible sitting; the row holds a file list and nothing else.
 const HOSTED_EXPIRY = 604_800;
 const LIST_POLL_MS = 15_000;
+/** One page of the public listing, and how many make a listing worth searching. */
+const PUBLIC_PAGE = 100;
+const PUBLIC_SEARCH_FROM = 12;
 
 function storedExpiry(): number {
   try {
@@ -259,16 +263,45 @@ function TransferRow({ code, icon, title, detail, badge, mono = false }: { code:
 function PublicList() {
   const now = useNow(60_000);
   const [list, setList] = useState<Summary[] | null>(null);
-  usePolling(async () => setList(await listPublic()), LIST_POLL_MS);
+  const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(PUBLIC_PAGE);
+  const needle = query.trim();
+
+  // Asking for the pages already on screen keeps a refresh from dropping what was opened up.
+  usePolling(async () => setList(await listPublic({ q: needle, limit })), LIST_POLL_MS);
 
   if (!list) return null;
+  // A full page is the only sign there may be more; the server doesn't count the rest.
+  const more = list.length === limit;
+  const searchable = needle !== "" || list.length >= PUBLIC_SEARCH_FROM;
+
   return (
     <div className="mt-6">
       <p className="mb-2 flex items-center gap-2 text-sm font-medium">
         <GlobeIcon className="size-4 text-muted" />
         Public files
-        {list.length > 0 && <Badge>{list.length}</Badge>}
+        {list.length > 0 && <Badge>{more ? `${list.length}+` : list.length}</Badge>}
       </p>
+      {searchable && (
+        <div className="relative mb-2">
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setLimit(PUBLIC_PAGE);
+            }}
+            placeholder="Search public files"
+            aria-label="Search public files"
+            autoCapitalize="off"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            className="min-h-11 w-full rounded-xl border border-line bg-bg pr-3 pl-9 text-base outline-none placeholder:text-muted/60 focus:border-accent"
+          />
+        </div>
+      )}
       {list.length ? (
         list.map((t) => (
           <TransferRow
@@ -291,7 +324,14 @@ function PublicList() {
           />
         ))
       ) : (
-        <p className="rounded-xl border border-dashed border-line p-4 text-center text-sm text-muted">Nothing is shared publicly right now.</p>
+        <p className="rounded-xl border border-dashed border-line p-4 text-center text-sm text-muted">
+          {needle ? `Nothing public matches “${needle}”.` : "Nothing is shared publicly right now."}
+        </p>
+      )}
+      {more && (
+        <Button className="mt-2 w-full" onClick={() => setLimit((n) => n + PUBLIC_PAGE)}>
+          Show more
+        </Button>
       )}
     </div>
   );
@@ -411,7 +451,7 @@ function OwnedList() {
           mono
           icon={o.public ? <GlobeIcon className="size-4.5" /> : <LockIcon className="size-4.5" />}
           title={formatCode(code)}
-          detail={`${plural(o.count, "file")} · ${formatBytes(o.size)} · ${formatRemaining(o.expiresAt)}`}
+          detail={`${plural(o.count, "file")} · ${formatBytes(o.size)} · ${formatLifetime(o.expiresAt, !!o.hosted, live.has(code))}`}
           badge={ownedBadge(code, summaries[code])}
         />
       ))}
