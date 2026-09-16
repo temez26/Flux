@@ -16,6 +16,8 @@ export interface TransferMeta {
   collect: boolean;
   /** Downloads started from a page, of all or part of the transfer. */
   downloads: number;
+  /** A collection its owner stopped: nothing more can be added. */
+  closed: boolean;
   createdAt: string;
   expiresAt: string;
   /** Served from the sender's device: the server has the file list but none of the bytes. */
@@ -45,6 +47,7 @@ export interface Summary {
   hosted: boolean;
   collect: boolean;
   downloads: number;
+  closed: boolean;
   files: number;
   size: number;
   complete: boolean;
@@ -183,8 +186,8 @@ export function countDownload(code: string) {
 }
 
 /** Changes a transfer its owner holds the token for; `expiresIn` counts from now. */
-export function updateTransfer(code: string, token: string, changes: { expiresIn?: number }) {
-  return request<{ expiresAt: string }>(transferUrl(code), {
+export function updateTransfer(code: string, token: string, changes: { expiresIn?: number; closed?: boolean }) {
+  return request<{ expiresAt: string; closed: boolean }>(transferUrl(code), {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...auth(token) },
     body: JSON.stringify(changes),

@@ -47,6 +47,8 @@ pub struct Transfer {
     pub collect: bool,
     pub title: String,
     pub downloads: i32,
+    /// A collection no longer taking files.
+    pub closed: bool,
 }
 
 pub fn normalize_code(raw: &str) -> String {
@@ -55,7 +57,7 @@ pub fn normalize_code(raw: &str) -> String {
 
 pub async fn find(db: &sqlx::PgPool, code: &str) -> Result<Transfer> {
     sqlx::query_as(
-        "SELECT id, code, token_hash, created_at, expires_at, hosted, collect, title, downloads FROM transfers
+        "SELECT id, code, token_hash, created_at, expires_at, hosted, collect, title, downloads, closed FROM transfers
          WHERE code = $1 AND expires_at > now()",
     )
     .bind(normalize_code(code))
@@ -343,12 +345,15 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
 pub struct Update {
     /// Keep the transfer this long from now, whatever was chosen when it was made.
     expires_in: Option<i64>,
+    /// Stop a collection taking files, or start it again.
+    closed: Option<bool>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Updated {
     expires_at: DateTime<Utc>,
+    closed: bool,
 }
 
 /// Changes what its owner may change about a transfer after making it.
@@ -365,12 +370,17 @@ pub async fn update(
         Some(_) => return Err(AppError::bad_request("invalid expiry")),
         None => transfer.expires_at,
     };
-    sqlx::query("UPDATE transfers SET expires_at = $2 WHERE id = $1")
+    if req.closed.is_some() && !transfer.collect {
+        return Err(AppError::bad_request("only a collection can be closed"));
+    }
+    let closed = req.closed.unwrap_or(transfer.closed);
+    sqlx::query("UPDATE transfers SET expires_at = $2, closed = $3 WHERE id = $1")
         .bind(transfer.id)
         .bind(expires_at)
+        .bind(closed)
         .execute(&state.db)
         .await?;
-    Ok(Json(Updated { expires_at }))
+    Ok(Json(Updated { expires_at, closed }))
 }
 
 #[derive(Deserialize)]
@@ -411,6 +421,10 @@ pub async fn add_files(
     // coming back to add more — so the uploads they can finish or cancel are only theirs.
     let contributor = match (owner, transfer.collect) {
         (true, _) => None,
+        // Files a contributor already added may still finish uploading; only new ones are refused.
+        (false, true) if transfer.closed => {
+            return Err(AppError(StatusCode::FORBIDDEN, "this collection is closed"));
+        }
         (false, true) => Some(bearer(&headers).map_or_else(|| hex(&rand::random::<[u8; 32]>()), str::to_owned)),
         (false, false) => return Err(AppError::UNAUTHORIZED),
     };
@@ -482,6 +496,7 @@ pub struct TransferInfo {
     title: String,
     collect: bool,
     downloads: i32,
+    closed: bool,
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
     hosted: bool,
@@ -540,6 +555,7 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
         title: transfer.title,
         collect: transfer.collect,
         downloads: transfer.downloads,
+        closed: transfer.closed,
         created_at: transfer.created_at,
         expires_at: transfer.expires_at,
         hosted: transfer.hosted,
@@ -561,7 +577,7 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
     Ok(response)
 }
 
-const SUMMARY_SQL: &str = "SELECT t.code, t.title, t.created_at, t.expires_at, t.hosted, t.collect, t.downloads,
+const SUMMARY_SQL: &str = "SELECT t.code, t.title, t.created_at, t.expires_at, t.hosted, t.collect, t.downloads, t.closed,
         count(f.idx) AS files,
         coalesce(sum(f.size), 0)::bigint AS size,
         -- Nothing is pending for a hosted transfer: its bytes were never coming here.
@@ -578,6 +594,7 @@ pub struct Summary {
     hosted: bool,
     collect: bool,
     downloads: i32,
+    closed: bool,
     files: i64,
     size: i64,
     complete: bool,
@@ -777,6 +794,7 @@ mod tests {
             collect: true,
             title: String::new(),
             downloads: 0,
+            closed: false,
         };
         let with = |value: &str| {
             let mut headers = HeaderMap::new();

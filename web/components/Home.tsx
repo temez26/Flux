@@ -528,7 +528,9 @@ function ReceiveForm() {
 function ownedBadge(code: string, summary: Summary | undefined): ReactNode {
   if (!summary) return null;
   if (summary.collect) {
-    return (
+    return summary.closed ? (
+      <Badge icon={<LockIcon />}>Closed</Badge>
+    ) : (
       <Badge tone="accent" icon={<FolderIcon />}>
         Collecting
       </Badge>

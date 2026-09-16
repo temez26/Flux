@@ -10,6 +10,7 @@ function transfer(files: { path: string; size: number; hash?: string }[]): Trans
     title: "",
     collect: false,
     downloads: 0,
+    closed: false,
     createdAt: "",
     expiresAt: "",
     hosted: false,

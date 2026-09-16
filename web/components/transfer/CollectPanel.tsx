@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { zipUrl, type TransferMeta } from "@/lib/api";
+import { errorMessage, updateTransfer, zipUrl, type TransferMeta } from "@/lib/api";
 import { formatBytes, formatCode, plural } from "@/lib/format";
-import { useTitle } from "@/lib/hooks";
+import { reloadTransfer, useTitle } from "@/lib/hooks";
 import { notify } from "@/lib/notify";
+import { toast } from "@/lib/toast";
 import { FileBrowser } from "../FileList";
-import { DownloadIcon, FolderIcon } from "../icons";
+import { DownloadIcon, FolderIcon, LockIcon } from "../icons";
 import { PreviewDialog } from "../preview/Preview";
 import { ShareCard } from "../ShareCard";
-import { ConfirmButton, StatusCard, buttonClass } from "../ui";
+import { Button, ConfirmButton, StatusCard, buttonClass } from "../ui";
 import { MetaRow, MetaTile, SelectionDownload, pageTitle, removeTransfer, summarize } from "./common";
 
 /**
@@ -21,6 +22,20 @@ export function CollectPanel({ meta, token }: { meta: TransferMeta; token: strin
   const [previewing, setPreviewing] = useState<number | null>(null);
   const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
   const arriving = meta.files.length - complete;
+  const [closing, setClosing] = useState(false);
+
+  async function setClosed(closed: boolean) {
+    setClosing(true);
+    try {
+      await updateTransfer(meta.code, token, { closed });
+      reloadTransfer(meta.code);
+      toast(closed ? "Stopped collecting — what's here stays" : "Collecting again");
+    } catch (err) {
+      toast(errorMessage(err), "err");
+    } finally {
+      setClosing(false);
+    }
+  }
   useTitle(pageTitle(meta.code));
 
   // Anyone may add at any moment, so arrivals are worth hearing about while the page is out of sight.
@@ -43,19 +58,28 @@ export function CollectPanel({ meta, token }: { meta: TransferMeta; token: strin
     <div className="space-y-4">
       <ShareCard code={meta.code} expiresAt={meta.expiresAt} />
       <StatusCard
-        tone="accent"
-        icon={<FolderIcon />}
-        title={`Collecting: ${meta.title}`}
-        subtitle="Anyone with the code can add files, and download what's here, until it expires."
+        tone={meta.closed ? "muted" : "accent"}
+        icon={meta.closed ? <LockIcon /> : <FolderIcon />}
+        title={meta.closed ? `Closed: ${meta.title}` : `Collecting: ${meta.title}`}
+        subtitle={
+          meta.closed
+            ? "Nothing more can be added. Anyone with the code can still download what's here until it expires."
+            : "Anyone with the code can add files, and download what's here, until it expires."
+        }
         stats={stats}
         actions={
-          complete > 1 &&
-          ready && (
-            <a href={zipUrl(meta.code)} download className={buttonClass("primary")}>
-              <DownloadIcon className="size-4" />
-              Download all as .zip
-            </a>
-          )
+          <>
+            {complete > 1 && ready && (
+              <a href={zipUrl(meta.code)} download className={buttonClass("primary")}>
+                <DownloadIcon className="size-4" />
+                Download all as .zip
+              </a>
+            )}
+            <Button onClick={() => setClosed(!meta.closed)} disabled={closing}>
+              {meta.closed ? <FolderIcon className="size-4" /> : <LockIcon className="size-4" />}
+              {meta.closed ? "Collect again" : "Stop collecting"}
+            </Button>
+          </>
         }
         danger={<ConfirmButton onConfirm={() => removeTransfer(meta.code, token)}>Delete collection</ConfirmButton>}
       />
