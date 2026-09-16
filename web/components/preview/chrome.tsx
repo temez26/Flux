@@ -2,7 +2,9 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { fileUrl, type FileMeta } from "@/lib/api";
-import { DownloadIcon, ExpandIcon, FileTypeIcon } from "../icons";
+import { copyText } from "@/lib/clipboard";
+import { toast } from "@/lib/toast";
+import { CopyIcon, DownloadIcon, ExpandIcon, FileTypeIcon } from "../icons";
 import { Spinner, buttonClass } from "../ui";
 
 // The viewer is always dark, like a photo viewer, so its controls don't follow the theme.
@@ -73,16 +75,38 @@ export function Loading({ inline }: { inline: boolean }) {
   );
 }
 
-export function InlineFrame({ onExpand, children }: { onExpand?: () => void; children: ReactNode }) {
+const frameButton =
+  "inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted transition hover:bg-hover hover:text-fg";
+
+/** Copies what a text preview shows — on a phone, usually the reason for opening it at all. */
+export function CopyButton({ text }: { text: string }) {
+  async function copy() {
+    try {
+      await copyText(text);
+      toast("Copied");
+    } catch {
+      toast("Couldn't copy the text", "err");
+    }
+  }
+  return (
+    <button type="button" onClick={copy} className={frameButton}>
+      <CopyIcon className="size-3.5" />
+      Copy
+    </button>
+  );
+}
+
+export function InlineFrame({ onExpand, aside, children }: { onExpand?: () => void; aside?: ReactNode; children: ReactNode }) {
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-bg">
       <div className="flex items-center justify-between gap-2 border-b border-line py-1 pr-1 pl-3">
-        <span className="text-xs font-medium text-muted">Preview</span>
+        <span className="mr-auto text-xs font-medium text-muted">Preview</span>
+        {aside}
         {onExpand && (
           <button
             type="button"
             onClick={onExpand}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted transition hover:bg-hover hover:text-fg"
+            className={frameButton}
           >
             <ExpandIcon className="size-3.5" />
             Full screen
@@ -95,10 +119,23 @@ export function InlineFrame({ onExpand, children }: { onExpand?: () => void; chi
 }
 
 /** A sheet for documents: scrolling inside the card, or a centred page in the viewer. */
-export function Panel({ inline, onExpand, wide = false, children }: { inline: boolean; onExpand?: () => void; wide?: boolean; children: ReactNode }) {
+export function Panel({
+  inline,
+  onExpand,
+  aside,
+  wide = false,
+  children,
+}: {
+  inline: boolean;
+  onExpand?: () => void;
+  /** Actions for what the panel shows, beside its title inline or above it full screen. */
+  aside?: ReactNode;
+  wide?: boolean;
+  children: ReactNode;
+}) {
   if (inline) {
     return (
-      <InlineFrame onExpand={onExpand}>
+      <InlineFrame onExpand={onExpand} aside={aside}>
         <div className="flex max-h-[60vh] flex-col">{children}</div>
       </InlineFrame>
     );
@@ -106,6 +143,7 @@ export function Panel({ inline, onExpand, wide = false, children }: { inline: bo
   return (
     <div className="absolute inset-0 flex justify-center sm:px-16 sm:pb-6">
       <div className={`flex min-h-0 w-full flex-col overflow-hidden bg-surface text-fg [color-scheme:light_dark] sm:rounded-2xl ${wide ? "max-w-6xl" : "max-w-4xl"}`}>
+        {aside && <div className="flex shrink-0 justify-end border-b border-line px-2 py-1">{aside}</div>}
         {children}
       </div>
     </div>
