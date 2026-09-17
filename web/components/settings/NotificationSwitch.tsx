@@ -7,6 +7,7 @@ import {
   turnOffNotifications,
   turnOnNotifications,
 } from "@/lib/alerts/notify";
+import { isAppleTouch, isInstalled } from "@/lib/platform/install";
 import { toast } from "@/lib/alerts/toast";
 import { Switch } from "../ui/ui";
 
@@ -39,7 +40,9 @@ export function NotificationSwitch() {
         <p id="notifications-hint" className="text-xs text-muted">
           {supported
             ? "When a transfer finishes or a device sends you something while Flux is in the background."
-            : "This browser can't show notifications from Flux."}
+            : isAppleTouch() && !isInstalled()
+              ? "Add Flux to your Home Screen first; iPhone and iPad only notify from there."
+              : "This browser can't show notifications from Flux."}
         </p>
       </div>
       {supported && (

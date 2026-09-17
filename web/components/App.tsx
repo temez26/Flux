@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { normalizeCode } from "@/lib/util/format";
 import { useMounted, useOnline } from "@/lib/hooks";
+import { watchInstall } from "@/lib/platform/install";
 import { navigate, usePath } from "@/lib/platform/router";
 import Home from "./home/Home";
 import { tabAt } from "./share/tabs";
@@ -33,6 +34,7 @@ export default function App() {
   }, [path]);
 
   useEffect(() => {
+    watchInstall();
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
