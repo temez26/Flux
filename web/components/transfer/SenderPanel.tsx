@@ -7,20 +7,10 @@ import { formatBytes, formatDuration, plural } from "@/lib/util/format";
 import { useLeaveGuard, useNotifyWhen, useNow, useTitle, useTransferMeta, useWakeLock } from "@/lib/hooks";
 import { canPreview } from "@/lib/preview/preview";
 import type { Item, Uploader } from "@/lib/transfer/upload";
-import { addFiles, type Session } from "@/lib/transfer/session";
+import { addFiles } from "@/lib/transfer/session";
 import { toast } from "@/lib/alerts/toast";
 import { FileBrowser, FileRow } from "../files/FileList";
-import {
-  AlertIcon,
-  CheckIcon,
-  ClockIcon,
-  CloseIcon,
-  PauseIcon,
-  PlayIcon,
-  PlusIcon,
-  RetryIcon,
-  ZapIcon,
-} from "../ui/icons";
+import { AlertIcon, CheckIcon, ClockIcon, CloseIcon, PauseIcon, PlayIcon, PlusIcon, RetryIcon } from "../ui/icons";
 import { useFilePickers } from "../files/picker";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
 import { ShareCard } from "./ShareCard";
@@ -38,7 +28,7 @@ import {
   removeTransfer,
 } from "./common";
 
-function senderStatus(session: Session, uploader: Uploader): StatusProps {
+function senderStatus(uploader: Uploader): StatusProps {
   const { counts, finished, reconnecting } = uploader.snapshot;
   if (uploader.gone) {
     return {
@@ -63,21 +53,6 @@ function senderStatus(session: Session, uploader: Uploader): StatusProps {
       title: "Ready to receive",
       subtitle: "Every file is uploaded and verified.",
     };
-  if (session.delivered && uploader.paused) {
-    return {
-      tone: "ok",
-      icon: <ZapIcon />,
-      title: "Delivered directly",
-      subtitle: "The receiver has everything. Resume to also keep a copy on the server.",
-    };
-  }
-  if (uploader.held)
-    return {
-      tone: "accent",
-      icon: <ZapIcon />,
-      title: "Sending directly",
-      subtitle: "A receiver is downloading straight from this device.",
-    };
   if (uploader.paused)
     return { tone: "warn", icon: <PauseIcon />, title: "Paused", subtitle: "Resume to continue uploading." };
   if (reconnecting)
@@ -96,23 +71,12 @@ function senderStatus(session: Session, uploader: Uploader): StatusProps {
 }
 
 /** This tab's own upload, from the moment the files were picked until every one is stored. */
-export function SenderPanel({
-  session,
-  uploader,
-  expiresAt,
-}: {
-  session: Session;
-  uploader: Uploader;
-  expiresAt?: string;
-}) {
-  const { host } = session;
+export function SenderPanel({ uploader, expiresAt }: { uploader: Uploader; expiresAt?: string }) {
   useSyncExternalStore(uploader.subscribe, uploader.getVersion, uploader.getVersion);
-  useSyncExternalStore(host.subscribe, host.getVersion, host.getVersion);
   const now = useNow(30_000);
   const [previewing, setPreviewing] = useState<number | null>(null);
   const { total, sent, counts, speed, finished } = uploader.snapshot;
   const running = !finished && !uploader.paused;
-  const serving = host.receivers > 0;
   const expired = !!expiresAt && Date.parse(expiresAt) <= now;
   // Previews read the server's copy, so the sender only needs its metadata once the upload
   // is done; until then the uploader's own state is all this panel shows.
@@ -136,36 +100,32 @@ export function SenderPanel({
       setAdding(false);
     }
   });
-  useWakeLock(running || serving);
-  useLeaveGuard(!finished || serving);
+  useWakeLock(running);
+  useLeaveGuard(!finished);
   useNotifyWhen(finished && !counts.failed && !uploader.gone, "Upload finished", "Your files are ready to receive");
   useNotifyWhen(
     finished && counts.failed > 0 && !uploader.gone,
     "Upload stopped",
     `${plural(counts.failed, "file")} failed to upload`,
   );
-  useNotifyWhen(serving, "A device is downloading", "Straight from this device");
   useTitle(
     running
       ? `${percent(sent, total)}% uploaded · Flux`
       : pageTitle(offerTitle(uploader.items.map((item) => item.path))),
   );
 
-  // The server deletes expired transfers, so stop uploading and serving at the same moment.
+  // The server deletes expired transfers, so stop uploading at the same moment.
   useEffect(() => {
-    if (!expired) return;
-    uploader.markGone();
-    host.close();
-  }, [expired, uploader, host]);
+    if (expired) uploader.markGone();
+  }, [expired, uploader]);
 
   const files = uploader.items.length - counts.canceled;
-  const delivered = session.delivered && uploader.paused && !finished;
   const stats: [string, string][] = [
     ["Files", `${counts.done.toLocaleString()} / ${files.toLocaleString()}`],
     ["Uploaded", `${formatBytes(sent)} / ${formatBytes(total)}`],
   ];
   if (finished && meta) stats.push(["Downloads", meta.downloads.toLocaleString()]);
-  if (running && !uploader.held) {
+  if (running) {
     stats.push(
       ["Speed", speed > 0 ? `${formatBytes(speed)}/s` : "–"],
       ["Time left", speed > 0 ? formatDuration((total - sent) / speed) : "–"],
@@ -181,7 +141,7 @@ export function SenderPanel({
         open={meta?.public ? meta.open : undefined}
       />
       <StatusCard
-        {...senderStatus(session, uploader)}
+        {...senderStatus(uploader)}
         percent={percent(sent, total)}
         progress={total ? sent / total : 1}
         stats={stats}
@@ -209,19 +169,12 @@ export function SenderPanel({
         }
         danger={
           <ConfirmButton onConfirm={() => removeTransfer(uploader.code, uploader.token)}>
-            {uploader.gone ? "Remove" : finished || delivered ? "Delete transfer" : "Cancel transfer"}
+            {uploader.gone ? "Remove" : finished ? "Delete transfer" : "Cancel transfer"}
           </ConfirmButton>
         }
       >
-        <BackgroundNotice active={running || serving} />
+        <BackgroundNotice active={running} />
         {adder.inputs}
-        {serving && (
-          <div className="mt-4">
-            <Badge tone="ok" icon={<ZapIcon />}>
-              Receiver connected directly{host.sent > 0 ? ` · ${formatBytes(host.sent)} sent` : ""}
-            </Badge>
-          </div>
-        )}
         {single && previewable.has(single.idx) && (
           <InlinePreview code={uploader.code} file={single} onExpand={() => setPreviewing(single.idx)} />
         )}

@@ -67,13 +67,13 @@ function checksumsUrl(meta: TransferMeta): string {
 /** `children` go right below the heading card: what else can be done with the transfer. */
 export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children?: ReactNode }) {
   const { size, received, complete, ready } = summarize(meta.files);
-  const [initial] = useState({ ready: ready && !meta.hosted, size });
+  const [initialSize] = useState(size);
   /** How the whole transfer could be saved at once; null when it is too big to be. */
   const [whole, setWhole] = useState<SaveMethod | null>();
-  // A hosted transfer has no other source, and otherwise a peer is only worth trying while
-  // the server doesn't have everything yet. Worth it whatever the transfer weighs: one too
-  // big to save in a single go can still be taken a file at a time.
-  const [direct] = useState(() => (initial.ready ? undefined : new DirectClient(meta.code)));
+  // Only a transfer sent to a device comes from the sender; a public share comes from the server
+  // alone, even while it uploads. Worth it whatever the transfer weighs: one too big to save in a
+  // single go can still be taken a file at a time.
+  const [direct] = useState(() => (meta.hosted ? new DirectClient(meta.code) : undefined));
   const [receiver, setReceiver] = useState<Receiver>();
   /** Files already downloaded from this transfer on this device, from an earlier visit or a lost tab. */
   const [saved, setSaved] = useState(() => getReceived(meta.code));
@@ -89,11 +89,11 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
 
   useEffect(() => {
     let alive = true;
-    void saveMethod(initial.size).then((m) => alive && setWhole(m));
+    void saveMethod(initialSize).then((m) => alive && setWhole(m));
     return () => {
       alive = false;
     };
-  }, [initial.size]);
+  }, [initialSize]);
 
   useEffect(() => {
     receiver?.update(meta);
@@ -103,11 +103,11 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
 
   const single = meta.files.length === 1 ? meta.files[0] : null;
   const directOpen = direct?.state === "open";
-  const viaDirect = directOpen && (meta.hosted || !ready);
+  const viaDirect = directOpen;
   // The sender's page is the only source, so its absence is the whole story.
   const senderMissing = meta.hosted && !directOpen;
   // Only a download taken from the sender's device is saved from the page; the server's copy downloads as usual.
-  const tooLargeHere = whole === null && (meta.hosted || !ready);
+  const tooLargeHere = whole === null && meta.hosted;
   const unreachable = direct?.state === "unavailable";
   const remaining = meta.files.filter((f) => !saved.has(f.idx));
 

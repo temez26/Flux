@@ -103,13 +103,6 @@ function drained(channel: RTCDataChannel) {
 
 const failure = (err: unknown) => (err instanceof Error ? err.message : "Failed");
 
-export interface HostEvents {
-  /** A receiver asked for data, so the server upload should yield bandwidth. */
-  activity(): void;
-  /** A receiver finished receiving everything. */
-  delivered(): void;
-}
-
 /** Sender side: serves the transfer's files to receivers over WebRTC data channels. */
 export class DirectHost extends Observable {
   /** Bytes sent directly since this page opened. */
@@ -122,7 +115,6 @@ export class DirectHost extends Observable {
     code: string,
     token: string,
     private readonly file: (idx: number) => File | undefined,
-    private readonly events: HostEvents,
   ) {
     super();
     this.signal = new Signal(code, { role: "sender", token }, (msg) => void this.onSignal(msg));
@@ -210,8 +202,7 @@ export class DirectHost extends Observable {
     channel.onmessage = (e) => {
       if (typeof e.data !== "string") return;
       const req = JSON.parse(e.data) as Request;
-      if (req.t === "done") return this.events.delivered();
-      if (req.t === "get") this.events.activity();
+      if (req.t === "done") return;
       queue.push(req);
       if (!draining) void drain();
     };

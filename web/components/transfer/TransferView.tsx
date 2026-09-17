@@ -30,9 +30,8 @@ export default function TransferView({ code }: { code: string }) {
   }, [meta, code]);
 
   if (session) {
-    const { uploader } = session;
-    return uploader ? (
-      <SenderPanel session={session} uploader={uploader} expiresAt={owned?.expiresAt} />
+    return session.uploader ? (
+      <SenderPanel uploader={session.uploader} expiresAt={owned?.expiresAt} />
     ) : (
       <HostedPanel session={session} expiresAt={owned?.expiresAt} />
     );

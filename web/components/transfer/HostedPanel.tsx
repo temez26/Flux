@@ -39,7 +39,13 @@ function hostedStatus(serving: number, sent: number, expired: boolean): StatusPr
  * A transfer whose bytes never left this device. There is no upload to follow, so the panel
  * shows what is being served and makes it plain that closing the page ends it.
  */
-export function HostedPanel({ session, expiresAt }: { session: Session; expiresAt?: string }) {
+export function HostedPanel({
+  session,
+  expiresAt,
+}: {
+  session: Extract<Session, { host: unknown }>;
+  expiresAt?: string;
+}) {
   const { host, entries, code, token } = session;
   useSyncExternalStore(host.subscribe, host.getVersion, host.getVersion);
   const now = useNow(30_000);
