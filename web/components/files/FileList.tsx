@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -15,15 +16,16 @@ import { formatBytes, plural } from "@/lib/util/format";
 import { CheckIcon, FileTypeIcon, GridIcon, ListIcon, SearchIcon } from "../ui/icons";
 import { Badge, ProgressBar, type Tone } from "../ui/ui";
 
-const ROW_HEIGHT = 60;
+// Sizes are in rems, so rows and tiles grow with the reader's own text size rather than clip it.
+const ROW_HEIGHT = 3.75;
 // Kept off screen above and below, in pixels rather than rows: a grid row is twice the
 // height of a list row, and each of its tiles may fetch an image to draw itself.
 const OVERSCAN_PX = 480;
-const TILE_GAP = 8;
+const TILE_GAP = 0.5;
 // Tiles stretch to fill the width, never narrower than this.
-const MIN_TILE = 104;
+const MIN_TILE = 6.5;
 /** Name and size under a tile's thumbnail. */
-const TILE_LABEL = 40;
+const TILE_LABEL = 2.5;
 // Under a screenful or so, a search box is more clutter than help.
 const SEARCH_FROM = 12;
 const VIEW_KEY = "flux.view";
@@ -36,6 +38,20 @@ function storedView(): FileView {
   } catch {
     return "list";
   }
+}
+
+function subscribeResize(listener: () => void) {
+  window.addEventListener("resize", listener);
+  return () => window.removeEventListener("resize", listener);
+}
+
+/** Pixels in a rem, which follows the text size set in the browser. */
+function useRem(): number {
+  return useSyncExternalStore(
+    subscribeResize,
+    () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16,
+    () => 16,
+  );
 }
 
 /**
@@ -71,7 +87,8 @@ function useVisibleRows(ref: RefObject<HTMLDivElement | null>, rowHeight: number
 
 export function FileList({ count, renderRow }: { count: number; renderRow: (index: number) => ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [start, end] = useVisibleRows(ref, ROW_HEIGHT, count);
+  const rowHeight = ROW_HEIGHT * useRem();
+  const [start, end] = useVisibleRows(ref, rowHeight, count);
 
   const rows: ReactNode[] = [];
   // The range is measured in an effect, so a render that shrinks the list sees the old one.
@@ -85,14 +102,14 @@ export function FileList({ count, renderRow }: { count: number; renderRow: (inde
         aria-setsize={count}
         aria-posinset={i + 1}
         className="absolute inset-x-0"
-        style={{ top: i * ROW_HEIGHT, height: ROW_HEIGHT }}
+        style={{ top: i * rowHeight, height: rowHeight }}
       >
         {renderRow(i)}
       </div>,
     );
   }
   return (
-    <div ref={ref} role="list" className="relative" style={{ height: count * ROW_HEIGHT }}>
+    <div ref={ref} role="list" className="relative" style={{ height: count * rowHeight }}>
       {rows}
     </div>
   );
@@ -110,9 +127,11 @@ function FileGrid({ count, renderTile }: { count: number; renderTile: (index: nu
     return () => observer.disconnect();
   }, []);
 
-  const columns = Math.max(2, Math.floor((width + TILE_GAP) / (MIN_TILE + TILE_GAP)));
-  const tile = width ? (width - TILE_GAP * (columns - 1)) / columns : MIN_TILE;
-  const rowHeight = tile + TILE_LABEL + TILE_GAP;
+  const rem = useRem();
+  const gap = TILE_GAP * rem;
+  const columns = Math.max(2, Math.floor((width + gap) / (MIN_TILE * rem + gap)));
+  const tile = width ? (width - gap * (columns - 1)) / columns : MIN_TILE * rem;
+  const rowHeight = tile + TILE_LABEL * rem + gap;
   const rows = Math.ceil(count / columns);
   const [start, end] = useVisibleRows(ref, rowHeight, rows);
 
@@ -128,7 +147,7 @@ function FileGrid({ count, renderTile }: { count: number; renderTile: (index: nu
           aria-setsize={count}
           aria-posinset={i + 1}
           className="absolute"
-          style={{ top: row * rowHeight, left: column * (tile + TILE_GAP), width: tile, height: rowHeight - TILE_GAP }}
+          style={{ top: row * rowHeight, left: column * (tile + gap), width: tile, height: rowHeight - gap }}
         >
           {renderTile(i)}
         </div>,
@@ -455,7 +474,7 @@ export function FileTile({
       <span className="mt-1.5 block truncate text-xs font-medium transition-colors group-hover:text-accent">
         {basename(path)}
       </span>
-      <span className="block truncate text-[11px] text-muted tabular-nums">{formatBytes(size)}</span>
+      <span className="block truncate text-[0.6875rem] text-muted tabular-nums">{formatBytes(size)}</span>
     </>
   );
   const className = "flex size-full flex-col text-left";
