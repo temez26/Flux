@@ -43,43 +43,47 @@ export function useNearby(): Nearby {
 /** Offers from other devices, shown over whichever page is open when they arrive. */
 export function IncomingOffers() {
   const nearby = useNearby();
-  if (!nearby.offers.length) return null;
   return (
+    // Always there, empty or not: a live region that arrives along with its message goes unread.
     <div
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 top-0 z-50 mx-auto flex max-w-2xl flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]"
+      className="pointer-events-none fixed inset-x-0 top-0 z-50 mx-auto max-w-2xl p-3 pt-[max(0.75rem,env(safe-area-inset-top))] empty:hidden"
     >
-      {nearby.offers.map((offer) => (
-        <div
-          key={offer.code}
-          className="pointer-events-auto flex animate-[toast-in_.2s_ease-out] items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-lg"
-        >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
-            <DownloadIcon className="size-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">
-              {offer.from.name} wants to send you {offer.title}
-            </p>
-            <p className="truncate text-xs text-muted">{offerDetail(offer)}</p>
-          </div>
-          <Button
-            variant="primary"
-            onClick={() => {
-              nearby.answer(offer, true);
-              navigate(`/${formatCode(offer.code)}`);
-            }}
-          >
-            Open
-          </Button>
-          <IconButton
-            label={`Decline ${offer.title} from ${offer.from.name}`}
-            onClick={() => nearby.answer(offer, false)}
-          >
-            <CloseIcon className="size-4" />
-          </IconButton>
-        </div>
-      ))}
+      {nearby.offers.length > 0 && (
+        <section aria-label="Offers from nearby devices" className="flex flex-col gap-2">
+          {nearby.offers.map((offer) => (
+            <div
+              key={offer.code}
+              className="pointer-events-auto flex animate-[toast-in_.2s_ease-out] items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-lg"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+                <DownloadIcon className="size-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">
+                  {offer.from.name} wants to send you {offer.title}
+                </p>
+                <p className="truncate text-xs text-muted">{offerDetail(offer)}</p>
+              </div>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  nearby.answer(offer, true);
+                  navigate(`/${formatCode(offer.code)}`);
+                }}
+              >
+                Open
+              </Button>
+              <IconButton
+                label={`Decline ${offer.title} from ${offer.from.name}`}
+                onClick={() => nearby.answer(offer, false)}
+              >
+                <CloseIcon className="size-4" />
+              </IconButton>
+            </div>
+          ))}
+        </section>
+      )}
     </div>
   );
 }

@@ -84,6 +84,9 @@ export default function App() {
       >
         Skip to content
       </a>
+      {/* Offers can arrive on any page, and there is nothing to connect for before hydration. They
+          come first after the skip link, so a keyboard reaches one without crossing the page. */}
+      {mounted && <IncomingOffers />}
       <header className="flex h-12 items-center gap-1">
         {!tab && (
           <IconButton label="Back to home" className="-ml-2" onClick={() => navigate("/")}>
@@ -108,8 +111,6 @@ export default function App() {
       <main id="main" ref={main} tabIndex={-1} className="flex-1 pt-4 outline-none">
         {view}
       </main>
-      {/* Offers can arrive on any page, and there is nothing to connect for before hydration. */}
-      {mounted && <IncomingOffers />}
       <Toaster />
     </div>
   );
