@@ -8,9 +8,8 @@ function transfer(files: { path: string; size: number; hash?: string }[]): Trans
   return {
     code: "abcdefgh",
     title: "",
-    collect: false,
+    open: false,
     downloads: 0,
-    closed: false,
     editable: false,
     noteVersion: 0,
     createdAt: "",
@@ -26,6 +25,7 @@ function transfer(files: { path: string; size: number; hash?: string }[]): Trans
       modified: null,
       hash: f.hash ?? null,
       received: 0,
+      added: false,
     })),
   };
 }

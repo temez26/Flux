@@ -7,6 +7,8 @@ export interface FileMeta {
   /** BLAKE3 hex digest; present once the file is fully uploaded and verified. */
   hash: string | null;
   received: number;
+  /** Added by someone other than the owner, to a share open to that. */
+  added: boolean;
 }
 
 export interface TransferMeta {
@@ -18,12 +20,10 @@ export interface TransferMeta {
   editable: boolean;
   /** Moves on with every saved edit, so a save can say which text it was edited from. */
   noteVersion: number;
-  /** A collection: anyone with the code may add files, not only whoever created it. */
-  collect: boolean;
+  /** A public share its owner lets anyone who opens it add files to. */
+  open: boolean;
   /** Downloads started from a page, of all or part of the transfer. */
   downloads: number;
-  /** A collection its owner stopped: nothing more can be added. */
-  closed: boolean;
   createdAt: string;
   expiresAt: string;
   /** Served from the sender's device: the server has the file list but none of the bytes. */
@@ -57,9 +57,8 @@ export interface Summary {
   /** Seconds it lasts once its upload completes; null when it counts from creation. */
   lifetime: number | null;
   hosted: boolean;
-  collect: boolean;
+  open: boolean;
   downloads: number;
-  closed: boolean;
   /** A text transfer rather than files. */
   note: boolean;
   files: number;
@@ -188,15 +187,6 @@ export async function saveNote(
   throw new ApiError(res.status, body?.error ?? `Request failed (${res.status})`);
 }
 
-/** An empty transfer for other people to send files into. */
-export function createCollection(expiresIn: number, title?: string) {
-  return request<Created>("/api/transfers", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ files: [], expiresIn, collect: true, title }),
-  });
-}
-
 /** Where this deployment's STUN responder listens, so peers can find each other. */
 export function getConfig() {
   return request<{ stunPort: number | null }>("/api/config");
@@ -224,7 +214,7 @@ export interface AddedFile {
 
 /**
  * Adds files to a transfer, answering with the index and final path of each, in order. The
- * owner's token adds to any transfer; to a collection anyone may add, under a folder named by
+ * owner's token adds to any transfer; to an open share anyone may add, under a folder named by
  * `from`, and gets back a token for uploading what they added — to send again with more.
  */
 export function appendFiles(code: string, token: string | undefined, files: NewFile[], from?: string) {
@@ -252,9 +242,9 @@ export function countDownload(code: string) {
 export function updateTransfer(
   code: string,
   token: string,
-  changes: { expiresIn?: number; closed?: boolean; editable?: boolean; public?: boolean },
+  changes: { expiresIn?: number; open?: boolean; editable?: boolean; public?: boolean },
 ) {
-  return request<{ expiresAt: string; closed: boolean; editable: boolean; public: boolean; lifetime: number | null }>(
+  return request<{ expiresAt: string; open: boolean; editable: boolean; public: boolean; lifetime: number | null }>(
     transferUrl(code),
     {
       method: "PATCH",

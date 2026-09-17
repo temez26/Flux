@@ -2,7 +2,6 @@ use super::files::NewFile;
 
 const MAX_TITLE: usize = 80;
 const MAX_CONTRIBUTOR: usize = 60;
-const COLLECTION_TITLE: &str = "Collected files";
 const NOTE_TITLE: &str = "Text";
 
 /// A human name for the transfer: the dropped folder's name, or the first file's name.
@@ -34,21 +33,6 @@ pub(super) fn note_title(text: &str) -> String {
     }
 }
 
-pub(super) fn collection_title(title: Option<&str>) -> String {
-    let title: String = title
-        .unwrap_or_default()
-        .chars()
-        .filter(|c| !c.is_control())
-        .take(MAX_TITLE)
-        .collect();
-    let title = title.trim();
-    if title.is_empty() {
-        COLLECTION_TITLE.to_owned()
-    } else {
-        title.to_owned()
-    }
-}
-
 /// A contributor's name as the one folder their files go into, or None if nothing usable is left.
 pub(super) fn contributor_folder(name: &str) -> Option<String> {
     let name: String = name
@@ -63,14 +47,6 @@ pub(super) fn contributor_folder(name: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_collection_is_called_what_its_owner_says_or_something_plain() {
-        assert_eq!(collection_title(Some("  Holiday photos ")), "Holiday photos");
-        assert_eq!(collection_title(None), COLLECTION_TITLE);
-        assert_eq!(collection_title(Some("\n\t ")), COLLECTION_TITLE);
-        assert_eq!(collection_title(Some(&"x".repeat(200))).chars().count(), MAX_TITLE);
-    }
 
     #[test]
     fn a_text_is_called_by_its_first_line() {

@@ -16,6 +16,25 @@ import { ShareCard } from "./ShareCard";
 import { Badge, Button, ConfirmButton, Notice, Spinner, StatusCard, type StatusProps } from "../ui/ui";
 import { MetaRow, MetaTile, pageTitle, percent, removeOwnedFile, removeTransfer, summarize } from "./common";
 
+function ownerStatus(hosted: boolean, ready: boolean): StatusProps {
+  if (hosted) {
+    return {
+      tone: "warn",
+      icon: <DeviceIcon />,
+      title: "Not being shared",
+      subtitle: "Nothing was uploaded, so add the files again to serve them from this device.",
+    };
+  }
+  return ready
+    ? { tone: "ok", icon: <CheckIcon />, title: "Ready to receive", subtitle: "Every file is uploaded and verified." }
+    : {
+        tone: "warn",
+        icon: <AlertIcon />,
+        title: "Upload interrupted",
+        subtitle: "Add the same files again to continue where it stopped.",
+      };
+}
+
 /**
  * The sender coming back to a transfer this tab is no longer uploading — after a reload, or
  * from another visit. The files themselves are gone with the old page, so continuing means
@@ -30,7 +49,7 @@ export function OwnerPanel({
   token: string;
   onResume: (s: Session) => void;
 }) {
-  const { complete, ready, size, received } = summarize(meta.files);
+  const { complete, ownReady: ready, size, received } = summarize(meta.files);
   const [previewing, setPreviewing] = useState<number | null>(null);
   const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
   const folders = canPickFolder();
@@ -63,25 +82,17 @@ export function OwnerPanel({
   });
   useTitle(pageTitle(meta.code));
 
-  const status: StatusProps = meta.hosted
-    ? {
-        tone: "warn",
-        icon: <DeviceIcon />,
-        title: "Not being shared",
-        subtitle: "Nothing was uploaded, so add the files again to serve them from this device.",
-      }
-    : ready
-      ? { tone: "ok", icon: <CheckIcon />, title: "Ready to receive", subtitle: "Every file is uploaded and verified." }
-      : {
-          tone: "warn",
-          icon: <AlertIcon />,
-          title: "Upload interrupted",
-          subtitle: "Add the same files again to continue where it stopped.",
-        };
+  const status = ownerStatus(meta.hosted, ready);
 
   return (
     <div className="space-y-4">
-      <ShareCard code={meta.code} expiresAt={meta.expiresAt} hosted={meta.hosted} uploading={!ready} />
+      <ShareCard
+        code={meta.code}
+        expiresAt={meta.expiresAt}
+        hosted={meta.hosted}
+        uploading={!ready}
+        open={meta.public && !meta.hosted ? meta.open : undefined}
+      />
       <StatusCard
         {...status}
         // Nothing was ever uploaded for a hosted transfer, so there is no progress to show.

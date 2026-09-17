@@ -17,8 +17,8 @@ use crate::{
 pub struct Update {
     /// Keep the transfer this long from now, whatever was chosen when it was made.
     expires_in: Option<i64>,
-    /// Stop a collection taking files, or start it again.
-    closed: Option<bool>,
+    /// Let anyone who opens a public share add files to it, or stop that.
+    open: Option<bool>,
     /// Let anyone with the code edit a text transfer, or only its owner.
     editable: Option<bool>,
     /// List the transfer for everyone who opens Flux, or stop listing it.
@@ -29,7 +29,7 @@ pub struct Update {
 #[serde(rename_all = "camelCase")]
 pub struct Updated {
     expires_at: DateTime<Utc>,
-    closed: bool,
+    open: bool,
     editable: bool,
     public: bool,
     lifetime: Option<i32>,
@@ -57,21 +57,21 @@ pub async fn update(
         ),
         None => (transfer.expires_at, transfer.lifetime),
     };
-    if req.closed.is_some() && !transfer.collect {
-        return Err(AppError::bad_request("only a collection can be closed"));
+    if req.open == Some(true) && (!transfer.public || transfer.hosted || transfer.note.is_some()) {
+        return Err(AppError::bad_request("only public files can take files from others"));
     }
     if req.editable.is_some() && transfer.note.is_none() {
         return Err(AppError::bad_request("only text can be made editable"));
     }
-    let closed = req.closed.unwrap_or(transfer.closed);
+    let open = req.open.unwrap_or(transfer.open);
     let editable = req.editable.unwrap_or(transfer.editable);
     let public = req.public.unwrap_or(transfer.public);
     sqlx::query(
-        "UPDATE transfers SET expires_at = $2, closed = $3, editable = $4, public = $5, lifetime = $6 WHERE id = $1",
+        "UPDATE transfers SET expires_at = $2, open = $3, editable = $4, public = $5, lifetime = $6 WHERE id = $1",
     )
     .bind(transfer.id)
     .bind(expires_at)
-    .bind(closed)
+    .bind(open)
     .bind(editable)
     .bind(public)
     .bind(lifetime)
@@ -80,7 +80,7 @@ pub async fn update(
     state.notes.changed(transfer.id);
     Ok(Json(Updated {
         expires_at,
-        closed,
+        open,
         editable,
         public,
         lifetime,
@@ -88,12 +88,12 @@ pub async fn update(
 }
 
 async fn uploading(db: &sqlx::PgPool, id: uuid::Uuid) -> Result<bool> {
-    Ok(
-        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM files WHERE transfer_id = $1 AND hash IS NULL)")
-            .bind(id)
-            .fetch_one(db)
-            .await?,
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM files WHERE transfer_id = $1 AND hash IS NULL AND upload_token_hash IS NULL)",
     )
+    .bind(id)
+    .fetch_one(db)
+    .await?)
 }
 
 /// Counts one download of a transfer. Called by the page a download starts from, which is the

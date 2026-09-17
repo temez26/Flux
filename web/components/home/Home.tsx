@@ -18,7 +18,7 @@ import { ShareTabs } from "./ShareTabs";
 /** The start page: the ways to share on top, what is shared publicly below, then this device's own. */
 export default function Home({ tab }: { tab: ShareTab }) {
   useTitle(tab.id === "public" ? "Flux" : `${tab.name} · Flux`);
-  /** Files from another app's Share sheet, or dropped on a tab that doesn't send files, asking where to go. */
+  /** Files from another app's Share sheet, or dropped on the text tab, asking where to go. */
   const [incoming, setIncoming] = useState<Picked[] | null>(null);
   // The file tabs take what is dropped or pasted on them themselves.
   const sendsFiles = tab.id === "public" || tab.id === "device";

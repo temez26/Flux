@@ -40,7 +40,7 @@ export function RecentList() {
             icon={
               r.note ? (
                 <TextIcon className="size-4.5" />
-              ) : r.collect || files > 1 ? (
+              ) : files > 1 ? (
                 <FolderIcon className="size-4.5" />
               ) : (
                 <FileTypeIcon path={r.title} className="size-4.5" />
@@ -64,9 +64,7 @@ export function RecentList() {
                 <Badge tone="ok" icon={<CheckIcon />}>
                   Saved
                 </Badge>
-              ) : (
-                summary?.collect && <Badge icon={<FolderIcon />}>{summary.closed ? "Closed" : "Collection"}</Badge>
-              )
+              ) : undefined
             }
           />
         );

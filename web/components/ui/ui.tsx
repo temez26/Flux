@@ -199,6 +199,40 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   );
 }
 
+/** An on/off setting, named and explained by the elements whose ids it is given. */
+export function Switch({
+  checked,
+  onChange,
+  labelledBy,
+  describedBy,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  labelledBy: string;
+  describedBy?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition disabled:opacity-50 ${
+        checked ? "bg-accent-solid" : "bg-line"
+      }`}
+    >
+      <span
+        className={`inline-block size-5 rounded-full bg-white shadow-sm transition ${checked ? "translate-x-6" : "translate-x-1"}`}
+      />
+    </button>
+  );
+}
+
 export function Segmented<T extends string | number>({
   label,
   value,

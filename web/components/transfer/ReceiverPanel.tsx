@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { countDownload, errorMessage, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
 import { DirectClient } from "@/lib/transfer/direct";
 import { basename } from "@/lib/platform/files";
@@ -60,7 +60,8 @@ function checksumsUrl(meta: TransferMeta): string {
 }
 
 /** What someone who opened a code sees before they start downloading. */
-export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
+/** `children` go right below the heading card: what else can be done with the transfer. */
+export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children?: ReactNode }) {
   const { size, received, complete, ready } = summarize(meta.files);
   const [initial] = useState({ ready: ready && !meta.hosted, size });
   /** How the whole transfer could be saved at once; null when it is too big to be. */
@@ -262,6 +263,7 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
           <InlinePreview code={meta.code} file={single} onExpand={() => setPreviewing(single.idx)} />
         )}
       </Card>
+      {children}
       {!single &&
         (meta.hosted ? (
           <FileBrowser

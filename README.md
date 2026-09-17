@@ -5,11 +5,12 @@ code. Receivers take single files or the lot as one zip.
 
 The home page has a tab for each way to share, with everything shared publicly listed below:
 
-- **Public** — upload files anyone who opens Flux can see and download
+- **Public** — upload files anyone who opens Flux can see and download, and optionally let them
+  add their own
 - **Device** — pick a nearby device and send files straight to it; nothing is uploaded
 - **Text** — a note, link or password, listed publicly or reachable by link only, read only or
-  edited together; edits save as you type and reach everyone who has it open
-- **Collect** — hand out a link people add files to
+  edited together; edits save as you type and reach everyone who has it open. Can be sent to a
+  nearby device too
 
 And throughout:
 

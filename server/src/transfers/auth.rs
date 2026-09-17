@@ -27,14 +27,14 @@ pub(super) fn authorize(headers: &HeaderMap, transfer: &Transfer) -> Result<()> 
     }
 }
 
-/// Whether a request may write to or remove one file: its transfer's owner may, and in a
-/// collection so may whoever added that file.
+/// Whether a request may write to or remove one file: its transfer's owner may, and in an open
+/// share so may whoever added that file.
 pub async fn authorize_file(db: &sqlx::PgPool, headers: &HeaderMap, transfer: &Transfer, idx: i32) -> Result<()> {
     let token = bearer(headers).ok_or(AppError::UNAUTHORIZED)?;
     if token_matches(token, transfer) {
         return Ok(());
     }
-    if transfer.collect {
+    if transfer.open {
         let stored: Option<Option<Vec<u8>>> =
             sqlx::query_scalar("SELECT upload_token_hash FROM files WHERE transfer_id = $1 AND idx = $2")
                 .bind(transfer.id)
@@ -66,10 +66,9 @@ mod tests {
             expires_at: Utc::now(),
             hosted: false,
             public: false,
-            collect: true,
+            open: true,
             title: String::new(),
             downloads: 0,
-            closed: false,
             note: None,
             editable: false,
             note_version: 0,

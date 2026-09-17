@@ -1,12 +1,4 @@
-import {
-  appendFiles,
-  createCollection,
-  createNote,
-  createTransfer,
-  deleteFile,
-  type NewFile,
-  type TransferMeta,
-} from "../api";
+import { appendFiles, createNote, createTransfer, deleteFile, type NewFile, type TransferMeta } from "../api";
 import { getDevice } from "../nearby/device";
 import { DirectHost } from "./direct";
 import { basename, uniquePaths, type Picked } from "../platform/files";
@@ -110,25 +102,11 @@ export async function sendNote(text: string, editable: boolean, expiresIn: numbe
   return created.code;
 }
 
-/** Opens a collection for other people to send files into, and returns its code. */
-export async function collect(expiresIn: number, title?: string): Promise<string> {
-  const created = await createCollection(expiresIn, title);
-  saveOwned(created.code, {
-    token: created.token,
-    expiresAt: created.expiresAt,
-    collect: true,
-    count: 0,
-    size: 0,
-    createdAt: Date.now(),
-  });
-  return created.code;
-}
-
-/** Uploads this tab has added to collections, by code. Like sessions, they outlive the page showing them. */
+/** Uploads this tab has added to other people's open shares, by code. Like sessions, they outlive the page showing them. */
 export const contributions = new Map<string, Uploader>();
 
 /**
- * Adds files to someone else's collection. They go into a folder named after this device, and
+ * Adds files to someone else's open share. They go into a folder named after this device, and
  * a second batch joins the first — same token, same queue — so what this device sent stays one
  * upload to follow.
  */
@@ -188,7 +166,7 @@ export async function addFiles(code: string, token: string, picked: Picked[], me
   }
   if (!meta) throw new Error("This transfer isn't open in this tab");
   end(code);
-  const held = meta.files.map((f) => ({ idx: f.idx, path: f.path, size: f.size, done: f.hash !== null }));
+  const held = meta.files.map((f) => ({ idx: f.idx, path: f.path, size: f.size, done: f.hash !== null || f.added }));
   return start(code, token, [...held, ...entries], false);
 }
 
@@ -218,7 +196,8 @@ export function matchPicked(meta: TransferMeta, picked: Picked[]): Match {
   let complete = 0;
 
   const entries = meta.files.map((f) => {
-    const done = f.hash !== null;
+    // What others added to an open share is theirs to upload, not the owner's.
+    const done = f.hash !== null || f.added;
     const exact = byPath.get(f.path);
     const file = done ? undefined : exact?.size === f.size ? exact : byName.get(`${basename(f.path)}\n${f.size}`);
     if (done) complete++;

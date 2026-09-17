@@ -10,7 +10,6 @@ import {
   CheckIcon,
   ClockIcon,
   DeviceIcon,
-  FolderIcon,
   GlobeIcon,
   LockIcon,
   PauseIcon,
@@ -21,13 +20,11 @@ import { TransferRow } from "./TransferRow";
 import { useSummaries } from "./useSummaries";
 
 function ownedBadge(code: string, summary: Summary | undefined): ReactNode {
-  if (!summary || summary.note) return null;
-  if (summary.collect) {
-    return summary.closed ? (
-      <Badge icon={<LockIcon />}>Closed</Badge>
-    ) : (
-      <Badge tone="accent" icon={<FolderIcon />}>
-        Collecting
+  if (!summary) return null;
+  if (summary.note) {
+    return (
+      <Badge tone="ok" icon={<CheckIcon />}>
+        Ready
       </Badge>
     );
   }
@@ -90,15 +87,13 @@ export function OwnedList() {
             icon={
               o.note ? (
                 <TextIcon className="size-4.5" />
-              ) : o.collect ? (
-                <FolderIcon className="size-4.5" />
               ) : o.public ? (
                 <GlobeIcon className="size-4.5" />
               ) : (
                 <LockIcon className="size-4.5" />
               )
             }
-            title={summary?.title ?? (o.note ? "Text" : o.collect ? "Collection" : plural(o.count, "file"))}
+            title={summary?.title ?? (o.note ? "Text" : plural(o.count, "file"))}
             detail={[
               o.note ? "Text" : plural(count, "file"),
               formatBytes(size),

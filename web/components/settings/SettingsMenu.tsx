@@ -108,8 +108,8 @@ export function SettingsMenu() {
               ))}
             </select>
             <p id={`${id}-expiry-hint`} className="mt-1.5 text-xs text-muted">
-              Files, texts and collections you share from now on are removed after {expiryLabel(expiresIn)}. You can
-              keep a share longer from its page.
+              Files and texts you share from now on are removed after {expiryLabel(expiresIn)}. You can keep a share
+              longer from its page.
             </p>
           </div>
 

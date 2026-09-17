@@ -30,14 +30,14 @@ async function transfer(count: number): Promise<TransferMeta> {
       // Hosted: the server never sees these bytes, so it has no digest of its own either.
       hash: null,
       received: 0,
+      added: false,
     });
   }
   return {
     code: "abcdefgh",
     title: "",
-    collect: false,
+    open: false,
     downloads: 0,
-    closed: false,
     editable: false,
     noteVersion: 0,
     createdAt: "",

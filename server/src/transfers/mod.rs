@@ -46,12 +46,10 @@ pub struct Transfer {
     pub hosted: bool,
     /// Listed for everyone who opens Flux.
     pub public: bool,
-    /// Open to files from anyone with the code, not only from its owner.
-    pub collect: bool,
+    /// A public share its owner opened to files from anyone who opens it.
+    pub open: bool,
     pub title: String,
     pub downloads: i32,
-    /// A collection no longer taking files.
-    pub closed: bool,
     /// The text of a text transfer, which has no files.
     pub note: Option<String>,
     /// Whether anyone with the code may edit the text, not only its owner.
@@ -67,7 +65,7 @@ pub fn normalize_code(raw: &str) -> String {
 
 pub async fn find(db: &sqlx::PgPool, code: &str) -> Result<Transfer> {
     sqlx::query_as(
-        "SELECT id, code, token_hash, created_at, expires_at, hosted, public, collect, title, downloads, closed, note, editable, note_version, lifetime FROM transfers
+        "SELECT id, code, token_hash, created_at, expires_at, hosted, public, open, title, downloads, note, editable, note_version, lifetime FROM transfers
          WHERE code = $1 AND expires_at > now()",
     )
     .bind(normalize_code(code))
@@ -91,12 +89,15 @@ pub async fn keep_uploading(db: &sqlx::PgPool, id: Uuid) -> Result<()> {
     Ok(())
 }
 
-/// Starts an uploaded transfer's lifetime once the last of its files has arrived.
+/// Starts an uploaded transfer's lifetime once the last of its owner's files has arrived. It starts
+/// once: what others add to an open share later never keeps the share going longer.
 pub async fn start_lifetime(db: &sqlx::PgPool, id: Uuid) -> Result<()> {
     sqlx::query(
-        "UPDATE transfers SET expires_at = now() + make_interval(secs => lifetime)
+        "UPDATE transfers SET expires_at = now() + make_interval(secs => lifetime), lifetime = NULL
          WHERE id = $1 AND lifetime IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM files WHERE transfer_id = $1 AND hash IS NULL)",
+           AND NOT EXISTS (
+             SELECT 1 FROM files WHERE transfer_id = $1 AND hash IS NULL AND upload_token_hash IS NULL
+           )",
     )
     .bind(id)
     .execute(db)

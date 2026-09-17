@@ -2,15 +2,18 @@
 
 import { useId, useState, type FormEvent } from "react";
 import { errorMessage } from "@/lib/api";
+import type { Peer } from "@/lib/nearby/nearby";
 import { navigate } from "@/lib/platform/router";
 import { sendNote } from "@/lib/transfer/session";
 import { formatCode } from "@/lib/util/format";
-import { AlertIcon, GlobeIcon, LinkIcon, LockIcon, TextIcon, UsersIcon } from "../../ui/icons";
+import { NearbyDevices } from "../../nearby";
+import { AlertIcon, DeviceIcon, GlobeIcon, LinkIcon, LockIcon, TextIcon, UsersIcon } from "../../ui/icons";
 import { Button, Field, Notice, Segmented, Spinner } from "../../ui/ui";
 import { ExpiryNote } from "../../settings/ExpiryNote";
 import { useExpiry } from "../../settings/expiry";
 import { useHandoff } from "../handoff";
 import { usePaste } from "../incoming";
+import { offerTo } from "../offer";
 
 const VISIBILITY = [
   { label: "Link only", value: "link", icon: <LinkIcon className="size-4" /> },
@@ -23,7 +26,8 @@ const EDITORS = [
 
 /**
  * Writes text to share. It always lives on the server, where it can be listed, opened by link or
- * QR code, and edited by its owner or by everyone with the link. Text pasted anywhere on the page
+ * QR code, and edited by its owner or by everyone with the link. It can also be offered to a nearby
+ * device, which then opens it from the server like anyone else. Text pasted anywhere on the page
  * lands in it.
  */
 export function TextComposer() {
@@ -32,6 +36,9 @@ export function TextComposer() {
   const [isPublic, setIsPublic] = useState(false);
   const [editable, setEditable] = useState(false);
   const [expiresIn] = useExpiry();
+  /** Whether to offer it to a nearby device too, and which one. */
+  const [toDevice, setToDevice] = useState(false);
+  const [target, setTarget] = useState<Peer | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const id = useId();
@@ -42,11 +49,15 @@ export function TextComposer() {
 
   async function submit(e?: FormEvent) {
     e?.preventDefault();
-    if (!text.trim() || busy) return;
+    if (!text.trim() || busy || (toDevice && !target)) return;
     setError(null);
     setBusy(true);
     try {
       const code = await sendNote(text, editable, expiresIn, isPublic);
+      if (toDevice) {
+        const title = text.trim().split(/\r?\n/)[0].slice(0, 80);
+        offerTo(target, code, { title, files: 0, size: new TextEncoder().encode(text).length });
+      }
       navigate(`/${formatCode(code)}`);
     } catch (err) {
       setError(errorMessage(err));
@@ -110,9 +121,45 @@ export function TextComposer() {
           {error}
         </Notice>
       )}
-      <Button type="submit" variant="primary" className="mt-5 w-full @md:w-auto" disabled={!text.trim() || busy}>
-        {busy ? <Spinner className="size-4" /> : <TextIcon className="size-4" />}
-        Share text
+      <div className="mt-5 rounded-2xl border border-line p-3">
+        <label className="flex min-h-11 cursor-pointer items-center gap-3">
+          <input
+            type="checkbox"
+            checked={toDevice}
+            onChange={(e) => setToDevice(e.target.checked)}
+            className="size-5 accent-[var(--accent-solid)]"
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">Send to a device too</span>
+            <span className="block text-xs text-muted">
+              A nearby device gets it right away. The text stays on the server, where edits happen.
+            </span>
+          </span>
+        </label>
+        {toDevice && (
+          <div className="mt-3">
+            <NearbyDevices
+              target={target}
+              onChoose={(peer) => setTarget(target?.device === peer.device ? null : peer)}
+            />
+          </div>
+        )}
+      </div>
+
+      <Button
+        type="submit"
+        variant="primary"
+        className="mt-5 w-full @md:w-auto"
+        disabled={!text.trim() || busy || (toDevice && !target)}
+      >
+        {busy ? (
+          <Spinner className="size-4" />
+        ) : toDevice ? (
+          <DeviceIcon className="size-4" />
+        ) : (
+          <TextIcon className="size-4" />
+        )}
+        {toDevice && target ? `Share and send to ${target.name}` : toDevice ? "Choose a device first" : "Share text"}
       </Button>
     </form>
   );

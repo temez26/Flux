@@ -2,7 +2,6 @@
 
 import { useId, type KeyboardEvent } from "react";
 import { navigate } from "@/lib/platform/router";
-import { CollectForm } from "../rooms/collect/CollectForm";
 import { FileSender } from "../rooms/files/FileSender";
 import { TABS, type ShareTab, type TabId } from "../rooms/tabs";
 import { TextComposer } from "../rooms/text/TextComposer";
@@ -16,8 +15,6 @@ function TabBody({ id }: { id: TabId }) {
       return <FileSender mode="device" />;
     case "text":
       return <TextComposer />;
-    case "collect":
-      return <CollectForm />;
   }
 }
 
@@ -49,7 +46,7 @@ export function ShareTabs({ tab }: { tab: ShareTab }) {
         role="tablist"
         aria-label="How to share"
         onKeyDown={onKeyDown}
-        className="grid grid-cols-4 gap-1 rounded-2xl border border-line bg-bg p-1"
+        className="grid grid-cols-3 gap-1 rounded-2xl border border-line bg-bg p-1"
       >
         {TABS.map((t) => {
           const selected = t.id === tab.id;

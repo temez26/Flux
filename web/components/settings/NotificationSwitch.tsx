@@ -8,6 +8,7 @@ import {
   turnOnNotifications,
 } from "@/lib/alerts/notify";
 import { toast } from "@/lib/alerts/toast";
+import { Switch } from "../ui/ui";
 
 /** Turns system notifications on or off, or says why they can't be. */
 export function NotificationSwitch() {
@@ -42,21 +43,7 @@ export function NotificationSwitch() {
         </p>
       </div>
       {supported && (
-        <button
-          type="button"
-          role="switch"
-          aria-checked={on}
-          aria-labelledby="notifications-label"
-          aria-describedby="notifications-hint"
-          onClick={toggle}
-          className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${
-            on ? "bg-accent-solid" : "bg-line"
-          }`}
-        >
-          <span
-            className={`inline-block size-5 rounded-full bg-white shadow-sm transition ${on ? "translate-x-6" : "translate-x-1"}`}
-          />
-        </button>
+        <Switch checked={on} onChange={toggle} labelledBy="notifications-label" describedBy="notifications-hint" />
       )}
     </div>
   );

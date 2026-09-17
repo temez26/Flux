@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { EXPIRY_OPTIONS, errorMessage, updateTransfer } from "@/lib/api";
 import { encode } from "uqr";
 import { copyText } from "@/lib/platform/clipboard";
@@ -9,7 +9,7 @@ import { reloadTransfer, useNow, useOwned } from "@/lib/hooks";
 import { saveOwned } from "@/lib/storage/owned";
 import { toast } from "@/lib/alerts/toast";
 import { ClockIcon, GlobeIcon, LinkIcon, LockIcon, QrIcon } from "../ui/icons";
-import { Badge, Button, Card } from "../ui/ui";
+import { Badge, Button, Card, Switch } from "../ui/ui";
 
 function QrCode({ text }: { text: string }) {
   const { path, size } = useMemo(() => {
@@ -37,12 +37,15 @@ export function ShareCard({
   expiresAt,
   hosted,
   uploading = false,
+  open,
 }: {
   code: string;
   expiresAt?: string;
   hosted?: boolean;
   /** Its files are still uploading, so its lifetime hasn't started counting yet. */
   uploading?: boolean;
+  /** Whether others may add files; absent where that can't be offered. */
+  open?: boolean;
 }) {
   const now = useNow(60_000);
   const [showQr, setShowQr] = useState(false);
@@ -75,6 +78,23 @@ export function ShareCard({
       toast(uploading ? `Kept for ${label} after the upload` : `Kept for ${label} from now`);
     } catch (err) {
       toast(errorMessage(err), "err");
+    }
+  }
+
+  const [opening, setOpening] = useState(false);
+  const openId = useId();
+
+  async function setOpen(value: boolean) {
+    if (!owned) return;
+    setOpening(true);
+    try {
+      await updateTransfer(code, owned.token, { open: value });
+      reloadTransfer(code);
+      toast(value ? "Anyone can add files now" : "Only you can add files now");
+    } catch (err) {
+      toast(errorMessage(err), "err");
+    } finally {
+      setOpening(false);
     }
   }
 
@@ -134,6 +154,27 @@ export function ShareCard({
           <QrCode text={link} />
         </div>
       </div>
+      {owned && open !== undefined && (
+        <div className="mt-4 flex items-center gap-3 border-t border-line pt-4">
+          <div className="min-w-0 flex-1">
+            <p id={`${openId}-label`} className="text-sm font-medium">
+              Let others add files
+            </p>
+            <p id={`${openId}-hint`} className="text-xs text-muted">
+              {open
+                ? "Anyone who opens this share can add their files to it."
+                : "Only you can add files. Turn on to let anyone who opens it add theirs."}
+            </p>
+          </div>
+          <Switch
+            checked={open}
+            onChange={setOpen}
+            disabled={opening}
+            labelledBy={`${openId}-label`}
+            describedBy={`${openId}-hint`}
+          />
+        </div>
+      )}
     </Card>
   );
 }

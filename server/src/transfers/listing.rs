@@ -18,12 +18,14 @@ const PUBLIC_LIST_MAX: i64 = 500;
 const LIKE_ESCAPE: char = '!';
 
 const SUMMARY_SQL: &str =
-    "SELECT t.code, t.title, t.created_at, t.expires_at, t.lifetime, t.hosted, t.collect, t.downloads, t.closed,
+    "SELECT t.code, t.title, t.created_at, t.expires_at, t.lifetime, t.hosted, t.open, t.downloads,
         t.note IS NOT NULL AS note,
         count(f.idx) AS files,
         CASE WHEN t.note IS NULL THEN coalesce(sum(f.size), 0) ELSE octet_length(t.note) END::bigint AS size,
-        -- Nothing is pending for a hosted transfer: its bytes were never coming here.
-        t.hosted OR count(f.idx) = count(f.hash) AS complete
+        -- Nothing is pending for a hosted transfer: its bytes were never coming here. What others
+        -- are still adding to an open share doesn't make the owner's share incomplete.
+        t.hosted OR count(f.idx) FILTER (WHERE f.upload_token_hash IS NULL)
+          = count(f.hash) FILTER (WHERE f.upload_token_hash IS NULL) AS complete
      FROM transfers t LEFT JOIN files f ON f.transfer_id = t.id";
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -35,9 +37,8 @@ pub struct Summary {
     expires_at: DateTime<Utc>,
     lifetime: Option<i32>,
     hosted: bool,
-    collect: bool,
+    open: bool,
     downloads: i32,
-    closed: bool,
     /// A text transfer rather than files.
     note: bool,
     files: i64,

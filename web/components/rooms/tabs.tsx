@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
-import { DeviceIcon, FolderIcon, GlobeIcon, TextIcon, type IconProps } from "../ui/icons";
+import { DeviceIcon, GlobeIcon, TextIcon, type IconProps } from "../ui/icons";
 
-export type TabId = "public" | "device" | "text" | "collect";
+export type TabId = "public" | "device" | "text";
 
 /** A way to share, chosen from the tabs at the top of the home page. */
 export interface ShareTab {
@@ -34,13 +34,6 @@ export const TABS: ShareTab[] = [
     name: "Text",
     summary: "Share a note, link or password, to read or to edit together.",
     Icon: TextIcon,
-  },
-  {
-    id: "collect",
-    path: "/collect",
-    name: "Collect",
-    summary: "Get a link other people use to send files to you.",
-    Icon: FolderIcon,
   },
 ];
 
