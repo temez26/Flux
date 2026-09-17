@@ -29,6 +29,7 @@ export function getNearby(): Nearby {
         `${offer.from.name} wants to send you ${offer.files ? "files" : "text"}`,
         `${offer.title} · ${offerDetail(offer)}`,
         `offer-${offer.code}`,
+        `/${formatCode(offer.code)}`,
       ),
   ));
 }

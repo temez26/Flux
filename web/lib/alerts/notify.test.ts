@@ -77,6 +77,12 @@ test("asks for permission when turned on, and then notifies", async () => {
   ]);
 });
 
+test("carries where tapping it should go", async () => {
+  await turnOnNotifications();
+  await notify("Tablet wants to send you files", "photo.jpg", "offer-abcd", "/abcd-efgh");
+  assert.deepEqual(shown[0].options.data, { url: "/abcd-efgh" });
+});
+
 test("says nothing to a page that is being looked at", async () => {
   await turnOnNotifications();
   visibility = "visible";

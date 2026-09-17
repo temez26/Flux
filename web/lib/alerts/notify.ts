@@ -42,10 +42,13 @@ export function turnOffNotifications() {
   remember("off");
 }
 
-/** `tag` replaces an earlier notification about the same thing rather than stacking another. */
-export async function notify(title: string, body?: string, tag?: string) {
+/**
+ * `tag` replaces an earlier notification about the same thing rather than stacking another.
+ * `url` is where tapping it goes when Flux is no longer open.
+ */
+export async function notify(title: string, body?: string, tag?: string, url?: string) {
   if (document.visibilityState === "visible" || !notificationsOn()) return;
-  const options: NotificationOptions = { body, tag, icon: ICON };
+  const options: NotificationOptions = { body, tag, icon: ICON, ...(url && { data: { url } }) };
   try {
     // Android refuses the Notification constructor outright; only a service worker may show one.
     const registration = await navigator.serviceWorker?.getRegistration();
