@@ -53,7 +53,8 @@ export class Signal {
       }
     };
     ws.onclose = () => {
-      if (!this.closed) this.timer = window.setTimeout(() => this.connect(), Math.min(10_000, 500 * 2 ** this.attempts++));
+      if (!this.closed)
+        this.timer = window.setTimeout(() => this.connect(), Math.min(10_000, 500 * 2 ** this.attempts++));
     };
   }
 }

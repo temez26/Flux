@@ -14,5 +14,9 @@ test("tells several pasted screenshots apart, and leaves a real file name alone"
     [new File(["a"], "image.png"), new File(["b"], "image.png"), new File(["c"], "report.pdf")],
     when,
   ).map((p) => p.path);
-  assert.deepEqual(paths, ["Pasted image 2026-09-17 at 14.03.07 (1).png", "Pasted image 2026-09-17 at 14.03.07.png", "report.pdf"]);
+  assert.deepEqual(paths, [
+    "Pasted image 2026-09-17 at 14.03.07 (1).png",
+    "Pasted image 2026-09-17 at 14.03.07.png",
+    "report.pdf",
+  ]);
 });

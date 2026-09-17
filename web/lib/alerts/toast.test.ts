@@ -43,5 +43,8 @@ test("dismissing one leaves the others", () => {
   toast("first");
   toast("second");
   toasts.dismiss(toasts.list[0].id);
-  assert.deepEqual(toasts.list.map((t) => t.message), ["second"]);
+  assert.deepEqual(
+    toasts.list.map((t) => t.message),
+    ["second"],
+  );
 });

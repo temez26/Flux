@@ -28,7 +28,9 @@ export default function App() {
   // matches the current page background and follows the system light/dark switch.
   useEffect(() => {
     const dark = window.matchMedia("(prefers-color-scheme: dark)");
-    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]:not([media])') ?? document.createElement("meta");
+    const meta =
+      document.querySelector<HTMLMetaElement>('meta[name="theme-color"]:not([media])') ??
+      document.createElement("meta");
     if (!meta.isConnected) {
       meta.name = "theme-color";
       document.head.prepend(meta);
@@ -50,7 +52,12 @@ export default function App() {
   if (mounted) {
     if (code) view = <TransferView key={code} code={code} />;
     else if (path === "/") view = <Home />;
-    else view = <Message icon={<AlertIcon />} title="Nothing here">Check the link or code and try again.</Message>;
+    else
+      view = (
+        <Message icon={<AlertIcon />} title="Nothing here">
+          Check the link or code and try again.
+        </Message>
+      );
   }
 
   return (

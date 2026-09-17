@@ -33,10 +33,14 @@ beforeEach(() => {
     }
   }
 
-  const define = (name: string, value: unknown) => Object.defineProperty(globalThis, name, { value, configurable: true });
+  const define = (name: string, value: unknown) =>
+    Object.defineProperty(globalThis, name, { value, configurable: true });
   define("Notification", FakeNotification);
   define("window", Object.assign(globalThis, { isSecureContext: true }));
-  define("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) });
+  define("localStorage", {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => store.set(k, v),
+  });
   define("document", {
     get visibilityState() {
       return visibility;
@@ -45,7 +49,12 @@ beforeEach(() => {
   define("navigator", {
     serviceWorker: {
       getRegistration: async () =>
-        worker ? { showNotification: async (title: string, options: NotificationOptions) => void shown.push({ title, options, via: "worker" }) } : undefined,
+        worker
+          ? {
+              showNotification: async (title: string, options: NotificationOptions) =>
+                void shown.push({ title, options, via: "worker" }),
+            }
+          : undefined,
     },
   });
 });
@@ -59,7 +68,13 @@ test("asks for permission when turned on, and then notifies", async () => {
   assert.equal(await turnOnNotifications(), true);
   assert.equal(notificationsOn(), true);
   await notify("Upload finished", "abcd-efgh is ready", "upload-abcd");
-  assert.deepEqual(shown, [{ title: "Upload finished", options: { body: "abcd-efgh is ready", tag: "upload-abcd", icon: "/icons/icon-192.png" }, via: "worker" }]);
+  assert.deepEqual(shown, [
+    {
+      title: "Upload finished",
+      options: { body: "abcd-efgh is ready", tag: "upload-abcd", icon: "/icons/icon-192.png" },
+      via: "worker",
+    },
+  ]);
 });
 
 test("says nothing to a page that is being looked at", async () => {
@@ -81,7 +96,10 @@ test("goes through the service worker where there is one, since Android allows n
 });
 
 test("reports a refusal rather than pretending", async () => {
-  Object.defineProperty(globalThis.Notification, "requestPermission", { value: async () => (permission = "denied"), configurable: true });
+  Object.defineProperty(globalThis.Notification, "requestPermission", {
+    value: async () => (permission = "denied"),
+    configurable: true,
+  });
   assert.equal(await turnOnNotifications(), false);
   await notify("anything");
   assert.equal(shown.length, 0);
@@ -96,6 +114,9 @@ test("can be turned off again without giving up the permission", async () => {
 });
 
 test("offers nothing where the page isn't a secure context", async () => {
-  Object.defineProperty(globalThis, "window", { value: Object.assign(globalThis, { isSecureContext: false }), configurable: true });
+  Object.defineProperty(globalThis, "window", {
+    value: Object.assign(globalThis, { isSecureContext: false }),
+    configurable: true,
+  });
   assert.equal(await turnOnNotifications(), false);
 });

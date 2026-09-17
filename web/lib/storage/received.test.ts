@@ -24,7 +24,11 @@ test("remembers nothing until something is saved", () => {
 test("accumulates files across separate downloads", () => {
   markReceived("abcdefgh", hour(), [3]);
   markReceived("abcdefgh", hour(), [7, 3]);
-  assert.deepEqual([...getReceived("abcdefgh")].sort((a, b) => a - b), [3, 7], "no duplicates");
+  assert.deepEqual(
+    [...getReceived("abcdefgh")].sort((a, b) => a - b),
+    [3, 7],
+    "no duplicates",
+  );
 });
 
 test("keeps transfers apart", () => {

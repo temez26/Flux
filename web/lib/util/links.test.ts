@@ -21,9 +21,16 @@ test("text with no link is one piece, and empty text none", () => {
 });
 
 test("only plain web addresses count", () => {
-  assert.deepEqual(linkify("ftp://x and javascript:alert(1) and example.com"), ["ftp://x and javascript:alert(1) and example.com"]);
+  assert.deepEqual(linkify("ftp://x and javascript:alert(1) and example.com"), [
+    "ftp://x and javascript:alert(1) and example.com",
+  ]);
 });
 
 test("several links on several lines", () => {
-  assert.deepEqual(linkify("a http://one.local\nb https://two.local"), ["a ", { url: "http://one.local" }, "\nb ", { url: "https://two.local" }]);
+  assert.deepEqual(linkify("a http://one.local\nb https://two.local"), [
+    "a ",
+    { url: "http://one.local" },
+    "\nb ",
+    { url: "https://two.local" },
+  ]);
 });

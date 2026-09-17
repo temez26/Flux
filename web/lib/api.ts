@@ -92,7 +92,7 @@ export const inlineUrl = (code: string, idx: number) => `${fileUrl(code, idx)}?i
 export function selectionSpec(idxs: number[]): string {
   const sorted = [...new Set(idxs)].sort((a, b) => a - b);
   const ranges: string[] = [];
-  for (let i = 0; i < sorted.length; ) {
+  for (let i = 0; i < sorted.length;) {
     let j = i;
     while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
     ranges.push(i === j ? String(sorted[i]) : `${sorted[i]}-${sorted[j]}`);
@@ -155,7 +155,12 @@ export interface NoteState {
  * Saves edited text, naming the version it was edited from. When someone else saved first the
  * save doesn't happen, and what comes back instead is the text as it now is.
  */
-export async function saveNote(code: string, token: string | undefined, text: string, version: number): Promise<{ saved: NoteState } | { conflict: NoteState }> {
+export async function saveNote(
+  code: string,
+  token: string | undefined,
+  text: string,
+  version: number,
+): Promise<{ saved: NoteState } | { conflict: NoteState }> {
   let res: Response;
   try {
     res = await fetch(`${transferUrl(code)}/note`, {
@@ -229,7 +234,11 @@ export function countDownload(code: string) {
 }
 
 /** Changes a transfer its owner holds the token for; `expiresIn` counts from now. */
-export function updateTransfer(code: string, token: string, changes: { expiresIn?: number; closed?: boolean; editable?: boolean }) {
+export function updateTransfer(
+  code: string,
+  token: string,
+  changes: { expiresIn?: number; closed?: boolean; editable?: boolean },
+) {
   return request<{ expiresAt: string; closed: boolean; editable: boolean }>(transferUrl(code), {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...auth(token) },

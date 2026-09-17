@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { basename } from "@/lib/platform/files";
 import { formatBytes, plural } from "@/lib/util/format";
 import { CheckIcon, FileTypeIcon, GridIcon, ListIcon, SearchIcon } from "../ui/icons";
@@ -142,7 +151,19 @@ function FileGrid({ count, renderTile }: { count: number; renderTile: (index: nu
  * Makes a row or tile a checkbox while the listing is choosing files. The whole cell takes the
  * tap, so a preview or download inside it can't fire by accident.
  */
-function Selectable({ tile, checked, label, onToggle, children }: { tile: boolean; checked: boolean; label: string; onToggle: () => void; children: ReactNode }) {
+function Selectable({
+  tile,
+  checked,
+  label,
+  onToggle,
+  children,
+}: {
+  tile: boolean;
+  checked: boolean;
+  label: string;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
   return (
     <div className={`relative h-full ${tile ? "" : "pl-9"}`}>
       {children}
@@ -213,7 +234,12 @@ export function FileBrowser({
 
   const cell = (index: number, tile: boolean, node: ReactNode) =>
     chosen ? (
-      <Selectable tile={tile} checked={chosen.has(index)} label={`Select ${paths[index]}`} onToggle={() => toggle(index)}>
+      <Selectable
+        tile={tile}
+        checked={chosen.has(index)}
+        label={`Select ${paths[index]}`}
+        onToggle={() => toggle(index)}
+      >
         {node}
       </Selectable>
     ) : (
@@ -234,7 +260,9 @@ export function FileBrowser({
         <div className="flex items-center gap-2">
           <h2 className="flex items-center gap-2 text-sm font-medium">
             Files
-            <Badge>{matches ? `${count.toLocaleString()} of ${paths.length.toLocaleString()}` : count.toLocaleString()}</Badge>
+            <Badge>
+              {matches ? `${count.toLocaleString()} of ${paths.length.toLocaleString()}` : count.toLocaleString()}
+            </Badge>
           </h2>
           {select && (
             <button
@@ -248,7 +276,11 @@ export function FileBrowser({
             </button>
           )}
           {renderTile && (
-            <div role="radiogroup" aria-label="Layout" className={`${select ? "" : "ml-auto "}flex gap-1 rounded-xl border border-line bg-bg p-1`}>
+            <div
+              role="radiogroup"
+              aria-label="Layout"
+              className={`${select ? "" : "ml-auto "}flex gap-1 rounded-xl border border-line bg-bg p-1`}
+            >
               {(
                 [
                   ["list", "List", <ListIcon key="l" className="size-4" />],
@@ -275,12 +307,22 @@ export function FileBrowser({
         </div>
         {chosen && select && (
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-hover p-2 pl-3 text-sm">
-            <span className="font-medium tabular-nums">{chosen.size ? `${chosen.size.toLocaleString()} selected` : "Tap files to select them"}</span>
-            <button type="button" onClick={chooseAll} className="rounded-lg px-2 py-1 text-accent transition hover:bg-surface">
+            <span className="font-medium tabular-nums">
+              {chosen.size ? `${chosen.size.toLocaleString()} selected` : "Tap files to select them"}
+            </span>
+            <button
+              type="button"
+              onClick={chooseAll}
+              className="rounded-lg px-2 py-1 text-accent transition hover:bg-surface"
+            >
               {matches ? `Select all ${matches.length.toLocaleString()} matching` : "Select all"}
             </button>
             {chosen.size > 0 && (
-              <button type="button" onClick={() => setChosen(new Set())} className="rounded-lg px-2 py-1 text-muted transition hover:bg-surface hover:text-fg">
+              <button
+                type="button"
+                onClick={() => setChosen(new Set())}
+                className="rounded-lg px-2 py-1 text-muted transition hover:bg-surface hover:text-fg"
+              >
                 Clear
               </button>
             )}
@@ -312,7 +354,9 @@ export function FileBrowser({
           : plural(count, "file")}
       </p>
       {count === 0 ? (
-        <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">No files match that search.</p>
+        <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">
+          No files match that search.
+        </p>
       ) : view === "grid" && renderTile ? (
         <FileGrid count={count} renderTile={(position) => cell(at(position), true, renderTile(at(position)))} />
       ) : (
@@ -374,7 +418,11 @@ export function FileRow({
   return (
     <div className="flex h-full items-center gap-3 border-b border-line">
       {onOpen ? (
-        <button type="button" onClick={onOpen} className="group flex h-full min-w-0 flex-1 cursor-pointer items-center gap-3 text-left">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="group flex h-full min-w-0 flex-1 cursor-pointer items-center gap-3 text-left"
+        >
           {details}
         </button>
       ) : (
@@ -404,7 +452,9 @@ export function FileTile({
         {thumb ?? <FileTypeIcon path={path} className="size-7" />}
         {badge && <span className="absolute top-1 right-1">{badge}</span>}
       </span>
-      <span className="mt-1.5 block truncate text-xs font-medium transition-colors group-hover:text-accent">{basename(path)}</span>
+      <span className="mt-1.5 block truncate text-xs font-medium transition-colors group-hover:text-accent">
+        {basename(path)}
+      </span>
       <span className="block truncate text-[11px] text-muted tabular-nums">{formatBytes(size)}</span>
     </>
   );

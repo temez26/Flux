@@ -12,17 +12,52 @@ import { getReceived, markReceived } from "@/lib/storage/received";
 import { memorySink, saveMethod, streamSink, type SaveMethod } from "@/lib/save/save";
 import { singleTarget, zipTarget } from "@/lib/save/zip";
 import { FileBrowser, FileRow } from "../files/FileList";
-import { AlertIcon, BackIcon, CheckIcon, ClockIcon, CloseIcon, DeviceIcon, DownloadIcon, PauseIcon, PlayIcon, ZapIcon } from "../ui/icons";
+import {
+  AlertIcon,
+  BackIcon,
+  CheckIcon,
+  ClockIcon,
+  CloseIcon,
+  DeviceIcon,
+  DownloadIcon,
+  PauseIcon,
+  PlayIcon,
+  ZapIcon,
+} from "../ui/icons";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
-import { Badge, Button, Card, ConfirmButton, IconButton, Notice, ProgressBar, Spinner, StatusCard, buttonClass, type StatusProps } from "../ui/ui";
-import { MetaRow, MetaTile, Pinned, SelectionDownload, TransferHeading, inFlight, pageTitle, percent, subscribeNothing, summarize, useRememberRecent, versionZero } from "./common";
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmButton,
+  IconButton,
+  Notice,
+  ProgressBar,
+  Spinner,
+  StatusCard,
+  buttonClass,
+  type StatusProps,
+} from "../ui/ui";
+import {
+  MetaRow,
+  MetaTile,
+  Pinned,
+  SelectionDownload,
+  TransferHeading,
+  inFlight,
+  pageTitle,
+  percent,
+  subscribeNothing,
+  summarize,
+  useRememberRecent,
+  versionZero,
+} from "./common";
 
 function checksumsUrl(meta: TransferMeta): string {
   // b3sum-compatible, so a download can be verified with `b3sum -c`.
   const lines = meta.files.filter((f) => f.hash).map((f) => `${f.hash}  ${f.path}\n`);
   return URL.createObjectURL(new Blob(lines, { type: "text/plain" }));
 }
-
 
 /** What someone who opened a code sees before they start downloading. */
 export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
@@ -88,7 +123,11 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
         if (!next.finished) return;
         stop();
         if (next.error) return;
-        markReceived(meta.code, meta.expiresAt, files.map((f) => f.idx));
+        markReceived(
+          meta.code,
+          meta.expiresAt,
+          files.map((f) => f.idx),
+        );
         setSaved(getReceived(meta.code));
       });
       next.start();
@@ -122,7 +161,9 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
 
         {viaDirect && (
           <Notice tone="ok" icon={<ZapIcon />} className="mt-4">
-            {meta.hosted ? "Connected to the sender. These files come straight from their device." : "The sender is online, so files come straight from their device."}
+            {meta.hosted
+              ? "Connected to the sender. These files come straight from their device."
+              : "The sender is online, so files come straight from their device."}
           </Notice>
         )}
         {tooLargeHere && (
@@ -134,15 +175,23 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
         )}
         {remaining.length > 0 && remaining.length < meta.files.length && (
           <Notice tone="ok" icon={<CheckIcon />} className="mt-4">
-            {plural(meta.files.length - remaining.length, "file")} of {meta.files.length.toLocaleString()} already saved on this
-            device.{" "}
-            <button type="button" onClick={() => startDirect(remaining)} disabled={!viaDirect} className="font-medium underline disabled:no-underline disabled:opacity-60">
+            {plural(meta.files.length - remaining.length, "file")} of {meta.files.length.toLocaleString()} already saved
+            on this device.{" "}
+            <button
+              type="button"
+              onClick={() => startDirect(remaining)}
+              disabled={!viaDirect}
+              className="font-medium underline disabled:no-underline disabled:opacity-60"
+            >
               Download the remaining {remaining.length.toLocaleString()}
             </button>
           </Notice>
         )}
         {senderMissing && !tooLargeHere && (
-          <Notice icon={unreachable ? <AlertIcon className="text-warn" /> : <Spinner className="text-accent" />} className="mt-4">
+          <Notice
+            icon={unreachable ? <AlertIcon className="text-warn" /> : <Spinner className="text-accent" />}
+            className="mt-4"
+          >
             {unreachable
               ? "Couldn't reach the sender's device. These files were never uploaded, so they can only come from there."
               : "Waiting for the sender. Nothing was uploaded, so their page has to be open for this to arrive."}
@@ -157,14 +206,20 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
             </div>
             <ProgressBar value={size ? received / size : 0} />
             <p className="mt-2 text-xs text-muted">
-              {complete.toLocaleString()} of {plural(meta.files.length, "file")} ready. Uploaded files can already be downloaded below.
+              {complete.toLocaleString()} of {plural(meta.files.length, "file")} ready. Uploaded files can already be
+              downloaded below.
             </p>
           </div>
         )}
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
           {meta.hosted ? (
-            <Button variant="primary" className={primary} onClick={() => startDirect(meta.files)} disabled={!viaDirect || tooLargeHere}>
+            <Button
+              variant="primary"
+              className={primary}
+              onClick={() => startDirect(meta.files)}
+              disabled={!viaDirect || tooLargeHere}
+            >
               {label}
             </Button>
           ) : viaDirect ? (
@@ -200,8 +255,12 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
             {error}
           </Notice>
         )}
-        {!single && (ready || viaDirect) && <p className="mt-3 text-xs text-muted">Everything downloads as one .zip file.</p>}
-        {single && canPreview(single) && <InlinePreview code={meta.code} file={single} onExpand={() => setPreviewing(single.idx)} />}
+        {!single && (ready || viaDirect) && (
+          <p className="mt-3 text-xs text-muted">Everything downloads as one .zip file.</p>
+        )}
+        {single && canPreview(single) && (
+          <InlinePreview code={meta.code} file={single} onExpand={() => setPreviewing(single.idx)} />
+        )}
       </Card>
       {!single &&
         (meta.hosted ? (
@@ -233,7 +292,12 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
               />
             )}
             select={(indices) => (
-              <Button variant="primary" className="min-h-9" disabled={!viaDirect} onClick={() => startDirect(indices.map((i) => meta.files[i]))}>
+              <Button
+                variant="primary"
+                className="min-h-9"
+                disabled={!viaDirect}
+                onClick={() => startDirect(indices.map((i) => meta.files[i]))}
+              >
                 <DownloadIcon className="size-4" />
                 {indices.length === 1 ? "Download" : `Download ${indices.length.toLocaleString()} as .zip`}
               </Button>
@@ -242,9 +306,13 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
         ) : (
           <FileBrowser
             paths={paths}
-            renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable counted onPreview={setPreviewing} />}
+            renderRow={(i) => (
+              <MetaRow file={meta.files[i]} code={meta.code} downloadable counted onPreview={setPreviewing} />
+            )}
             renderTile={(i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />}
-            select={(indices) => <SelectionDownload code={meta.code} files={indices.map((i) => meta.files[i])} counted />}
+            select={(indices) => (
+              <SelectionDownload code={meta.code} files={indices.map((i) => meta.files[i])} counted />
+            )}
           />
         ))}
       <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />
@@ -254,11 +322,22 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
 
 function receivingStatus(receiver: Receiver): StatusProps {
   const { finished, paused, error } = receiver;
-  if (finished && !error) return { tone: "ok", icon: <CheckIcon />, title: "Download complete", subtitle: "Saved to your downloads. Every file was verified." };
+  if (finished && !error)
+    return {
+      tone: "ok",
+      icon: <CheckIcon />,
+      title: "Download complete",
+      subtitle: "Saved to your downloads. Every file was verified.",
+    };
   if (error === "Canceled") return { tone: "muted", icon: <CloseIcon />, title: "Download canceled" };
   if (error) return { tone: "err", icon: <AlertIcon />, title: "Download failed", subtitle: error };
   if (paused) return { tone: "warn", icon: <PauseIcon />, title: "Paused", subtitle: "Resume to continue." };
-  return { tone: "accent", icon: <Spinner className="size-5" />, title: "Downloading", subtitle: "Keep this page open until it finishes." };
+  return {
+    tone: "accent",
+    icon: <Spinner className="size-5" />,
+    title: "Downloading",
+    subtitle: "Keep this page open until it finishes.",
+  };
 }
 
 function ReceivingPanel({ receiver, meta, onBack }: { receiver: Receiver; meta: TransferMeta; onBack: () => void }) {
@@ -274,7 +353,11 @@ function ReceivingPanel({ receiver, meta, onBack }: { receiver: Receiver; meta: 
   const paths = useMemo(() => receiver.items.map((i) => i.path), [receiver]);
   useWakeLock(running);
   useLeaveGuard(!finished);
-  useNotifyWhen(finished && !receiver.error, "Download complete", `${plural(receiver.items.length, "file")} saved and verified`);
+  useNotifyWhen(
+    finished && !receiver.error,
+    "Download complete",
+    `${plural(receiver.items.length, "file")} saved and verified`,
+  );
   useNotifyWhen(finished && !!receiver.error && receiver.error !== "Canceled", "Download failed", receiver.error);
   useTitle(running ? `${percent(received, total)}% downloaded · Flux` : undefined);
 
@@ -283,7 +366,10 @@ function ReceivingPanel({ receiver, meta, onBack }: { receiver: Receiver; meta: 
     ["Received", `${formatBytes(received)} / ${formatBytes(total)}`],
   ];
   if (running) {
-    stats.push(["Speed", speed > 0 ? `${formatBytes(speed)}/s` : "–"], ["Time left", speed > 0 ? formatDuration((total - received) / speed) : "–"]);
+    stats.push(
+      ["Speed", speed > 0 ? `${formatBytes(speed)}/s` : "–"],
+      ["Time left", speed > 0 ? formatDuration((total - received) / speed) : "–"],
+    );
   }
 
   return (
@@ -316,7 +402,9 @@ function ReceivingPanel({ receiver, meta, onBack }: { receiver: Receiver; meta: 
             </Badge>
           </div>
         )}
-        {finished && single && previewable.has(single.idx) && <InlinePreview code={meta.code} file={single} onExpand={() => setPreviewing(single.idx)} />}
+        {finished && single && previewable.has(single.idx) && (
+          <InlinePreview code={meta.code} file={single} onExpand={() => setPreviewing(single.idx)} />
+        )}
       </StatusCard>
       <Pinned title="Now receiving">
         {inFlight(receiver.items, finished).map((item) => (
@@ -325,7 +413,12 @@ function ReceivingPanel({ receiver, meta, onBack }: { receiver: Receiver; meta: 
       </Pinned>
       <FileBrowser
         paths={paths}
-        renderRow={(i) => <ReceiveRow item={receiver.items[i]} onPreview={previewable.has(receiver.items[i].idx) ? () => setPreviewing(receiver.items[i].idx) : undefined} />}
+        renderRow={(i) => (
+          <ReceiveRow
+            item={receiver.items[i]}
+            onPreview={previewable.has(receiver.items[i].idx) ? () => setPreviewing(receiver.items[i].idx) : undefined}
+          />
+        )}
       />
       <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />
     </div>

@@ -143,7 +143,9 @@ export class DirectHost extends Observable {
     try {
       if (msg.data.sdp?.type === "offer") {
         this.peers.get(from)?.pc.close();
-        const peer = createPeer(await iceServers(), (candidate) => this.signal.send({ t: "signal", to: from, data: { candidate } }));
+        const peer = createPeer(await iceServers(), (candidate) =>
+          this.signal.send({ t: "signal", to: from, data: { candidate } }),
+        );
         this.peers.set(from, peer);
         peer.pc.ondatachannel = (e) => this.serve(e.channel, frameSize(peer.pc));
         await peer.signal(msg.data);
@@ -174,7 +176,8 @@ export class DirectHost extends Observable {
           if (req.t === "get") await this.sendRange(channel, req, hashes, frame);
           else await this.sendHash(channel, req, hashes);
         } catch (err) {
-          if (channel.readyState === "open") channel.send(JSON.stringify({ t: "error", id: req.id, message: failure(err) }));
+          if (channel.readyState === "open")
+            channel.send(JSON.stringify({ t: "error", id: req.id, message: failure(err) }));
         }
       }
       draining = false;
@@ -212,14 +215,17 @@ export class DirectHost extends Observable {
     const data = new Uint8Array(await file.slice(req.offset, end).arrayBuffer());
 
     let running = hashes.get(req.idx);
-    if (!running && req.offset === 0) hashes.set(req.idx, (running = { hasher: createHasher(), pos: 0, hashing: Promise.resolve() }));
+    if (!running && req.offset === 0)
+      hashes.set(req.idx, (running = { hasher: createHasher(), pos: 0, hashing: Promise.resolve() }));
     if (running?.pos === req.offset) {
       const started = running;
       started.pos = end;
       // The digest is only wanted if the receiver asks for one later, so it is built
       // alongside the frames rather than ahead of them. Chaining keeps the bytes in order;
       // a failure drops the running hash, and any later request re-reads the file for it.
-      started.hashing = started.hashing.then(() => started.hasher.update(data)).catch(() => void hashes.delete(req.idx));
+      started.hashing = started.hashing
+        .then(() => started.hasher.update(data))
+        .catch(() => void hashes.delete(req.idx));
     }
 
     const payload = frame - HEADER;
@@ -236,11 +242,7 @@ export class DirectHost extends Observable {
     this.changed();
   }
 
-  private async sendHash(
-    channel: RTCDataChannel,
-    req: Extract<Request, { t: "hash" }>,
-    hashes: Map<number, Running>,
-  ) {
+  private async sendHash(channel: RTCDataChannel, req: Extract<Request, { t: "hash" }>, hashes: Map<number, Running>) {
     const file = this.file(req.idx);
     if (!file) throw new Error("This file isn't available from the sender");
     const running = hashes.get(req.idx) ?? { hasher: createHasher(), pos: 0, hashing: Promise.resolve() };

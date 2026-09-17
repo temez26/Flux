@@ -21,5 +21,9 @@ export function navigate(path: string, replace = false) {
 }
 
 export function usePath(): string {
-  return useSyncExternalStore(subscribe, () => window.location.pathname, () => "/");
+  return useSyncExternalStore(
+    subscribe,
+    () => window.location.pathname,
+    () => "/",
+  );
 }

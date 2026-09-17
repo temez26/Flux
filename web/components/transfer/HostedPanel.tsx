@@ -11,7 +11,13 @@ import { Badge, ConfirmButton, StatusCard, type StatusProps } from "../ui/ui";
 import { pageTitle, removeTransfer } from "./common";
 
 function hostedStatus(serving: number, sent: number, expired: boolean): StatusProps {
-  if (expired) return { tone: "err", icon: <AlertIcon />, title: "Link expired", subtitle: "The code no longer works. Send the files again to share them." };
+  if (expired)
+    return {
+      tone: "err",
+      icon: <AlertIcon />,
+      title: "Link expired",
+      subtitle: "The code no longer works. Send the files again to share them.",
+    };
   if (serving > 0) {
     return {
       tone: "accent",
@@ -74,7 +80,13 @@ export function HostedPanel({ session, expiresAt }: { session: Session; expiresA
       </StatusCard>
       <FileBrowser
         paths={paths}
-        renderRow={(i) => <FileRow path={entries[i].path} size={entries[i].size} badge={<Badge icon={<DeviceIcon />}>On this device</Badge>} />}
+        renderRow={(i) => (
+          <FileRow
+            path={entries[i].path}
+            size={entries[i].size}
+            badge={<Badge icon={<DeviceIcon />}>On this device</Badge>}
+          />
+        )}
       />
     </div>
   );

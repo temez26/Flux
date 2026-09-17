@@ -1,4 +1,12 @@
-import { appendFiles, createCollection, createNote, createTransfer, deleteFile, type NewFile, type TransferMeta } from "../api";
+import {
+  appendFiles,
+  createCollection,
+  createNote,
+  createTransfer,
+  deleteFile,
+  type NewFile,
+  type TransferMeta,
+} from "../api";
 import { getDevice } from "../nearby/device";
 import { DirectHost } from "./direct";
 import { basename, uniquePaths, type Picked } from "../platform/files";
@@ -25,7 +33,12 @@ export interface Session {
 /** Transfers started in this tab. They keep running while the user moves between views. */
 export const live = new Map<string, Session>();
 
-const describe = ({ path, file }: Picked): NewFile => ({ path, size: file.size, type: file.type, modified: file.lastModified || null });
+const describe = ({ path, file }: Picked): NewFile => ({
+  path,
+  size: file.size,
+  type: file.type,
+  modified: file.lastModified || null,
+});
 
 function start(code: string, token: string, entries: Entry[], hosted: boolean): Session {
   const uploader = hosted ? undefined : new Uploader(code, token, entries);
@@ -51,12 +64,7 @@ function start(code: string, token: string, entries: Entry[], hosted: boolean): 
 
 export async function send(picked: Picked[], expiresIn: number, isPublic: boolean, hosted: boolean): Promise<string> {
   const files = uniquePaths(picked);
-  const created = await createTransfer(
-    files.map(describe),
-    expiresIn,
-    isPublic,
-    hosted,
-  );
+  const created = await createTransfer(files.map(describe), expiresIn, isPublic, hosted);
   saveOwned(created.code, {
     token: created.token,
     expiresAt: created.expiresAt,
@@ -104,7 +112,14 @@ export async function sendNote(text: string, editable: boolean, expiresIn: numbe
 /** Opens a collection for other people to send files into, and returns its code. */
 export async function collect(expiresIn: number, title?: string): Promise<string> {
   const created = await createCollection(expiresIn, title);
-  saveOwned(created.code, { token: created.token, expiresAt: created.expiresAt, collect: true, count: 0, size: 0, createdAt: Date.now() });
+  saveOwned(created.code, {
+    token: created.token,
+    expiresAt: created.expiresAt,
+    collect: true,
+    count: 0,
+    size: 0,
+    createdAt: Date.now(),
+  });
   return created.code;
 }
 
@@ -121,7 +136,12 @@ export async function contribute(code: string, picked: Picked[]): Promise<Upload
   const existing = contributions.get(code);
   const current = existing && !existing.gone ? existing : undefined;
   const { files: added, token } = await appendFiles(code, current?.token, files.map(describe), getDevice().name);
-  const entries: Entry[] = added.map((f, i) => ({ idx: f.idx, path: f.path, size: files[i].file.size, file: files[i].file }));
+  const entries: Entry[] = added.map((f, i) => ({
+    idx: f.idx,
+    path: f.path,
+    size: files[i].file.size,
+    file: files[i].file,
+  }));
   if (current) {
     current.add(entries);
     return current;
@@ -142,11 +162,20 @@ export async function contribute(code: string, picked: Picked[]): Promise<Upload
 export async function addFiles(code: string, token: string, picked: Picked[], meta?: TransferMeta): Promise<Session> {
   const files = uniquePaths(picked);
   const { files: added } = await appendFiles(code, token, files.map(describe));
-  const entries: Entry[] = added.map((f, i) => ({ idx: f.idx, path: f.path, size: files[i].file.size, file: files[i].file }));
+  const entries: Entry[] = added.map((f, i) => ({
+    idx: f.idx,
+    path: f.path,
+    size: files[i].file.size,
+    file: files[i].file,
+  }));
 
   const owned = getOwned(code);
   if (owned) {
-    saveOwned(code, { ...owned, count: owned.count + entries.length, size: owned.size + entries.reduce((sum, e) => sum + e.size, 0) });
+    saveOwned(code, {
+      ...owned,
+      count: owned.count + entries.length,
+      size: owned.size + entries.reduce((sum, e) => sum + e.size, 0),
+    });
   }
 
   const session = live.get(code);
@@ -190,7 +219,7 @@ export function matchPicked(meta: TransferMeta, picked: Picked[]): Match {
   const entries = meta.files.map((f) => {
     const done = f.hash !== null;
     const exact = byPath.get(f.path);
-    const file = done ? undefined : (exact?.size === f.size ? exact : byName.get(`${basename(f.path)}\n${f.size}`));
+    const file = done ? undefined : exact?.size === f.size ? exact : byName.get(`${basename(f.path)}\n${f.size}`);
     if (done) complete++;
     else if (file) matched++;
     else missing.push(f.path);

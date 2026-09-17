@@ -108,7 +108,7 @@ function centralRecords(bytes: Uint8Array) {
 /** The payload of the ZIP64 extended-information field, or undefined when there isn't one. */
 function zip64Extra(extra: Uint8Array): Uint8Array | undefined {
   const v = view(extra);
-  for (let i = 0; i + 4 <= extra.length; ) {
+  for (let i = 0; i + 4 <= extra.length;) {
     const id = v.getUint16(i, true);
     const size = v.getUint16(i + 2, true);
     if (id === ZIP64_EXTRA_ID) return extra.subarray(i + 4, i + 4 + size);
@@ -175,10 +175,12 @@ test("puts the CRC in a descriptor after the payload", async () => {
 });
 
 test("end record points at the real central directory", async () => {
-  const bytes = (await archive([
-    { path: "one", body: utf8("1") },
-    { path: "two", body: utf8("22") },
-  ])).bytes();
+  const bytes = (
+    await archive([
+      { path: "one", body: utf8("1") },
+      { path: "two", body: utf8("22") },
+    ])
+  ).bytes();
   const records = centralRecords(bytes);
   assert.equal(records.length, 2);
 
@@ -190,7 +192,11 @@ test("end record points at the real central directory", async () => {
   assert.equal(v.getUint16(eocd + 8, true), 2, "entries on this disk");
   assert.equal(v.getUint16(eocd + 10, true), 2, "entries in total");
   assert.equal(offset, records[0].at, "directory starts at the first record");
-  assert.equal(size, records.reduce((n, r) => n + r.length, 0), "directory covers both records");
+  assert.equal(
+    size,
+    records.reduce((n, r) => n + r.length, 0),
+    "directory covers both records",
+  );
   assert.equal(offset + size, eocd, "and runs right up to the end record");
 });
 

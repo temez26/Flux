@@ -16,7 +16,10 @@ beforeEach(() => {
 test("lists what was opened, most recent first", () => {
   rememberRecent("aaaaaaaa", transfer("first"), 1);
   rememberRecent("bbbbbbbb", transfer("second"), 2);
-  assert.deepEqual(listRecent().map(([code]) => code), ["bbbbbbbb", "aaaaaaaa"]);
+  assert.deepEqual(
+    listRecent().map(([code]) => code),
+    ["bbbbbbbb", "aaaaaaaa"],
+  );
 });
 
 test("opening one again moves it to the top rather than listing it twice", () => {
@@ -43,7 +46,10 @@ test("keeps only the latest twenty", () => {
 test("forgets a transfer once it has expired", () => {
   rememberRecent("gone0000", transfer("expired", inHours(-1)), 1);
   rememberRecent("here0000", transfer("current"), 2);
-  assert.deepEqual(listRecent().map(([code]) => code), ["here0000"]);
+  assert.deepEqual(
+    listRecent().map(([code]) => code),
+    ["here0000"],
+  );
 });
 
 test("forgets one, or all of them, and says so to whoever follows", () => {
@@ -53,7 +59,10 @@ test("forgets one, or all of them, and says so to whoever follows", () => {
   rememberRecent("aaaaaaaa", transfer("a"), 1);
   rememberRecent("bbbbbbbb", transfer("b"), 2);
   forgetRecent("aaaaaaaa");
-  assert.deepEqual(listRecent().map(([code]) => code), ["bbbbbbbb"]);
+  assert.deepEqual(
+    listRecent().map(([code]) => code),
+    ["bbbbbbbb"],
+  );
   clearRecent();
   assert.deepEqual(listRecent(), []);
   assert.equal(heard, 4);

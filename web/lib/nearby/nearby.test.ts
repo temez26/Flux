@@ -78,10 +78,17 @@ test("keeps the list of devices current", () => {
   assert.deepEqual(client.peers, [alice, bob]);
 
   sockets[0].push({ t: "peer", device: "bob", name: "Kitchen iPad" });
-  assert.deepEqual(client.peers.map((p) => p.name), ["Alice's Mac", "Kitchen iPad"], "a rename replaces, not adds");
+  assert.deepEqual(
+    client.peers.map((p) => p.name),
+    ["Alice's Mac", "Kitchen iPad"],
+    "a rename replaces, not adds",
+  );
 
   sockets[0].push({ t: "gone", device: "alice" });
-  assert.deepEqual(client.peers.map((p) => p.device), ["bob"]);
+  assert.deepEqual(
+    client.peers.map((p) => p.device),
+    ["bob"],
+  );
 });
 
 test("forgets who was here when the connection drops, then reconnects and announces again", () => {
@@ -136,7 +143,14 @@ test("offers a transfer to one device by id", () => {
   const client = nearby();
   sockets[0].accept();
   client.offer(bob, { code: "abcdefgh", title: "notes.txt", files: 1, size: 12 });
-  assert.deepEqual(sockets[0].sent.at(-1), { t: "offer", to: "bob", code: "abcdefgh", title: "notes.txt", files: 1, size: 12 });
+  assert.deepEqual(sockets[0].sent.at(-1), {
+    t: "offer",
+    to: "bob",
+    code: "abcdefgh",
+    title: "notes.txt",
+    files: 1,
+    size: 12,
+  });
 });
 
 test("renaming is remembered and announced", () => {

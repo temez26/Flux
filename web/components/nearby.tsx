@@ -12,7 +12,8 @@ import { Button, IconButton } from "./ui/ui";
 let instance: Nearby | undefined;
 
 /** A text transfer is offered with no files, and is described as what it is. */
-const offerDetail = (offer: Offer) => (offer.files ? `${plural(offer.files, "file")} · ${formatBytes(offer.size)}` : "Text");
+const offerDetail = (offer: Offer) =>
+  offer.files ? `${plural(offer.files, "file")} · ${formatBytes(offer.size)}` : "Text";
 
 /** The page's one connection to the other devices, opened the first time anything needs it. */
 export function getNearby(): Nearby {
@@ -21,9 +22,14 @@ export function getNearby(): Nearby {
       const scheme = window.location.protocol === "https:" ? "wss" : "ws";
       return new WebSocket(`${scheme}://${window.location.host}/api/nearby`) as unknown as SocketLike;
     },
-    ({ from, accepted }) => toast(accepted ? `${from.name} is opening it` : `${from.name} declined`, accepted ? "ok" : "err"),
+    ({ from, accepted }) =>
+      toast(accepted ? `${from.name} is opening it` : `${from.name} declined`, accepted ? "ok" : "err"),
     (offer) =>
-      notify(`${offer.from.name} wants to send you ${offer.files ? "files" : "text"}`, `${offer.title} · ${offerDetail(offer)}`, `offer-${offer.code}`),
+      notify(
+        `${offer.from.name} wants to send you ${offer.files ? "files" : "text"}`,
+        `${offer.title} · ${offerDetail(offer)}`,
+        `offer-${offer.code}`,
+      ),
   ));
 }
 
@@ -54,9 +60,7 @@ export function IncomingOffers() {
             <p className="truncate text-sm font-semibold">
               {offer.from.name} wants to send you {offer.title}
             </p>
-            <p className="truncate text-xs text-muted">
-              {offerDetail(offer)}
-            </p>
+            <p className="truncate text-xs text-muted">{offerDetail(offer)}</p>
           </div>
           <Button
             variant="primary"
@@ -67,7 +71,10 @@ export function IncomingOffers() {
           >
             Open
           </Button>
-          <IconButton label={`Decline ${offer.title} from ${offer.from.name}`} onClick={() => nearby.answer(offer, false)}>
+          <IconButton
+            label={`Decline ${offer.title} from ${offer.from.name}`}
+            onClick={() => nearby.answer(offer, false)}
+          >
             <CloseIcon className="size-4" />
           </IconButton>
         </div>
@@ -92,7 +99,11 @@ export function NearbyDevices({ target, onChoose }: { target: Peer | null; onCho
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <p className="text-xs font-medium tracking-wide text-muted uppercase">Send to a nearby device</p>
         {draft === null ? (
-          <button type="button" onClick={() => setDraft(nearby.device.name)} className="text-xs text-muted transition hover:text-fg">
+          <button
+            type="button"
+            onClick={() => setDraft(nearby.device.name)}
+            className="text-xs text-muted transition hover:text-fg"
+          >
             You appear as <span className="font-medium text-fg">{nearby.device.name}</span> · Rename
           </button>
         ) : (

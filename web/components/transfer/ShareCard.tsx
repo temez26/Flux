@@ -20,7 +20,13 @@ function QrCode({ text }: { text: string }) {
   }, [text]);
   // Always dark-on-light: many scanners can't read inverted codes.
   return (
-    <svg viewBox={`-2 -2 ${size + 4} ${size + 4}`} className="size-full rounded-xl bg-white" shapeRendering="crispEdges" role="img" aria-label="QR code for the transfer link">
+    <svg
+      viewBox={`-2 -2 ${size + 4} ${size + 4}`}
+      className="size-full rounded-xl bg-white"
+      shapeRendering="crispEdges"
+      role="img"
+      aria-label="QR code for the transfer link"
+    >
       <path d={path} fill="#000" />
     </svg>
   );
@@ -75,7 +81,12 @@ export function ShareCard({ code, expiresAt, hosted }: { code: string; expiresAt
         {hosted ? (
           <Badge icon={<ClockIcon />}>While this page is open</Badge>
         ) : owned && expires ? (
-          <button type="button" onClick={() => setChoosing(!choosing)} aria-expanded={choosing} className="rounded-full transition hover:brightness-95">
+          <button
+            type="button"
+            onClick={() => setChoosing(!choosing)}
+            aria-expanded={choosing}
+            className="rounded-full transition hover:brightness-95"
+          >
             <Badge icon={<ClockIcon />}>{formatRemaining(expires, now)} · Change</Badge>
           </button>
         ) : (
@@ -101,7 +112,9 @@ export function ShareCard({ code, expiresAt, hosted }: { code: string; expiresAt
               <CopyIcon className="size-5" />
             </IconButton>
           </div>
-          <p className="mt-2 text-sm text-muted">Enter this code on the other device, scan the QR code, or send the link.</p>
+          <p className="mt-2 text-sm text-muted">
+            Enter this code on the other device, scan the QR code, or send the link.
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="primary" onClick={shareLink}>
               <LinkIcon className="size-4" />

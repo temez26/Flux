@@ -55,7 +55,10 @@ test("a second batch joins the first: same token, same queue", async () => {
   const second = await contribute("abcdefgh", picked("c.jpg"));
   assert.equal(second, first, "one upload to follow, not two");
   assert.equal(calls[1].auth, "Bearer issued-token", "and the server is told it's the same person");
-  assert.deepEqual(first.items.map((i) => i.idx), [0, 1]);
+  assert.deepEqual(
+    first.items.map((i) => i.idx),
+    [0, 1],
+  );
 });
 
 test("a collection that closed doesn't swallow a new batch", async () => {

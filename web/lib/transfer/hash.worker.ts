@@ -56,7 +56,10 @@ self.onmessage = (event: MessageEvent<HashRequest>) => {
     try {
       self.postMessage(await handle(req));
     } catch (err) {
-      self.postMessage({ seq: req.seq, error: err instanceof Error ? err.message : "Hashing failed" } satisfies HashReply);
+      self.postMessage({
+        seq: req.seq,
+        error: err instanceof Error ? err.message : "Hashing failed",
+      } satisfies HashReply);
     }
   });
 };

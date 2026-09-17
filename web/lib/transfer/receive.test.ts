@@ -32,7 +32,19 @@ async function transfer(count: number): Promise<TransferMeta> {
       received: 0,
     });
   }
-  return { code: "abcdefgh", title: "", collect: false, downloads: 0, closed: false, editable: false, noteVersion: 0, createdAt: "", expiresAt: "", hosted: true, files };
+  return {
+    code: "abcdefgh",
+    title: "",
+    collect: false,
+    downloads: 0,
+    closed: false,
+    editable: false,
+    noteVersion: 0,
+    createdAt: "",
+    expiresAt: "",
+    hosted: true,
+    files,
+  };
 }
 
 /** A sender that serves each file's bytes, and its digest, straight from memory. */
@@ -134,7 +146,12 @@ test("still checks the integrity of a single file", async () => {
   const meta = await transfer(2);
   const sink = collector();
   // A sender claiming a digest its own bytes don't match.
-  const receiver = new Receiver(meta, peer(async () => "0".repeat(64)), sink.target, new Set([1]));
+  const receiver = new Receiver(
+    meta,
+    peer(async () => "0".repeat(64)),
+    sink.target,
+    new Set([1]),
+  );
   receiver.start();
   await settled(receiver);
 

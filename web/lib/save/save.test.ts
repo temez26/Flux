@@ -23,7 +23,13 @@ const originals = { navigator: globalThis.navigator, fetch: globalThis.fetch, wi
  * A stand-in for sw.js: it takes a download over a port, then answers the matching request
  * by pulling from that port, which is the handshake the probe has to survive.
  */
-function install({ vendor = "Google Inc.", controlled = true, mute = false, missing = false, truncated = false }: Options) {
+function install({
+  vendor = "Google Inc.",
+  controlled = true,
+  mute = false,
+  missing = false,
+  truncated = false,
+}: Options) {
   const pending = new Map<string, MessagePort>();
 
   const controller = {

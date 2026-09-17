@@ -47,13 +47,33 @@ export function InlinePreview({ code, file, onExpand }: Target & { onExpand: () 
 }
 
 /** Full-screen viewer for the file with index `idx`, stepping through the transfer's previewable files. */
-export function PreviewDialog({ code, files, idx, onChange }: { code: string; files: FileMeta[]; idx: number | null; onChange: (idx: number | null) => void }) {
+export function PreviewDialog({
+  code,
+  files,
+  idx,
+  onChange,
+}: {
+  code: string;
+  files: FileMeta[];
+  idx: number | null;
+  onChange: (idx: number | null) => void;
+}) {
   const previewable = useMemo(() => files.filter(canPreview), [files]);
   const position = previewable.findIndex((f) => f.idx === idx);
   return position < 0 ? null : <Viewer code={code} files={previewable} position={position} onChange={onChange} />;
 }
 
-function Viewer({ code, files, position, onChange }: { code: string; files: FileMeta[]; position: number; onChange: (idx: number | null) => void }) {
+function Viewer({
+  code,
+  files,
+  position,
+  onChange,
+}: {
+  code: string;
+  files: FileMeta[];
+  position: number;
+  onChange: (idx: number | null) => void;
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const swipe = useRef<{ x: number; y: number } | null>(null);
   const closing = useRef(false);
@@ -150,16 +170,34 @@ function Viewer({ code, files, position, onChange }: { code: string; files: File
           </p>
         </div>
         {isPdf && navigator.pdfViewerEnabled && (
-          <a href={inlineUrl(code, file.idx)} target="_blank" rel="noopener" aria-label="Open in new tab" title="Open in new tab" className={overlayButton}>
+          <a
+            href={inlineUrl(code, file.idx)}
+            target="_blank"
+            rel="noopener"
+            aria-label="Open in new tab"
+            title="Open in new tab"
+            className={overlayButton}
+          >
             <ExternalIcon />
           </a>
         )}
-        <a href={fileUrl(code, file.idx)} download aria-label={`Download ${name}`} title="Download" className={overlayButton}>
+        <a
+          href={fileUrl(code, file.idx)}
+          download
+          aria-label={`Download ${name}`}
+          title="Download"
+          className={overlayButton}
+        >
           <DownloadIcon />
         </a>
       </header>
 
-      <div className="relative min-h-0 flex-1" onPointerDown={startSwipe} onPointerUp={endSwipe} onPointerCancel={() => (swipe.current = null)}>
+      <div
+        className="relative min-h-0 flex-1"
+        onPointerDown={startSwipe}
+        onPointerUp={endSwipe}
+        onPointerCancel={() => (swipe.current = null)}
+      >
         <PreviewContent key={file.idx} code={code} file={file} />
         {prev && (
           <button
@@ -187,11 +225,21 @@ function Viewer({ code, files, position, onChange }: { code: string; files: File
 
       {files.length > 1 && (
         <nav aria-label="Files" className="flex shrink-0 items-center justify-between px-2 py-2 sm:hidden">
-          <button type="button" disabled={!prev} onClick={() => prev && onChange(prev.idx)} className={overlayTextButton}>
+          <button
+            type="button"
+            disabled={!prev}
+            onClick={() => prev && onChange(prev.idx)}
+            className={overlayTextButton}
+          >
             <ChevronLeftIcon className="size-5" />
             Previous
           </button>
-          <button type="button" disabled={!next} onClick={() => next && onChange(next.idx)} className={overlayTextButton}>
+          <button
+            type="button"
+            disabled={!next}
+            onClick={() => next && onChange(next.idx)}
+            className={overlayTextButton}
+          >
             Next
             <ChevronRightIcon className="size-5" />
           </button>
@@ -201,7 +249,12 @@ function Viewer({ code, files, position, onChange }: { code: string; files: File
   );
 }
 
-function PreviewContent({ code, file, inline = false, onExpand }: Target & { inline?: boolean; onExpand?: () => void }) {
+function PreviewContent({
+  code,
+  file,
+  inline = false,
+  onExpand,
+}: Target & { inline?: boolean; onExpand?: () => void }) {
   const kind = previewKind(file.path);
   const view: ViewProps = { code, file, inline, onExpand, url: fileUrl(code, file.idx) };
   if ((kind === "docx" || kind === "xlsx" || kind === "pptx") && file.size > OFFICE_PREVIEW_BYTES) {

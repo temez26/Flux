@@ -31,12 +31,18 @@ function transfer(files: { path: string; size: number; hash?: string }[]): Trans
 const pick = (path: string, size: number): Picked => ({ path, file: { size } as File });
 
 test("lines files up by their path", () => {
-  const meta = transfer([{ path: "trip/a.jpg", size: 10 }, { path: "trip/b.jpg", size: 20 }]);
+  const meta = transfer([
+    { path: "trip/a.jpg", size: 10 },
+    { path: "trip/b.jpg", size: 20 },
+  ]);
   const match = matchPicked(meta, [pick("trip/a.jpg", 10), pick("trip/b.jpg", 20)]);
 
   assert.equal(match.matched, 2);
   assert.deepEqual(match.missing, []);
-  assert.ok(match.entries.every((e) => e.file), "every entry carries its file");
+  assert.ok(
+    match.entries.every((e) => e.file),
+    "every entry carries its file",
+  );
 });
 
 test("falls back to name and size when the folder was renamed", () => {
@@ -83,7 +89,10 @@ test("files the server already holds need nothing picked", () => {
 });
 
 test("reports a selection that matched nothing at all", () => {
-  const meta = transfer([{ path: "a.jpg", size: 1 }, { path: "b.jpg", size: 2 }]);
+  const meta = transfer([
+    { path: "a.jpg", size: 1 },
+    { path: "b.jpg", size: 2 },
+  ]);
   const match = matchPicked(meta, [pick("unrelated.txt", 500)]);
 
   assert.equal(match.matched, 0, "which is what stops an upload of nothing but failures");

@@ -107,7 +107,12 @@ export default function Home() {
       setBusy(`Preparing ${plural(files.length, "file")}…`);
       // Reading every file's metadata blocks the main thread, so let the spinner land first.
       await nextPaint();
-      const code = await send(files, options.current.hosted ? HOSTED_EXPIRY : options.current.expiresIn, options.current.isPublic, options.current.hosted);
+      const code = await send(
+        files,
+        options.current.hosted ? HOSTED_EXPIRY : options.current.expiresIn,
+        options.current.isPublic,
+        options.current.hosted,
+      );
       offerTo(options.current.target, code, {
         title: offerTitle(files.map((f) => f.path)),
         files: files.length,
@@ -298,8 +303,16 @@ export default function Home() {
               className="block min-h-40 w-full resize-y bg-transparent text-base outline-none placeholder:text-muted/60"
             />
             <div className="mt-3">
-              <Field label="Who can edit" hint="Anyone with the code can read it. You can change who can edit after sending.">
-                <Segmented label="Who can edit" value={textEditable ? "anyone" : "owner"} options={EDITORS} onChange={(v) => setTextEditable(v === "anyone")} />
+              <Field
+                label="Who can edit"
+                hint="Anyone with the code can read it. You can change who can edit after sending."
+              >
+                <Segmented
+                  label="Who can edit"
+                  value={textEditable ? "anyone" : "owner"}
+                  options={EDITORS}
+                  onChange={(v) => setTextEditable(v === "anyone")}
+                />
               </Field>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -333,9 +346,15 @@ export default function Home() {
               <>
                 <div>
                   <p className="font-semibold">
-                    {target ? `Choose what to send to ${target.name}` : folders ? "Drop files or folders here" : "Send photos, videos or any files"}
+                    {target
+                      ? `Choose what to send to ${target.name}`
+                      : folders
+                        ? "Drop files or folders here"
+                        : "Send photos, videos or any files"}
                   </p>
-                  <p className="mt-1 text-sm text-muted">{folders ? "Any size, any number of files — or paste them" : "Any size, any number of files"}</p>
+                  <p className="mt-1 text-sm text-muted">
+                    {folders ? "Any size, any number of files — or paste them" : "Any size, any number of files"}
+                  </p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
                   <Button variant="primary" onClick={pick("files")}>
@@ -387,12 +406,25 @@ export default function Home() {
                   : "Files are stored on the server, so the link works after you close this page."
               }
             >
-              <Segmented label="Delivery" value={hosted ? "device" : "server"} options={DELIVERY} onChange={chooseDelivery} />
+              <Segmented
+                label="Delivery"
+                value={hosted ? "device" : "server"}
+                options={DELIVERY}
+                onChange={chooseDelivery}
+              />
             </Field>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Who can open it" hint={isPublic ? "Listed on this page for anyone who opens Flux." : "Only people with the code or link."}>
-              <Segmented label="Visibility" value={isPublic ? "public" : "private"} options={VISIBILITY} onChange={chooseVisibility} />
+            <Field
+              label="Who can open it"
+              hint={isPublic ? "Listed on this page for anyone who opens Flux." : "Only people with the code or link."}
+            >
+              <Segmented
+                label="Visibility"
+                value={isPublic ? "public" : "private"}
+                options={VISIBILITY}
+                onChange={chooseVisibility}
+              />
             </Field>
             {!hosted && (
               <Field label="Delete after" hint="Files are removed automatically.">
@@ -423,7 +455,21 @@ export default function Home() {
   );
 }
 
-function TransferRow({ code, icon, title, detail, badge, mono = false }: { code: string; icon: ReactNode; title: string; detail: string; badge?: ReactNode; mono?: boolean }) {
+function TransferRow({
+  code,
+  icon,
+  title,
+  detail,
+  badge,
+  mono = false,
+}: {
+  code: string;
+  icon: ReactNode;
+  title: string;
+  detail: string;
+  badge?: ReactNode;
+  mono?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -488,7 +534,15 @@ function PublicList() {
           <TransferRow
             key={t.code}
             code={t.code}
-            icon={t.note ? <TextIcon className="size-4.5" /> : t.files > 1 ? <FolderIcon className="size-4.5" /> : <FileTypeIcon path={t.title} className="size-4.5" />}
+            icon={
+              t.note ? (
+                <TextIcon className="size-4.5" />
+              ) : t.files > 1 ? (
+                <FolderIcon className="size-4.5" />
+              ) : (
+                <FileTypeIcon path={t.title} className="size-4.5" />
+              )
+            }
             title={t.title}
             detail={`${t.note ? "Text" : plural(t.files, "file")} · ${formatBytes(t.size)} · ${formatRemaining(t.expiresAt, now)}`}
             badge={
@@ -538,7 +592,11 @@ function CollectForm({ expiresIn }: { expiresIn: number }) {
 
   if (name === null) {
     return (
-      <button type="button" onClick={() => setName("")} className="mt-3 flex items-center gap-1.5 text-sm text-muted transition hover:text-fg">
+      <button
+        type="button"
+        onClick={() => setName("")}
+        className="mt-3 flex items-center gap-1.5 text-sm text-muted transition hover:text-fg"
+      >
         <FolderIcon className="size-4" />
         Collect files from others instead
       </button>
@@ -647,7 +705,13 @@ function RecentList() {
             key={code}
             code={code}
             icon={
-              r.note ? <TextIcon className="size-4.5" /> : r.collect || files > 1 ? <FolderIcon className="size-4.5" /> : <FileTypeIcon path={r.title} className="size-4.5" />
+              r.note ? (
+                <TextIcon className="size-4.5" />
+              ) : r.collect || files > 1 ? (
+                <FolderIcon className="size-4.5" />
+              ) : (
+                <FileTypeIcon path={r.title} className="size-4.5" />
+              )
             }
             title={summary?.title ?? r.title}
             detail={[
@@ -759,7 +823,15 @@ function OwnedList() {
             code={code}
             mono
             icon={
-              o.note ? <TextIcon className="size-4.5" /> : o.collect ? <FolderIcon className="size-4.5" /> : o.public ? <GlobeIcon className="size-4.5" /> : <LockIcon className="size-4.5" />
+              o.note ? (
+                <TextIcon className="size-4.5" />
+              ) : o.collect ? (
+                <FolderIcon className="size-4.5" />
+              ) : o.public ? (
+                <GlobeIcon className="size-4.5" />
+              ) : (
+                <LockIcon className="size-4.5" />
+              )
             }
             title={o.collect && summary ? `${formatCode(code)} · ${summary.title}` : formatCode(code)}
             detail={[

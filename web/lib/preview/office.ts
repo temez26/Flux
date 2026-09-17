@@ -25,7 +25,8 @@ async function readXml(zip: JSZip, path: string): Promise<Document | null> {
 
 // Namespace prefixes are only conventional (Strict OOXML uses other namespaces), so match local names.
 const descendants = (node: Element | Document, name: string) => Array.from(node.getElementsByTagNameNS("*", name));
-const relationId = (el: Element) => Array.from(el.attributes).find((a) => a.localName === "id" && a.namespaceURI)?.value ?? "";
+const relationId = (el: Element) =>
+  Array.from(el.attributes).find((a) => a.localName === "id" && a.namespaceURI)?.value ?? "";
 
 /** Maps a package part's relationship ids to the paths they point to. */
 async function relationships(zip: JSZip, part: string): Promise<Map<string, string>> {
@@ -72,7 +73,9 @@ async function dateStyles(zip: JSZip): Promise<Set<number>> {
 
 function formatSerialDate(serial: number): string {
   const date = new Date(Math.round((serial - EXCEL_UNIX_DAYS) * 86_400_000));
-  return Number.isInteger(serial) ? date.toLocaleDateString(undefined, { timeZone: "UTC" }) : date.toLocaleString(undefined, { timeZone: "UTC" });
+  return Number.isInteger(serial)
+    ? date.toLocaleDateString(undefined, { timeZone: "UTC" })
+    : date.toLocaleString(undefined, { timeZone: "UTC" });
 }
 
 function columnIndex(ref: string): number {

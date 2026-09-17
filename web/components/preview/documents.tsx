@@ -4,7 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import { formatBytes } from "@/lib/util/format";
 import { readSlides, readWorkbook, renderDocx } from "@/lib/preview/office";
 import { loadText, TEXT_PREVIEW_BYTES } from "@/lib/preview/preview";
-import { CopyButton, InlineFrame, Loading, Note, Panel, Unavailable, scrollArea, useLoad, type Status, type ViewProps } from "./chrome";
+import {
+  CopyButton,
+  InlineFrame,
+  Loading,
+  Note,
+  Panel,
+  Unavailable,
+  scrollArea,
+  useLoad,
+  type Status,
+  type ViewProps,
+} from "./chrome";
 
 export function TextView(view: ViewProps) {
   const { data, failed } = useLoad(view.url, loadText);
@@ -12,9 +23,17 @@ export function TextView(view: ViewProps) {
   if (!data) return <Loading inline={view.inline} />;
   return (
     // Copying part of a file would pass for all of it, so only a complete one offers to.
-    <Panel inline={view.inline} onExpand={view.onExpand} aside={data.text && !data.truncated ? <CopyButton text={data.text} /> : undefined}>
-      {data.truncated && <Note>Showing the first {formatBytes(TEXT_PREVIEW_BYTES)}. Download the file to see all of it.</Note>}
-      <pre className={`${scrollArea} p-4 font-mono text-[13px] leading-relaxed break-words whitespace-pre-wrap [tab-size:4] sm:p-6`}>
+    <Panel
+      inline={view.inline}
+      onExpand={view.onExpand}
+      aside={data.text && !data.truncated ? <CopyButton text={data.text} /> : undefined}
+    >
+      {data.truncated && (
+        <Note>Showing the first {formatBytes(TEXT_PREVIEW_BYTES)}. Download the file to see all of it.</Note>
+      )}
+      <pre
+        className={`${scrollArea} p-4 font-mono text-[13px] leading-relaxed break-words whitespace-pre-wrap [tab-size:4] sm:p-6`}
+      >
         {data.text || <span className="text-muted">This file is empty.</span>}
       </pre>
     </Panel>
@@ -53,9 +72,18 @@ export function DocxView(view: ViewProps) {
 
   if (status === "failed") return <Unavailable {...view} message="This document can't be previewed" />;
   const pages = (
-    <div className={inline ? "relative max-h-[60vh] min-h-48 overflow-auto overscroll-contain bg-hover p-3" : "absolute inset-0 overflow-auto overscroll-contain px-2 pt-2 pb-6 sm:px-16"}>
+    <div
+      className={
+        inline
+          ? "relative max-h-[60vh] min-h-48 overflow-auto overscroll-contain bg-hover p-3"
+          : "absolute inset-0 overflow-auto overscroll-contain px-2 pt-2 pb-6 sm:px-16"
+      }
+    >
       {status === "loading" && <Loading inline={false} />}
-      <div ref={host} className={`transition-opacity duration-200 ${status === "ready" ? "opacity-100" : "opacity-0"}`} />
+      <div
+        ref={host}
+        className={`transition-opacity duration-200 ${status === "ready" ? "opacity-100" : "opacity-0"}`}
+      />
     </div>
   );
   return inline ? <InlineFrame onExpand={onExpand}>{pages}</InlineFrame> : pages;
@@ -80,7 +108,11 @@ export function SheetView(view: ViewProps) {
   return (
     <Panel inline={view.inline} onExpand={view.onExpand} wide>
       {sheets.length > 1 && (
-        <div role="tablist" aria-label="Sheets" className="flex shrink-0 gap-1 overflow-x-auto border-b border-line p-1.5">
+        <div
+          role="tablist"
+          aria-label="Sheets"
+          className="flex shrink-0 gap-1 overflow-x-auto border-b border-line p-1.5"
+        >
           {sheets.map((s, i) => (
             <button
               key={i}

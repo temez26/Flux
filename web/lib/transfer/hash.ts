@@ -79,7 +79,14 @@ function workerHasher(id: number): Hasher {
   let spent = false;
   return {
     async update(data, from = 0) {
-      await ask({ op: "update", id, seq: sequence++, buffer: data.buffer, offset: data.byteOffset + from, length: data.byteLength - from });
+      await ask({
+        op: "update",
+        id,
+        seq: sequence++,
+        buffer: data.buffer,
+        offset: data.byteOffset + from,
+        length: data.byteLength - from,
+      });
     },
     async digest() {
       const reply = await ask({ op: "digest", id, seq: sequence++ });

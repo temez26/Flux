@@ -25,8 +25,14 @@ export function Button({ variant, className, ...props }: ButtonProps) {
   return <button type="button" className={buttonClass(variant, className)} {...props} />;
 }
 
-export function IconButton({ label, className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
-  return <button type="button" aria-label={label} title={label} className={`${iconButtonClass} ${className}`} {...props} />;
+export function IconButton({
+  label,
+  className = "",
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+  return (
+    <button type="button" aria-label={label} title={label} className={`${iconButtonClass} ${className}`} {...props} />
+  );
 }
 
 /** A destructive control's wait for its second tap, which lapses if that tap doesn't come. */
@@ -41,7 +47,15 @@ function useArmed(): [boolean, (armed: boolean) => void] {
 }
 
 /** ConfirmButton for a row with no room for words: an icon that turns red while it waits. */
-export function ConfirmIconButton({ label, onConfirm, children }: { label: string; onConfirm: () => void; children: ReactNode }) {
+export function ConfirmIconButton({
+  label,
+  onConfirm,
+  children,
+}: {
+  label: string;
+  onConfirm: () => void;
+  children: ReactNode;
+}) {
   const [armed, setArmed] = useArmed();
   return (
     <IconButton
@@ -96,7 +110,9 @@ const solid: Record<Tone, string> = {
 
 export function Badge({ tone = "muted", icon, children }: { tone?: Tone; icon?: ReactNode; children: ReactNode }) {
   return (
-    <span className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${soft[tone]}`}>
+    <span
+      className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${soft[tone]}`}
+    >
       {/* Sized here so no caller has to repeat it; a descendant rule outranks the icon's own class. */}
       {icon && <span className="flex shrink-0 [&_svg]:size-3">{icon}</span>}
       <span className="truncate">{children}</span>
@@ -127,7 +143,11 @@ export function Notice({
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-2xl border border-line bg-surface p-4 shadow-sm sm:p-5 ${className}`}>{children}</section>;
+  return (
+    <section className={`rounded-2xl border border-line bg-surface p-4 shadow-sm sm:p-5 ${className}`}>
+      {children}
+    </section>
+  );
 }
 
 export function SectionTitle({ icon, children, aside }: { icon: ReactNode; children: ReactNode; aside?: ReactNode }) {
@@ -164,7 +184,11 @@ export function Segmented<T extends string | number>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="grid auto-cols-fr grid-flow-col gap-1 rounded-xl border border-line bg-bg p-1">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="grid auto-cols-fr grid-flow-col gap-1 rounded-xl border border-line bg-bg p-1"
+    >
       {options.map((option) => {
         const active = option.value === value;
         return (
@@ -197,7 +221,10 @@ export function ProgressBar({ value, tone = "accent", thin = false }: { value: n
       aria-valuemax={100}
       className={`overflow-hidden rounded-full bg-line ${thin ? "h-1" : "h-2"}`}
     >
-      <div className={`h-full rounded-full transition-[width] duration-300 ease-linear ${solid[tone]}`} style={{ width: `${pct}%` }} />
+      <div
+        className={`h-full rounded-full transition-[width] duration-300 ease-linear ${solid[tone]}`}
+        style={{ width: `${pct}%` }}
+      />
     </div>
   );
 }
@@ -268,7 +295,9 @@ export function StatusCard({
 export function Message({ icon, title, children }: { icon?: ReactNode; title: string; children?: ReactNode }) {
   return (
     <div className="flex flex-col items-center py-16 text-center">
-      {icon && <span className="mb-4 flex size-12 items-center justify-center rounded-full bg-hover text-muted">{icon}</span>}
+      {icon && (
+        <span className="mb-4 flex size-12 items-center justify-center rounded-full bg-hover text-muted">{icon}</span>
+      )}
       <h1 className="text-lg font-semibold">{title}</h1>
       {children && <div className="mt-2 text-sm text-muted">{children}</div>}
     </div>

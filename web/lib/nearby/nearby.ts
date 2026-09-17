@@ -127,7 +127,8 @@ export class Nearby extends Emitter {
       // Whoever was listed may be long gone by the time this reconnects.
       this.peers = [];
       this.emit();
-      if (!this.closed) this.timer = window.setTimeout(() => this.connect(), Math.min(MAX_BACKOFF_MS, 500 * 2 ** this.attempts++));
+      if (!this.closed)
+        this.timer = window.setTimeout(() => this.connect(), Math.min(MAX_BACKOFF_MS, 500 * 2 ** this.attempts++));
     };
   }
 

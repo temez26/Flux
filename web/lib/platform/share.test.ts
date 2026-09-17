@@ -115,7 +115,10 @@ test("a new share replaces one that was never picked up", async () => {
   second.append("files", new File(["c"], "c.txt"));
   await send(share(second));
 
-  assert.deepEqual((await takeShared())?.files.map((p) => p.path), ["c.txt"]);
+  assert.deepEqual(
+    (await takeShared())?.files.map((p) => p.path),
+    ["c.txt"],
+  );
 });
 
 test("a worker update keeps a share waiting to be picked up", async () => {
@@ -128,7 +131,14 @@ test("a worker update keeps a share waiting to be picked up", async () => {
     clients: { claim: async () => {} },
     skipWaiting: async () => {},
   };
-  vm.runInNewContext(readFileSync(fileURLToPath(new URL("../../public/sw.js", import.meta.url)), "utf8"), { self, caches, Response, URL, setTimeout, console });
+  vm.runInNewContext(readFileSync(fileURLToPath(new URL("../../public/sw.js", import.meta.url)), "utf8"), {
+    self,
+    caches,
+    Response,
+    URL,
+    setTimeout,
+    console,
+  });
   let done: Promise<unknown> | undefined;
   handlers.get("activate")!({ waitUntil: (p: Promise<unknown>) => (done = p) });
   await done;

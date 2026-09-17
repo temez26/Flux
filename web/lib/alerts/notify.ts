@@ -31,7 +31,8 @@ function remember(value: "on" | "off") {
 /** Asks for permission where it hasn't been given; true when notifications will now be sent. */
 export async function turnOnNotifications(): Promise<boolean> {
   if (!notificationsSupported()) return false;
-  const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+  const permission =
+    Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
   if (permission !== "granted") return false;
   remember("on");
   return true;

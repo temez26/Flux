@@ -35,7 +35,11 @@ test("a save someone else beat comes back as a conflict, with their text", async
   }) as typeof fetch;
 
   assert.deepEqual(await saveNote("abcdefgh", "owner-token", "mine", 2), { saved: { text: "mine", version: 3 } });
-  assert.deepEqual(sent[0], { url: "/api/transfers/abcdefgh/note", auth: "Bearer owner-token", body: { text: "mine", version: 2 } });
+  assert.deepEqual(sent[0], {
+    url: "/api/transfers/abcdefgh/note",
+    auth: "Bearer owner-token",
+    body: { text: "mine", version: 2 },
+  });
 
   assert.deepEqual(await saveNote("abcdefgh", undefined, "mine", 3), { conflict: { text: "theirs", version: 4 } });
   assert.equal(sent[1].auth, null, "someone without the owner's token sends none");

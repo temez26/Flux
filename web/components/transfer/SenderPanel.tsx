@@ -9,7 +9,17 @@ import type { Item, Uploader } from "@/lib/transfer/upload";
 import { addFiles, type Session } from "@/lib/transfer/session";
 import { toast } from "@/lib/alerts/toast";
 import { FileBrowser, FileRow } from "../files/FileList";
-import { AlertIcon, CheckIcon, ClockIcon, CloseIcon, PauseIcon, PlayIcon, PlusIcon, RetryIcon, ZapIcon } from "../ui/icons";
+import {
+  AlertIcon,
+  CheckIcon,
+  ClockIcon,
+  CloseIcon,
+  PauseIcon,
+  PlayIcon,
+  PlusIcon,
+  RetryIcon,
+  ZapIcon,
+} from "../ui/icons";
 import { useFilePickers } from "../files/picker";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
 import { ShareCard } from "./ShareCard";
@@ -19,23 +29,70 @@ import { MetaRow, MetaTile, Pinned, inFlight, pageTitle, percent, removeOwnedFil
 function senderStatus(session: Session, uploader: Uploader): StatusProps {
   const { counts, finished, reconnecting } = uploader.snapshot;
   if (uploader.gone) {
-    return { tone: "err", icon: <AlertIcon />, title: "Transfer no longer available", subtitle: "It expired or was deleted, so it can't be downloaded any more." };
+    return {
+      tone: "err",
+      icon: <AlertIcon />,
+      title: "Transfer no longer available",
+      subtitle: "It expired or was deleted, so it can't be downloaded any more.",
+    };
   }
   if (finished && counts.failed) {
-    return { tone: "err", icon: <AlertIcon />, title: `${plural(counts.failed, "file")} failed`, subtitle: "Retry them, or cancel them to share the rest." };
+    return {
+      tone: "err",
+      icon: <AlertIcon />,
+      title: `${plural(counts.failed, "file")} failed`,
+      subtitle: "Retry them, or cancel them to share the rest.",
+    };
   }
-  if (finished) return { tone: "ok", icon: <CheckIcon />, title: "Ready to receive", subtitle: "Every file is uploaded and verified." };
+  if (finished)
+    return {
+      tone: "ok",
+      icon: <CheckIcon />,
+      title: "Ready to receive",
+      subtitle: "Every file is uploaded and verified.",
+    };
   if (session.delivered && uploader.paused) {
-    return { tone: "ok", icon: <ZapIcon />, title: "Delivered directly", subtitle: "The receiver has everything. Resume to also keep a copy on the server." };
+    return {
+      tone: "ok",
+      icon: <ZapIcon />,
+      title: "Delivered directly",
+      subtitle: "The receiver has everything. Resume to also keep a copy on the server.",
+    };
   }
-  if (uploader.held) return { tone: "accent", icon: <ZapIcon />, title: "Sending directly", subtitle: "A receiver is downloading straight from this device." };
-  if (uploader.paused) return { tone: "warn", icon: <PauseIcon />, title: "Paused", subtitle: "Resume to continue uploading." };
-  if (reconnecting) return { tone: "warn", icon: <Spinner className="size-5" />, title: "Reconnecting…", subtitle: "The connection dropped. Retrying automatically." };
-  return { tone: "accent", icon: <Spinner className="size-5" />, title: "Uploading", subtitle: "Keep this page open until it finishes." };
+  if (uploader.held)
+    return {
+      tone: "accent",
+      icon: <ZapIcon />,
+      title: "Sending directly",
+      subtitle: "A receiver is downloading straight from this device.",
+    };
+  if (uploader.paused)
+    return { tone: "warn", icon: <PauseIcon />, title: "Paused", subtitle: "Resume to continue uploading." };
+  if (reconnecting)
+    return {
+      tone: "warn",
+      icon: <Spinner className="size-5" />,
+      title: "Reconnecting…",
+      subtitle: "The connection dropped. Retrying automatically.",
+    };
+  return {
+    tone: "accent",
+    icon: <Spinner className="size-5" />,
+    title: "Uploading",
+    subtitle: "Keep this page open until it finishes.",
+  };
 }
 
 /** This tab's own upload, from the moment the files were picked until every one is stored. */
-export function SenderPanel({ session, uploader, expiresAt }: { session: Session; uploader: Uploader; expiresAt?: string }) {
+export function SenderPanel({
+  session,
+  uploader,
+  expiresAt,
+}: {
+  session: Session;
+  uploader: Uploader;
+  expiresAt?: string;
+}) {
   const { host } = session;
   useSyncExternalStore(uploader.subscribe, uploader.getVersion, uploader.getVersion);
   useSyncExternalStore(host.subscribe, host.getVersion, host.getVersion);
@@ -71,7 +128,11 @@ export function SenderPanel({ session, uploader, expiresAt }: { session: Session
   useLeaveGuard(!finished || serving);
   const code = formatCode(uploader.code);
   useNotifyWhen(finished && !counts.failed && !uploader.gone, "Upload finished", `${code} is ready to receive`);
-  useNotifyWhen(finished && counts.failed > 0 && !uploader.gone, "Upload stopped", `${plural(counts.failed, "file")} in ${code} failed`);
+  useNotifyWhen(
+    finished && counts.failed > 0 && !uploader.gone,
+    "Upload stopped",
+    `${plural(counts.failed, "file")} in ${code} failed`,
+  );
   useNotifyWhen(serving, "A device is downloading", `${code}, straight from this device`);
   useTitle(running ? `${percent(sent, total)}% uploaded · Flux` : pageTitle(uploader.code));
 
@@ -90,7 +151,10 @@ export function SenderPanel({ session, uploader, expiresAt }: { session: Session
   ];
   if (finished && meta) stats.push(["Downloads", meta.downloads.toLocaleString()]);
   if (running && !uploader.held) {
-    stats.push(["Speed", speed > 0 ? `${formatBytes(speed)}/s` : "–"], ["Time left", speed > 0 ? formatDuration((total - sent) / speed) : "–"]);
+    stats.push(
+      ["Speed", speed > 0 ? `${formatBytes(speed)}/s` : "–"],
+      ["Time left", speed > 0 ? formatDuration((total - sent) / speed) : "–"],
+    );
   }
 
   return (
@@ -137,7 +201,9 @@ export function SenderPanel({ session, uploader, expiresAt }: { session: Session
             </Badge>
           </div>
         )}
-        {single && previewable.has(single.idx) && <InlinePreview code={uploader.code} file={single} onExpand={() => setPreviewing(single.idx)} />}
+        {single && previewable.has(single.idx) && (
+          <InlinePreview code={uploader.code} file={single} onExpand={() => setPreviewing(single.idx)} />
+        )}
       </StatusCard>
       <Pinned title="Now uploading">
         {inFlight(uploader.items, finished).map((item) => (
@@ -153,7 +219,9 @@ export function SenderPanel({ session, uploader, expiresAt }: { session: Session
               code={uploader.code}
               downloadable={false}
               onPreview={setPreviewing}
-              onRemove={meta.files.length > 1 ? () => removeOwnedFile(uploader.code, uploader.token, meta.files[i]) : undefined}
+              onRemove={
+                meta.files.length > 1 ? () => removeOwnedFile(uploader.code, uploader.token, meta.files[i]) : undefined
+              }
             />
           )}
           renderTile={(i) => <MetaTile file={meta.files[i]} code={uploader.code} onPreview={setPreviewing} />}
@@ -165,7 +233,9 @@ export function SenderPanel({ session, uploader, expiresAt }: { session: Session
             <UploadRow
               item={uploader.items[i]}
               uploader={uploader}
-              onPreview={previewable.has(uploader.items[i].idx) ? () => setPreviewing(uploader.items[i].idx) : undefined}
+              onPreview={
+                previewable.has(uploader.items[i].idx) ? () => setPreviewing(uploader.items[i].idx) : undefined
+              }
             />
           )}
         />

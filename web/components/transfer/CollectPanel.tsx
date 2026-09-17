@@ -42,7 +42,11 @@ export function CollectPanel({ meta, token }: { meta: TransferMeta; token: strin
   const arrived = useRef(complete);
   useEffect(() => {
     if (complete > arrived.current) {
-      void notify(`${plural(complete - arrived.current, "new file")} in ${meta.title}`, formatCode(meta.code), `collect-${meta.code}`);
+      void notify(
+        `${plural(complete - arrived.current, "new file")} in ${meta.title}`,
+        formatCode(meta.code),
+        `collect-${meta.code}`,
+      );
     }
     arrived.current = complete;
   }, [complete, meta.title, meta.code]);
