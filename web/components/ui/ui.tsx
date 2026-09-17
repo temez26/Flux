@@ -41,16 +41,27 @@ export function IconButton({ label, className = "", ...props }: ComponentProps<"
   );
 }
 
-/** A destructive control's wait for its second tap, which lapses if that tap doesn't come. */
+// Long enough to find the button again with a screen reader or a switch, short enough that a
+// stray tap much later doesn't delete anything.
+const ARMED_MS = 8000;
+
+/** A destructive control's wait for its second press, which lapses if that press doesn't come. */
 function useArmed(): [boolean, (armed: boolean) => void] {
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return;
-    const id = window.setTimeout(() => setArmed(false), 3000);
+    const id = window.setTimeout(() => setArmed(false), ARMED_MS);
     return () => window.clearTimeout(id);
   }, [armed]);
   return [armed, setArmed];
 }
+
+/** Says a control is waiting for its second press; the change of label alone goes unannounced. */
+const ArmedStatus = ({ armed }: { armed: boolean }) => (
+  <span role="status" className="sr-only">
+    {armed ? "Press again to confirm" : ""}
+  </span>
+);
 
 /** ConfirmButton for a row with no room for words: an icon that turns red while it waits. */
 export function ConfirmIconButton({
@@ -64,31 +75,40 @@ export function ConfirmIconButton({
 }) {
   const [armed, setArmed] = useArmed();
   return (
-    <IconButton
-      label={armed ? `Tap again: ${label}` : label}
-      onClick={() => {
-        if (!armed) return setArmed(true);
-        setArmed(false);
-        onConfirm();
-      }}
-      className={armed ? "bg-err/10 !text-err" : "hover:!text-err"}
-    >
-      {children}
-    </IconButton>
+    <>
+      <IconButton
+        label={armed ? `Press again: ${label}` : label}
+        onClick={() => {
+          if (!armed) return setArmed(true);
+          setArmed(false);
+          onConfirm();
+        }}
+        // Moving on is a clear enough no.
+        onBlur={() => setArmed(false)}
+        className={armed ? "bg-err/10 !text-err" : "hover:!text-err"}
+      >
+        {children}
+      </IconButton>
+      <ArmedStatus armed={armed} />
+    </>
   );
 }
 
-/** Destructive action that needs a second tap, instead of a blocking dialog. */
+/** Destructive action that needs a second press, instead of a blocking dialog. */
 export function ConfirmButton({ onConfirm, children }: { onConfirm: () => void; children: ReactNode }) {
   const [armed, setArmed] = useArmed();
   return (
-    <Button
-      variant={armed ? "primary" : "danger"}
-      className={armed ? "!bg-err-solid" : ""}
-      onClick={() => (armed ? onConfirm() : setArmed(true))}
-    >
-      {armed ? "Tap again to confirm" : children}
-    </Button>
+    <>
+      <Button
+        variant={armed ? "primary" : "danger"}
+        className={armed ? "!bg-err-solid" : ""}
+        onClick={() => (armed ? onConfirm() : setArmed(true))}
+        onBlur={() => setArmed(false)}
+      >
+        {armed ? "Press again to confirm" : children}
+      </Button>
+      <ArmedStatus armed={armed} />
+    </>
   );
 }
 
