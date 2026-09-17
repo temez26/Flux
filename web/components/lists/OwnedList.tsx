@@ -108,7 +108,7 @@ export function OwnedList() {
                 summary?.expiresAt ?? o.expiresAt,
                 !!o.hosted,
                 live.has(code),
-                Date.now(),
+                undefined,
                 summary && !summary.complete ? summary.lifetime : null,
               ),
             ]

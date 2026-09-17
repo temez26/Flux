@@ -55,7 +55,7 @@ export function RecentList() {
                 ? "From the sender's device"
                 : formatRemaining(
                     summary?.expiresAt ?? r.expiresAt,
-                    Date.now(),
+                    undefined,
                     summary && !summary.complete ? summary.lifetime : null,
                   ),
             ].join(" · ")}
