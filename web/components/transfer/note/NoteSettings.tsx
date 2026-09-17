@@ -29,12 +29,7 @@ export function NoteSettings({ meta, token }: { meta: TransferMeta; token: strin
 
   return (
     <div className="mt-5 grid gap-4 border-t border-line pt-5 @xl:grid-cols-2">
-      <Field
-        label="Who can find it"
-        hint={
-          meta.public ? "Listed in Public shares for anyone who opens Flux." : "Only people with the link or QR code."
-        }
-      >
+      <Field label="Who can find it">
         <Segmented
           label="Who can find it"
           value={meta.public ? "public" : "link"}
@@ -44,10 +39,7 @@ export function NoteSettings({ meta, token }: { meta: TransferMeta; token: strin
           }
         />
       </Field>
-      <Field
-        label="Who can edit"
-        hint={meta.editable ? "Anyone who can open it can change it." : "Only you can change it; others read."}
-      >
+      <Field label="Who can edit">
         <Segmented
           label="Who can edit"
           value={meta.editable ? "anyone" : "owner"}

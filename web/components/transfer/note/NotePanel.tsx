@@ -149,15 +149,14 @@ export function NotePanel({ meta, token }: { meta: TransferMeta; token?: string 
 
         {editor.stranded && (
           <Notice tone="warn" role="alert" icon={<AlertIcon />} className="mt-3">
-            Its owner has made this text read-only, so your changes can&apos;t be saved. Copy them first if you need
-            them.
+            This text is read only now. Copy your changes to keep them.
           </Notice>
         )}
         {editor.conflict && (
           <div role="alert" className="mt-3 rounded-xl bg-warn/10 p-3 text-sm">
             <p className="flex items-center gap-2 font-medium text-warn">
               <AlertIcon className="size-4 shrink-0" />
-              Someone else changed this text at the same time. This is what they saved:
+              Someone else changed this at the same time. Their version:
             </p>
             <div className="mt-2 max-h-48 overflow-auto rounded-lg bg-bg p-3">
               <Reading text={editor.conflict.text} />

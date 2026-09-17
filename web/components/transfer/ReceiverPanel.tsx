@@ -144,24 +144,17 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
           }
         />
 
-        {viaDirect && (
-          <Notice tone="ok" icon={<ZapIcon />} className="mt-4">
-            {meta.hosted
-              ? "Connected to the sender. These files come straight from their device."
-              : "The sender is online, so files come straight from their device."}
-          </Notice>
-        )}
         {tooLargeHere && (
           <Notice tone="warn" icon={<AlertIcon />} className="mt-4">
             {single
-              ? "This browser can't save a file this large from another device. Ask the sender to upload it to the server instead."
-              : "This browser can't save the whole transfer in one go. Take the files one at a time below, or ask the sender to upload it to the server instead."}
+              ? "Too large for this browser to save from another device."
+              : "Too large for this browser to save at once. Download files one at a time below."}
           </Notice>
         )}
         {remaining.length > 0 && remaining.length < meta.files.length && (
           <Notice tone="ok" icon={<CheckIcon />} className="mt-4">
-            {plural(meta.files.length - remaining.length, "file")} of {meta.files.length.toLocaleString()} already saved
-            on this device.{" "}
+            {plural(meta.files.length - remaining.length, "file")} of {meta.files.length.toLocaleString()} already
+            saved.{" "}
             <button
               type="button"
               onClick={() => startDirect(remaining)}
@@ -177,22 +170,19 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
             icon={unreachable ? <AlertIcon className="text-warn" /> : <Spinner className="text-accent" />}
             className="mt-4"
           >
-            {unreachable
-              ? "Couldn't reach the sender's device. These files were never uploaded, so they can only come from there."
-              : "Waiting for the sender. Nothing was uploaded, so their page has to be open for this to arrive."}
+            {unreachable ? "Couldn't reach the sender's device." : "Waiting for the sender to open Flux…"}
           </Notice>
         )}
         {!meta.hosted && !ready && !viaDirect && (
           <div className="mt-4 rounded-xl bg-hover p-3">
             <div className="mb-2 flex items-center gap-2 text-sm">
               <Spinner className="size-4 text-accent" />
-              <span className="flex-1">Waiting for the sender to finish uploading</span>
+              <span className="flex-1">Sender is still uploading</span>
               <span className="font-medium tabular-nums">{percent(received, size)}%</span>
             </div>
             <ProgressBar value={size ? received / size : 0} label="Uploaded by the sender" />
             <p className="mt-2 text-xs text-muted">
-              {complete.toLocaleString()} of {plural(meta.files.length, "file")} ready. Uploaded files can already be
-              downloaded below.
+              {complete.toLocaleString()} of {plural(meta.files.length, "file")} ready
             </p>
           </div>
         )}
@@ -244,9 +234,6 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
           <Notice tone="err" icon={<AlertIcon />} className="mt-3">
             {error}
           </Notice>
-        )}
-        {!single && (ready || viaDirect) && (
-          <p className="mt-3 text-xs text-muted">Everything downloads as one .zip file.</p>
         )}
         {single && canPreview(single) && (
           <InlinePreview code={meta.code} file={single} onExpand={() => setPreviewing(single.idx)} />
@@ -337,16 +324,16 @@ function receivingStatus(receiver: Receiver): StatusProps {
       tone: "ok",
       icon: <CheckIcon />,
       title: "Download complete",
-      subtitle: "Saved to your downloads. Every file was verified.",
+      subtitle: "Saved and verified.",
     };
   if (error === "Canceled") return { tone: "muted", icon: <CloseIcon />, title: "Download canceled" };
   if (error) return { tone: "err", icon: <AlertIcon />, title: "Download failed", subtitle: error };
-  if (paused) return { tone: "warn", icon: <PauseIcon />, title: "Paused", subtitle: "Resume to continue." };
+  if (paused) return { tone: "warn", icon: <PauseIcon />, title: "Paused" };
   return {
     tone: "accent",
     icon: <Spinner className="size-5" />,
     title: "Downloading",
-    subtitle: keepOpen("it finishes"),
+    subtitle: keepOpen(),
   };
 }
 

@@ -35,7 +35,7 @@ function senderStatus(uploader: Uploader): StatusProps {
       tone: "err",
       icon: <AlertIcon />,
       title: "Transfer no longer available",
-      subtitle: "It expired or was deleted, so it can't be downloaded any more.",
+      subtitle: "It expired or was deleted.",
     };
   }
   if (finished && counts.failed) {
@@ -43,7 +43,7 @@ function senderStatus(uploader: Uploader): StatusProps {
       tone: "err",
       icon: <AlertIcon />,
       title: `${plural(counts.failed, "file")} failed`,
-      subtitle: "Retry them, or cancel them to share the rest.",
+      subtitle: "Retry or cancel them.",
     };
   }
   if (finished)
@@ -51,22 +51,19 @@ function senderStatus(uploader: Uploader): StatusProps {
       tone: "ok",
       icon: <CheckIcon />,
       title: "Ready to receive",
-      subtitle: "Every file is uploaded and verified.",
     };
-  if (uploader.paused)
-    return { tone: "warn", icon: <PauseIcon />, title: "Paused", subtitle: "Resume to continue uploading." };
+  if (uploader.paused) return { tone: "warn", icon: <PauseIcon />, title: "Paused" };
   if (reconnecting)
     return {
       tone: "warn",
       icon: <Spinner className="size-5" />,
       title: "Reconnecting…",
-      subtitle: "The connection dropped. Retrying automatically.",
     };
   return {
     tone: "accent",
     icon: <Spinner className="size-5" />,
     title: "Uploading",
-    subtitle: keepOpen("it finishes"),
+    subtitle: keepOpen(),
   };
 }
 

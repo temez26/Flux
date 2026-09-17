@@ -6,6 +6,7 @@ import {
   type AnchorHTMLAttributes,
   type ButtonHTMLAttributes,
   type ComponentProps,
+  type CSSProperties,
   type HTMLAttributes,
   type KeyboardEvent,
   type ReactNode,
@@ -170,12 +171,7 @@ export function Notice({
 
 /** A section of a page. Its contents lay out by the card's own width, which differs by where it's shown. */
 export function Card({ className = "", ...props }: HTMLAttributes<HTMLElement>) {
-  return (
-    <section
-      className={`@container rounded-2xl border border-line bg-surface p-4 shadow-sm sm:p-5 ${className}`}
-      {...props}
-    />
-  );
+  return <section className={`@container surface rounded-2xl p-4 sm:p-5 ${className}`} {...props} />;
 }
 
 /**
@@ -209,28 +205,25 @@ export function SectionTitle({ icon, children, aside }: { icon: ReactNode; child
   );
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <p className="mb-1.5 text-xs font-medium tracking-wide text-muted uppercase">{label}</p>
       {children}
-      {hint && <p className="mt-1.5 text-xs text-muted">{hint}</p>}
     </div>
   );
 }
 
-/** An on/off setting, named and explained by the elements whose ids it is given. */
+/** An on/off setting, named by the element whose id it is given. */
 export function Switch({
   checked,
   onChange,
   labelledBy,
-  describedBy,
   disabled,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   labelledBy: string;
-  describedBy?: string;
   disabled?: boolean;
 }) {
   return (
@@ -239,7 +232,6 @@ export function Switch({
       role="switch"
       aria-checked={checked}
       aria-labelledby={labelledBy}
-      aria-describedby={describedBy}
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition disabled:opacity-50 ${
@@ -250,6 +242,20 @@ export function Switch({
         className={`inline-block size-5 rounded-full bg-white shadow-sm transition ${checked ? "translate-x-6" : "translate-x-1"}`}
       />
     </button>
+  );
+}
+
+/**
+ * The highlight behind the chosen one of `count` equal columns, gliding to it when the choice
+ * changes. Hidden while nothing is chosen. The options drawn over it need to be positioned.
+ */
+export function Thumb({ count, index, className = "" }: { count: number; index: number; className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{ "--count": count, "--index": Math.max(index, 0) } as CSSProperties}
+      className={`thumb bg-surface shadow-sm ring-1 ring-line ${index < 0 ? "opacity-0" : ""} ${className}`}
+    />
   );
 }
 
@@ -282,8 +288,9 @@ export function Segmented<T extends string | number>({
       role="radiogroup"
       aria-label={label}
       onKeyDown={onKeyDown}
-      className="grid auto-cols-fr grid-flow-col gap-1 rounded-xl border border-line bg-bg p-1"
+      className="relative grid auto-cols-fr grid-flow-col gap-1 rounded-xl border border-line bg-bg p-1"
     >
+      <Thumb count={options.length} index={options.findIndex((o) => o.value === value)} className="rounded-lg" />
       {options.map((option, i) => {
         const active = option.value === value;
         return (
@@ -294,8 +301,8 @@ export function Segmented<T extends string | number>({
             aria-checked={active}
             tabIndex={active || (i === 0 && !options.some((o) => o.value === value)) ? 0 : -1}
             onClick={() => onChange(option.value)}
-            className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition ${
-              active ? "bg-surface text-fg shadow-sm ring-1 ring-line" : "text-muted hover:text-fg"
+            className={`relative flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition ${
+              active ? "text-fg" : "text-muted hover:text-fg"
             }`}
           >
             {option.icon}

@@ -23,12 +23,7 @@ export function NotificationSwitch() {
     }
     const granted = await turnOnNotifications();
     setOn(granted);
-    toast(
-      granted
-        ? "You'll be notified while Flux is in the background"
-        : "Notifications are blocked for this site in your browser",
-      granted ? "ok" : "err",
-    );
+    toast(granted ? "Notifications on" : "Notifications are blocked in your browser", granted ? "ok" : "err");
   }
 
   return (
@@ -37,17 +32,15 @@ export function NotificationSwitch() {
         <p id="notifications-label" className="text-sm font-medium">
           Notifications
         </p>
-        <p id="notifications-hint" className="text-xs text-muted">
-          {supported
-            ? "When a transfer finishes or a device sends you something while Flux is in the background."
-            : isAppleTouch() && !isInstalled()
-              ? "Add Flux to your Home Screen first; iPhone and iPad only notify from there."
-              : "This browser can't show notifications from Flux."}
-        </p>
+        {!supported && (
+          <p className="text-xs text-muted">
+            {isAppleTouch() && !isInstalled()
+              ? "Add Flux to your Home Screen first."
+              : "Not supported in this browser."}
+          </p>
+        )}
       </div>
-      {supported && (
-        <Switch checked={on} onChange={toggle} labelledBy="notifications-label" describedBy="notifications-hint" />
-      )}
+      {supported && <Switch checked={on} onChange={toggle} labelledBy="notifications-label" />}
     </div>
   );
 }

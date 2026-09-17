@@ -12,14 +12,13 @@ import { useFilePickers } from "../../files/picker";
 import { NearbyDevices } from "../../nearby";
 import { ExpiryNote } from "../../settings/ExpiryNote";
 import { useExpiry } from "../../settings/expiry";
-import { AlertIcon, DeviceIcon, GlobeIcon } from "../../ui/icons";
+import { AlertIcon } from "../../ui/icons";
 import { Notice } from "../../ui/ui";
 import { useHandoff } from "../handoff";
 import { usePaste, useWindowDrop } from "../incoming";
 import { offerTo } from "../offer";
 import { DropOverlay, DropZone } from "./DropZone";
 import { StagedFiles } from "./StagedFiles";
-import { keepOpen } from "../../transfer/common";
 
 // Files sent to a device end with the page, so the code behind them only needs to outlast any
 // plausible sitting; the row holds a file list and nothing else.
@@ -83,9 +82,8 @@ export function FileSender({ mode }: { mode: "public" | "device" }) {
     staged && !status ? (
       <StagedFiles
         files={staged}
-        action={toDevice ? (target ? `Send to ${target.name}` : "Send") : "Share publicly"}
+        action={toDevice ? (target ? `Send to ${target.name}` : "Choose a device first") : "Share publicly"}
         disabled={blocked}
-        hint={blocked ? "Choose a device above first." : undefined}
         onSend={() => {
           setStaged(null);
           void start(staged);
@@ -99,14 +97,7 @@ export function FileSender({ mode }: { mode: "public" | "device" }) {
         status={status}
         stalled={picker.stalled}
         disabled={blocked}
-        title={
-          blocked
-            ? "Choose a device first"
-            : target
-              ? `Choose files to send to ${target.name}`
-              : "Choose files to share publicly"
-        }
-        hint="Photos, videos or any files, of any size"
+        title={blocked ? "Choose a device first" : target ? `Files for ${target.name}` : "Any files, any size"}
         onPick={picker.open}
         onDrop={(picked) => void stage(picked)}
       />
@@ -125,20 +116,12 @@ export function FileSender({ mode }: { mode: "public" | "device" }) {
           </Step>
           <Step number={2} title="Choose files">
             {files}
-            <p className="mt-2 flex items-start gap-1.5 text-sm text-muted">
-              <DeviceIcon className="mt-0.5 size-4 shrink-0" />
-              Sent straight from this device. {keepOpen("they have arrived")}
-            </p>
           </Step>
         </div>
       ) : (
         <>
           {files}
-          <p className="mt-2 flex items-center gap-1.5 text-sm text-muted">
-            <GlobeIcon className="size-4 shrink-0" />
-            Listed in Public shares below.
-          </p>
-          <ExpiryNote />
+          <ExpiryNote className="mt-2" />
         </>
       )}
 

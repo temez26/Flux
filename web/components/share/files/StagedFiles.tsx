@@ -57,7 +57,6 @@ export function StagedFiles({
   files,
   action,
   disabled,
-  hint,
   onSend,
   onAdd,
   onRemove,
@@ -66,8 +65,6 @@ export function StagedFiles({
   files: Picked[];
   action: string;
   disabled: boolean;
-  /** Why they can't be sent yet. */
-  hint?: string;
   onSend: () => void;
   /** Opens the picker for more; phones pick from the library a batch at a time. */
   onAdd: () => void;
@@ -89,7 +86,7 @@ export function StagedFiles({
   }, [files]);
 
   return (
-    <div className="rounded-2xl border-2 border-accent/60 bg-accent/5 p-4 sm:p-5">
+    <div className="animate-view-in rounded-2xl border-2 border-accent/60 bg-accent/5 p-4 sm:p-5">
       <div className="flex items-baseline justify-between gap-3">
         <p ref={heading} tabIndex={-1} className="font-semibold outline-none!">
           {plural(files.length, "file")} ready
@@ -138,7 +135,6 @@ export function StagedFiles({
           Cancel
         </Button>
       </div>
-      {hint && <p className="mt-3 text-sm text-muted">{hint}</p>}
     </div>
   );
 }

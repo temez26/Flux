@@ -17,21 +17,21 @@ function hostedStatus(serving: number, sent: number, expired: boolean): StatusPr
       tone: "err",
       icon: <AlertIcon />,
       title: "Link expired",
-      subtitle: "The link no longer works. Send the files again to share them.",
+      subtitle: "Send the files again to share them.",
     };
   if (serving > 0) {
     return {
       tone: "accent",
       icon: <ZapIcon />,
       title: `Sending to ${plural(serving, "device")}`,
-      subtitle: `${formatBytes(sent)} sent straight from here.`,
+      subtitle: `${formatBytes(sent)} sent`,
     };
   }
   return {
     tone: "ok",
     icon: <DeviceIcon />,
-    title: "Ready to send from this device",
-    subtitle: `Nothing was uploaded. ${keepOpen("the files have been received")}`,
+    title: "Ready to send",
+    subtitle: keepOpen(),
   };
 }
 

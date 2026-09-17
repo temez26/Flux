@@ -6,7 +6,7 @@ import { AlertIcon, CheckIcon } from "./icons";
 
 function ToastItem({ toast }: { toast: Toast }) {
   return (
-    <div className="pointer-events-auto flex animate-[toast-in_.2s_ease-out] items-center gap-2 rounded-xl border border-line bg-surface py-2.5 pr-2 pl-4 text-sm font-medium shadow-lg">
+    <div className="pointer-events-auto flex animate-[toast-in_.2s_ease-out] surface floating items-center gap-2 rounded-xl py-2.5 pr-2 pl-4 text-sm font-medium">
       {toast.tone === "ok" ? <CheckIcon className="size-4 text-ok" /> : <AlertIcon className="size-4 text-err" />}
       {toast.message}
       {toast.action && (

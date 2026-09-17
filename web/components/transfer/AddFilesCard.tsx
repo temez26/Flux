@@ -50,24 +50,23 @@ export function AddFilesCard({ meta }: { meta: TransferMeta }) {
           tone: "err",
           icon: <AlertIcon />,
           title: "This share is gone",
-          subtitle: "It expired or was deleted before everything arrived.",
+          subtitle: "It expired or was deleted.",
         }
       : snapshot.finished && failed
         ? {
             tone: "err",
             icon: <AlertIcon />,
             title: `${plural(failed, "file")} didn't make it`,
-            subtitle: "Retry them, or leave the rest as they are.",
           }
         : snapshot.finished
-          ? { tone: "ok", icon: <CheckIcon />, title: "Your files are in", subtitle: "Uploaded and verified." }
+          ? { tone: "ok", icon: <CheckIcon />, title: "Your files are in" }
           : uploader.paused
-            ? { tone: "warn", icon: <PauseIcon />, title: "Paused", subtitle: "Resume to finish adding your files." }
+            ? { tone: "warn", icon: <PauseIcon />, title: "Paused" }
             : {
                 tone: "accent",
                 icon: <Spinner className="size-5" />,
                 title: "Adding your files",
-                subtitle: keepOpen("it finishes"),
+                subtitle: keepOpen(),
               };
   }
 
@@ -76,8 +75,7 @@ export function AddFilesCard({ meta }: { meta: TransferMeta }) {
       <Card>
         <SectionTitle icon={<PlusIcon className="size-4.5" />}>Add your files</SectionTitle>
         <p className="text-sm text-muted">
-          The owner lets anyone add files here. Yours go into a folder named{" "}
-          <span className="font-medium text-fg">{getDevice().name}</span>, and everyone can see and download them.
+          Added to a public folder named <span className="font-medium text-fg">{getDevice().name}</span>.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button variant="primary" onClick={() => picker.open("files")} disabled={adding}>

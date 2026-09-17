@@ -10,6 +10,7 @@ import { tabAt } from "./share/tabs";
 import { AlertIcon, BackIcon, LogoIcon } from "./ui/icons";
 import { IncomingOffers } from "./nearby";
 import { SettingsMenu } from "./settings/SettingsMenu";
+import { syncThemeColor } from "./settings/theme";
 import Toaster from "./ui/Toaster";
 import TransferView from "./transfer/TransferView";
 import { Badge, IconButton, Link, Message } from "./ui/ui";
@@ -46,23 +47,13 @@ export default function App() {
   // matches the current page background and follows the system light/dark switch.
   useEffect(() => {
     const dark = window.matchMedia("(prefers-color-scheme: dark)");
-    const meta =
-      document.querySelector<HTMLMetaElement>('meta[name="theme-color"]:not([media])') ??
-      document.createElement("meta");
-    if (!meta.isConnected) {
-      meta.name = "theme-color";
-      document.head.prepend(meta);
-    }
-    const sync = () => {
-      meta.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
-    };
-    sync();
-    dark.addEventListener("change", sync);
+    syncThemeColor();
+    dark.addEventListener("change", syncThemeColor);
     // The theme is usually switched in system settings while the app is in the background.
-    document.addEventListener("visibilitychange", sync);
+    document.addEventListener("visibilitychange", syncThemeColor);
     return () => {
-      dark.removeEventListener("change", sync);
-      document.removeEventListener("visibilitychange", sync);
+      dark.removeEventListener("change", syncThemeColor);
+      document.removeEventListener("visibilitychange", syncThemeColor);
     };
   }, []);
 
@@ -111,7 +102,10 @@ export default function App() {
         </div>
       </header>
       <main id="main" ref={main} tabIndex={-1} className="flex-1 pt-4 outline-none!">
-        {view}
+        {/* Keyed by view rather than path, so moving between the home tabs isn't a new page. */}
+        <div key={code ?? (tab ? "home" : "missing")} className="animate-view-in">
+          {view}
+        </div>
       </main>
       <Toaster />
     </div>
