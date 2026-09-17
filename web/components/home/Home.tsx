@@ -83,8 +83,8 @@ export default function Home() {
       <Card aria-label="Open a share">
         <ReceiveForm />
       </Card>
-      <Card aria-label="Public shares">
-        <PublicList heading="h2" preview />
+      <Card aria-label="Public files">
+        <PublicList kind="files" heading="h2" preview />
       </Card>
       <OwnedList />
       <RecentList />

@@ -41,6 +41,8 @@ pub struct Transfer {
     pub expires_at: DateTime<Utc>,
     /// Served from the sender's device; the server never holds the bytes.
     pub hosted: bool,
+    /// Listed for everyone who opens Flux.
+    pub public: bool,
     /// Open to files from anyone with the code, not only from its owner.
     pub collect: bool,
     pub title: String,
@@ -60,7 +62,7 @@ pub fn normalize_code(raw: &str) -> String {
 
 pub async fn find(db: &sqlx::PgPool, code: &str) -> Result<Transfer> {
     sqlx::query_as(
-        "SELECT id, code, token_hash, created_at, expires_at, hosted, collect, title, downloads, closed, note, editable, note_version FROM transfers
+        "SELECT id, code, token_hash, created_at, expires_at, hosted, public, collect, title, downloads, closed, note, editable, note_version FROM transfers
          WHERE code = $1 AND expires_at > now()",
     )
     .bind(normalize_code(code))

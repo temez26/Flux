@@ -28,6 +28,8 @@ export interface TransferMeta {
   expiresAt: string;
   /** Served from the sender's device: the server has the file list but none of the bytes. */
   hosted: boolean;
+  /** Listed for everyone who opens Flux. */
+  public: boolean;
   files: FileMeta[];
 }
 
@@ -191,11 +193,15 @@ export function getConfig() {
   return request<{ stunPort: number | null }>("/api/config");
 }
 
-/** Public transfers, newest first. `q` narrows by title; `limit` is how many to ask for. */
-export function listPublic(options: { q?: string; limit?: number } = {}) {
+/**
+ * Public transfers, newest first. `q` narrows by title and `kind` to files or text; `limit` is how
+ * many to ask for.
+ */
+export function listPublic(options: { q?: string; limit?: number; kind?: "files" | "text" } = {}) {
   const params = new URLSearchParams();
   if (options.q) params.set("q", options.q);
   if (options.limit) params.set("limit", String(options.limit));
+  if (options.kind) params.set("kind", options.kind);
   const query = params.toString();
   return request<Summary[]>(`/api/public${query ? `?${query}` : ""}`);
 }
@@ -237,9 +243,9 @@ export function countDownload(code: string) {
 export function updateTransfer(
   code: string,
   token: string,
-  changes: { expiresIn?: number; closed?: boolean; editable?: boolean },
+  changes: { expiresIn?: number; closed?: boolean; editable?: boolean; public?: boolean },
 ) {
-  return request<{ expiresAt: string; closed: boolean; editable: boolean }>(transferUrl(code), {
+  return request<{ expiresAt: string; closed: boolean; editable: boolean; public: boolean }>(transferUrl(code), {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...auth(token) },
     body: JSON.stringify(changes),

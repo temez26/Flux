@@ -43,6 +43,7 @@ async function transfer(count: number): Promise<TransferMeta> {
     createdAt: "",
     expiresAt: "",
     hosted: true,
+    public: false,
     files,
   };
 }

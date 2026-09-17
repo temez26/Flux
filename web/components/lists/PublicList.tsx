@@ -15,11 +15,25 @@ const PUBLIC_SEARCH_FROM = 12;
 /** How many a preview shows before pointing to the whole listing. */
 const PREVIEW_LIMIT = 5;
 
+const WORDING = {
+  files: { heading: "Public files", room: "/public", noun: "files" },
+  text: { heading: "Public texts", room: "/text", noun: "texts" },
+};
+
 /**
- * What is shared publicly, newest first. A preview shows the newest few and links to the Public
- * share room, where the listing can be searched and paged through.
+ * Files or texts shared publicly, newest first. A preview shows the newest few and links to their
+ * room, where the listing can be searched and paged through.
  */
-export function PublicList({ heading: Heading, preview = false }: { heading: "h2" | "h3"; preview?: boolean }) {
+export function PublicList({
+  kind,
+  heading: Heading,
+  preview = false,
+}: {
+  kind: "files" | "text";
+  heading: "h2" | "h3";
+  preview?: boolean;
+}) {
+  const wording = WORDING[kind];
   const now = useNow(60_000);
   const [list, setList] = useState<Summary[] | null>(null);
   const [query, setQuery] = useState("");
@@ -27,12 +41,12 @@ export function PublicList({ heading: Heading, preview = false }: { heading: "h2
   const needle = query.trim();
 
   // Asking for the pages already on screen keeps a refresh from dropping what was opened up.
-  usePolling(async () => setList(await listPublic({ q: needle, limit })), LIST_POLL_MS);
+  usePolling(async () => setList(await listPublic({ q: needle, limit, kind })), LIST_POLL_MS);
 
   if (!list) {
     return (
       <p role="status" className="flex items-center gap-2 text-sm text-muted">
-        <Spinner /> Loading public shares…
+        <Spinner /> Loading public {wording.noun}…
       </p>
     );
   }
@@ -44,7 +58,7 @@ export function PublicList({ heading: Heading, preview = false }: { heading: "h2
     <div>
       <Heading className="mb-2 flex items-center gap-2 text-sm font-medium">
         <GlobeIcon className="size-4 text-muted" />
-        Public shares
+        {wording.heading}
         {list.length > 0 && <Badge>{more ? `${list.length}+` : list.length}</Badge>}
       </Heading>
       {searchable && (
@@ -57,8 +71,8 @@ export function PublicList({ heading: Heading, preview = false }: { heading: "h2
               setQuery(e.target.value);
               setLimit(PUBLIC_PAGE);
             }}
-            placeholder="Search public files"
-            aria-label="Search public files"
+            placeholder={`Search public ${wording.noun}`}
+            aria-label={`Search public ${wording.noun}`}
             autoCapitalize="off"
             autoComplete="off"
             autoCorrect="off"
@@ -98,15 +112,15 @@ export function PublicList({ heading: Heading, preview = false }: { heading: "h2
         ))
       ) : (
         <p className="rounded-xl border border-dashed border-line p-4 text-center text-sm text-muted">
-          {needle ? `Nothing public matches “${needle}”.` : "Nothing is shared publicly right now."}
+          {needle ? `No public ${wording.noun} match “${needle}”.` : `No public ${wording.noun} right now.`}
         </p>
       )}
       {preview ? (
         <Link
-          href="/public"
+          href={wording.room}
           className="mt-2 flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-medium text-accent transition hover:bg-hover"
         >
-          See all public shares
+          See all public {wording.noun}
           <ArrowIcon className="size-4" />
         </Link>
       ) : (

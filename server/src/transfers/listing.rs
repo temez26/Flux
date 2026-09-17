@@ -58,14 +58,23 @@ fn like_pattern(text: &str) -> String {
     out
 }
 
+#[derive(Deserialize, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum Kind {
+    Files,
+    Text,
+}
+
 #[derive(Deserialize)]
 pub struct PublicQuery {
     /// Matches the transfer's title, which is the dropped folder or the first file's name.
     q: Option<String>,
     limit: Option<i64>,
+    /// Only files or only text; both when absent.
+    kind: Option<Kind>,
 }
 
-/// Public transfers, newest first, narrowed by `q` and capped at `limit`.
+/// Public transfers, newest first, narrowed by `q` and `kind` and capped at `limit`.
 pub async fn list_public(State(state): State<Shared>, Query(query): Query<PublicQuery>) -> Result<Json<Vec<Summary>>> {
     let limit = query.limit.unwrap_or(PUBLIC_LIST_LIMIT).clamp(1, PUBLIC_LIST_MAX);
     let search = query
@@ -77,11 +86,13 @@ pub async fn list_public(State(state): State<Shared>, Query(query): Query<Public
     let sql = format!(
         "{SUMMARY_SQL} WHERE t.public AND t.expires_at > now()
            AND ($2::text IS NULL OR t.title ILIKE $2 ESCAPE '{LIKE_ESCAPE}')
+           AND ($3::bool IS NULL OR (t.note IS NOT NULL) = $3)
          GROUP BY t.id ORDER BY t.created_at DESC LIMIT $1"
     );
     let transfers = sqlx::query_as(&sql)
         .bind(limit)
         .bind(search)
+        .bind(query.kind.map(|kind| matches!(kind, Kind::Text)))
         .fetch_all(&state.db)
         .await?;
     Ok(Json(transfers))

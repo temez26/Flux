@@ -21,6 +21,8 @@ pub struct Update {
     closed: Option<bool>,
     /// Let anyone with the code edit a text transfer, or only its owner.
     editable: Option<bool>,
+    /// List the transfer for everyone who opens Flux, or stop listing it.
+    public: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -29,6 +31,7 @@ pub struct Updated {
     expires_at: DateTime<Utc>,
     closed: bool,
     editable: bool,
+    public: bool,
 }
 
 /// Changes what its owner may change about a transfer after making it.
@@ -53,17 +56,20 @@ pub async fn update(
     }
     let closed = req.closed.unwrap_or(transfer.closed);
     let editable = req.editable.unwrap_or(transfer.editable);
-    sqlx::query("UPDATE transfers SET expires_at = $2, closed = $3, editable = $4 WHERE id = $1")
+    let public = req.public.unwrap_or(transfer.public);
+    sqlx::query("UPDATE transfers SET expires_at = $2, closed = $3, editable = $4, public = $5 WHERE id = $1")
         .bind(transfer.id)
         .bind(expires_at)
         .bind(closed)
         .bind(editable)
+        .bind(public)
         .execute(&state.db)
         .await?;
     Ok(Json(Updated {
         expires_at,
         closed,
         editable,
+        public,
     }))
 }
 

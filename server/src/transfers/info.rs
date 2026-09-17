@@ -43,6 +43,7 @@ pub struct TransferInfo {
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
     hosted: bool,
+    public: bool,
     files: Vec<FileInfo>,
 }
 
@@ -121,6 +122,7 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
         created_at: transfer.created_at,
         expires_at: transfer.expires_at,
         hosted: transfer.hosted,
+        public: transfer.public,
         files,
     })
     .map_err(|_| AppError::INTERNAL)?;

@@ -43,9 +43,9 @@ export function RoomPage({ room }: { room: Room }) {
       <Card aria-label={room.name}>
         <RoomBody id={room.id} standalone />
       </Card>
-      {room.id === "public" && (
-        <Card aria-label="Public shares">
-          <PublicList heading="h2" />
+      {room.lists && (
+        <Card>
+          <PublicList kind={room.lists} heading="h2" />
         </Card>
       )}
     </div>
@@ -68,9 +68,9 @@ export function RoomPanel({ id }: { id: RoomId }) {
         {room.name}
       </SectionTitle>
       <RoomBody id={id} standalone={false} />
-      {id === "public" && (
+      {room.lists && (
         <div className="mt-6 border-t border-line pt-5">
-          <PublicList heading="h3" />
+          <PublicList kind={room.lists} heading="h3" />
         </div>
       )}
     </Card>

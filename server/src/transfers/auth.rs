@@ -65,6 +65,7 @@ mod tests {
             created_at: Utc::now(),
             expires_at: Utc::now(),
             hosted: false,
+            public: false,
             collect: true,
             title: String::new(),
             downloads: 0,

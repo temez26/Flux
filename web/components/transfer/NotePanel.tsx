@@ -7,14 +7,18 @@ import { formatCode, formatRemaining } from "@/lib/util/format";
 import { reloadTransfer, useNow, useTitle } from "@/lib/hooks";
 import { linkify } from "@/lib/util/links";
 import { toast } from "@/lib/alerts/toast";
-import { AlertIcon, ClockIcon, CopyIcon, LockIcon, TextIcon } from "../ui/icons";
+import { AlertIcon, ClockIcon, CopyIcon, GlobeIcon, LinkIcon, LockIcon, TextIcon, UsersIcon } from "../ui/icons";
 import { ShareCard } from "./ShareCard";
 import { Badge, Button, Card, ConfirmButton, Field, Notice, Segmented, Spinner } from "../ui/ui";
 import { pageTitle, removeTransfer, useRememberRecent } from "./common";
 
 const EDITORS = [
-  { label: "Only me", value: "owner", icon: <LockIcon className="size-4" /> },
-  { label: "Anyone with the code", value: "anyone", icon: <TextIcon className="size-4" /> },
+  { label: "Read only", value: "owner", icon: <LockIcon className="size-4" /> },
+  { label: "Edit together", value: "anyone", icon: <UsersIcon className="size-4" /> },
+];
+const VISIBILITY = [
+  { label: "Link only", value: "link", icon: <LinkIcon className="size-4" /> },
+  { label: "Listed publicly", value: "public", icon: <GlobeIcon className="size-4" /> },
 ];
 
 /** Text as it reads, with its web addresses made into links that open outside Flux. */
@@ -103,12 +107,12 @@ export function NotePanel({ meta, token }: { meta: TransferMeta; token?: string 
     }
   }
 
-  async function chooseEditors(value: string) {
+  async function change(changes: { editable?: boolean; public?: boolean }, done: string) {
     if (!token) return;
     try {
-      await updateTransfer(meta.code, token, { editable: value === "anyone" });
+      await updateTransfer(meta.code, token, changes);
       reloadTransfer(meta.code);
-      toast(value === "anyone" ? "Anyone with the code can edit it now" : "Only you can edit it now");
+      toast(done);
     } catch (err) {
       toast(errorMessage(err), "err");
     }
@@ -226,16 +230,41 @@ export function NotePanel({ meta, token }: { meta: TransferMeta; token?: string 
         </div>
 
         {owner && (
-          <div className="mt-5">
+          <div className="mt-5 grid gap-4 @xl:grid-cols-2">
+            <Field
+              label="Who can find it"
+              hint={
+                meta.public
+                  ? "Listed in Text for anyone who opens Flux."
+                  : "Only people with the code, link or QR code."
+              }
+            >
+              <Segmented
+                label="Who can find it"
+                value={meta.public ? "public" : "link"}
+                options={VISIBILITY}
+                onChange={(v) =>
+                  change(
+                    { public: v === "public" },
+                    v === "public" ? "Listed publicly now" : "Only reachable by link now",
+                  )
+                }
+              />
+            </Field>
             <Field
               label="Who can edit"
-              hint="Anyone with the code can always read it. You can change this whenever you like."
+              hint={meta.editable ? "Anyone who can open it can change it." : "Only you can change it; others read."}
             >
               <Segmented
                 label="Who can edit"
                 value={meta.editable ? "anyone" : "owner"}
                 options={EDITORS}
-                onChange={chooseEditors}
+                onChange={(v) =>
+                  change(
+                    { editable: v === "anyone" },
+                    v === "anyone" ? "Anyone with the link can edit it now" : "Only you can edit it now",
+                  )
+                }
               />
             </Field>
           </div>
