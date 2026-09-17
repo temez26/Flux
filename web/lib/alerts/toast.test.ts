@@ -5,7 +5,7 @@ import { toast, toasts } from "./toast";
 beforeEach(() => {
   vi.useFakeTimers();
   Object.defineProperty(globalThis, "window", { value: globalThis, configurable: true });
-  toasts.list = [];
+  while (toasts.list.length) toasts.dismiss(toasts.list[0].id);
 });
 afterEach(() => vi.useRealTimers());
 
@@ -47,4 +47,36 @@ test("dismissing one leaves the others", () => {
     toasts.list.map((t) => t.message),
     ["second"],
   );
+});
+
+test("stays up while held, and gets its whole time again once let go", () => {
+  toast("Link copied");
+  vi.advanceTimersByTime(2000);
+  toasts.hold();
+  vi.advanceTimersByTime(60_000);
+  assert.equal(toasts.list.length, 1, "held for as long as it takes");
+  toasts.release();
+  vi.advanceTimersByTime(2000);
+  assert.equal(toasts.list.length, 1, "not gone the moment it's let go");
+  vi.advanceTimersByTime(500);
+  assert.equal(toasts.list.length, 0);
+});
+
+test("an offer lapses when it goes untaken, and not when its action is taken", () => {
+  let lapsed = 0;
+  toast("Transfer deleted", "ok", { onLapse: () => lapsed++, action: { label: "Undo", run: () => {} } });
+  toasts.dismiss(toasts.list[0].id);
+  vi.advanceTimersByTime(10_000);
+  assert.equal(lapsed, 0);
+
+  toast("Transfer deleted", "ok", { onLapse: () => lapsed++ });
+  vi.advanceTimersByTime(2500);
+  assert.equal(lapsed, 1);
+});
+
+test("an offer pushed out by newer toasts has lapsed", () => {
+  let lapsed = false;
+  toast("Transfer deleted", "ok", { durationMs: 7000, onLapse: () => (lapsed = true) });
+  for (let i = 0; i < 3; i++) toast(`message ${i}`);
+  assert.ok(lapsed);
 });

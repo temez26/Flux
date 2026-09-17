@@ -87,20 +87,14 @@ export function removeOwnedFile(code: string, token: string, file: FileMeta) {
 
 export function removeTransfer(code: string, token: string) {
   navigate("/", true);
-  const timer = window.setTimeout(() => {
-    end(code);
-    removeOwned(code);
-    void deleteTransfer(code, token).catch(() => {});
-  }, UNDO_MS);
-
   toast("Transfer deleted", "ok", {
     durationMs: UNDO_MS,
-    action: {
-      label: "Undo",
-      run: () => {
-        window.clearTimeout(timer);
-        navigate(`/${formatCode(code)}`);
-      },
+    action: { label: "Undo", run: () => navigate(`/${formatCode(code)}`) },
+    // Tied to the toast rather than a clock of its own, so Undo stays good for as long as it's shown.
+    onLapse: () => {
+      end(code);
+      removeOwned(code);
+      void deleteTransfer(code, token).catch(() => {});
     },
   });
 }
