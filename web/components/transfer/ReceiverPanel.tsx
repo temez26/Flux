@@ -26,6 +26,7 @@ import {
 } from "../ui/icons";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
 import { ShareFilesButton } from "./ShareFiles";
+import { StickyAction } from "./StickyAction";
 import {
   Badge,
   Button,
@@ -218,30 +219,32 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
         )}
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
-          {meta.hosted ? (
-            <Button
-              variant="primary"
-              className={primary}
-              onClick={() => startDirect(meta.files)}
-              disabled={!viaDirect || tooLargeHere}
-            >
-              {label}
-            </Button>
-          ) : viaDirect ? (
-            <Button variant="primary" className={primary} onClick={() => startDirect(meta.files)}>
-              {label}
-            </Button>
-          ) : (
-            <a
-              href={single ? fileUrl(meta.code, single.idx) : zipUrl(meta.code)}
-              download
-              aria-disabled={!ready}
-              onClick={() => countDownload(meta.code)}
-              className={buttonClass("primary", primary)}
-            >
-              {label}
-            </a>
-          )}
+          <StickyAction enabled={!single}>
+            {meta.hosted ? (
+              <Button
+                variant="primary"
+                className={primary}
+                onClick={() => startDirect(meta.files)}
+                disabled={!viaDirect || tooLargeHere}
+              >
+                {label}
+              </Button>
+            ) : viaDirect ? (
+              <Button variant="primary" className={primary} onClick={() => startDirect(meta.files)}>
+                {label}
+              </Button>
+            ) : (
+              <a
+                href={single ? fileUrl(meta.code, single.idx) : zipUrl(meta.code)}
+                download
+                aria-disabled={!ready}
+                onClick={() => countDownload(meta.code)}
+                className={buttonClass("primary", primary)}
+              >
+                {label}
+              </a>
+            )}
+          </StickyAction>
           {!meta.hosted && !viaDirect && ready && (
             <ShareFilesButton code={meta.code} files={meta.files} counted className="min-h-12 max-sm:flex-1" />
           )}
