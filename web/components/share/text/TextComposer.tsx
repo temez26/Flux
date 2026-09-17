@@ -80,7 +80,7 @@ export function TextComposer() {
         placeholder="Paste a link, a note, a password…"
         aria-describedby={`${id}-hint`}
         spellCheck={false}
-        className="block min-h-40 w-full resize-y rounded-2xl border-2 border-line bg-bg p-3 text-base outline-none placeholder:text-muted focus:border-accent/60"
+        className="block min-h-40 w-full resize-y rounded-2xl border-2 border-line bg-bg p-3 text-base outline-none! transition-colors placeholder:text-muted focus:border-accent"
       />
       <p id={`${id}-hint`} className="mt-1.5 text-xs text-muted">
         Always kept on the server.<span className="hidden pointer-fine:inline"> Ctrl+Enter to share.</span>
