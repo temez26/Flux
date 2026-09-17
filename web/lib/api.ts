@@ -30,6 +30,8 @@ export interface TransferMeta {
   hosted: boolean;
   /** Listed for everyone who opens Flux. */
   public: boolean;
+  /** Seconds it lasts once its upload completes; null when it counts from creation. */
+  lifetime: number | null;
   files: FileMeta[];
 }
 
@@ -52,6 +54,8 @@ export interface Summary {
   title: string;
   createdAt: string;
   expiresAt: string;
+  /** Seconds it lasts once its upload completes; null when it counts from creation. */
+  lifetime: number | null;
   hosted: boolean;
   collect: boolean;
   downloads: number;
@@ -250,11 +254,14 @@ export function updateTransfer(
   token: string,
   changes: { expiresIn?: number; closed?: boolean; editable?: boolean; public?: boolean },
 ) {
-  return request<{ expiresAt: string; closed: boolean; editable: boolean; public: boolean }>(transferUrl(code), {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...auth(token) },
-    body: JSON.stringify(changes),
-  });
+  return request<{ expiresAt: string; closed: boolean; editable: boolean; public: boolean; lifetime: number | null }>(
+    transferUrl(code),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...auth(token) },
+      body: JSON.stringify(changes),
+    },
+  );
 }
 
 export function deleteTransfer(code: string, token: string) {

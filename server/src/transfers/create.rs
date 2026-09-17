@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::{
-    EXPIRY_CHOICES, MAX_FILES, MAX_NOTE_BYTES,
+    EXPIRY_CHOICES, MAX_FILES, MAX_NOTE_BYTES, UPLOAD_GRACE,
     files::{NewFile, checked_total, insert_files},
     hex,
     space::ensure_room,
@@ -84,7 +84,14 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
     let id = Uuid::new_v4();
     let token = hex(&rand::random::<[u8; 32]>());
     let token_hash = blake3::hash(token.as_bytes());
-    let expires_at = Utc::now() + chrono::Duration::seconds(req.expires_in);
+    // Files uploaded here last their lifetime from when the upload completes; until then the
+    // transfer is kept for at least as long as an upload may pause.
+    let lifetime = (!req.hosted && !req.collect && req.note.is_none()).then_some(req.expires_in as i32);
+    let kept_for = match lifetime {
+        Some(seconds) => seconds.max(UPLOAD_GRACE) as i64,
+        None => req.expires_in,
+    };
+    let expires_at = Utc::now() + chrono::Duration::seconds(kept_for);
     let title = match (&req.note, req.collect) {
         (Some(note), _) => note_title(note),
         (None, true) => collection_title(req.title.as_deref()),
@@ -96,8 +103,8 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
     for _ in 0..8 {
         let candidate = random_code();
         let inserted = sqlx::query(
-            "INSERT INTO transfers (id, code, token_hash, expires_at, public, title, hosted, collect, next_idx, note, editable)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            "INSERT INTO transfers (id, code, token_hash, expires_at, public, title, hosted, collect, next_idx, note, editable, lifetime)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
              ON CONFLICT (code) DO NOTHING",
         )
         .bind(id)
@@ -111,6 +118,7 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
         .bind(req.files.len() as i32)
         .bind(&req.note)
         .bind(req.note.is_some() && req.editable)
+        .bind(lifetime)
         .execute(&mut *tx)
         .await?;
         if inserted.rows_affected() == 1 {

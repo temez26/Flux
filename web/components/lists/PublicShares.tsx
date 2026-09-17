@@ -182,7 +182,7 @@ function PublicRow({ transfer: t, now }: { transfer: Summary; now: number }) {
         )
       }
       title={t.title}
-      detail={`${t.note ? "Text" : plural(t.files, "file")} · ${formatBytes(t.size)} · ${formatRemaining(t.expiresAt, now)}`}
+      detail={`${t.note ? "Text" : plural(t.files, "file")} · ${formatBytes(t.size)} · ${formatRemaining(t.expiresAt, now, t.complete ? null : t.lifetime)}`}
       badge={
         t.hosted ? (
           <Badge icon={<DeviceIcon />}>From a device</Badge>

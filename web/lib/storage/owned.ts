@@ -12,6 +12,8 @@ export interface Owned {
   collect?: boolean;
   /** Text rather than files. */
   note?: boolean;
+  /** Seconds uploaded files last once their upload completes. */
+  lifetime?: number;
   count: number;
   size: number;
   createdAt: number;

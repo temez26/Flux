@@ -159,7 +159,7 @@ export function SenderPanel({
 
   return (
     <div className="space-y-4">
-      <ShareCard code={uploader.code} expiresAt={expiresAt} />
+      <ShareCard code={uploader.code} expiresAt={expiresAt} uploading={!finished} />
       <StatusCard
         {...senderStatus(session, uploader)}
         percent={percent(sent, total)}

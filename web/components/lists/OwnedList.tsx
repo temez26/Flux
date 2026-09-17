@@ -104,7 +104,13 @@ export function OwnedList() {
               o.note ? "Text" : plural(count, "file"),
               formatBytes(size),
               summary?.downloads ? plural(summary.downloads, "download") : null,
-              formatLifetime(o.expiresAt, !!o.hosted, live.has(code)),
+              formatLifetime(
+                summary?.expiresAt ?? o.expiresAt,
+                !!o.hosted,
+                live.has(code),
+                Date.now(),
+                summary && !summary.complete ? summary.lifetime : null,
+              ),
             ]
               .filter(Boolean)
               .join(" · ")}

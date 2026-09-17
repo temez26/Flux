@@ -6,7 +6,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::{EXPIRY_CHOICES, auth::authorize, find, normalize_code};
+use super::{EXPIRY_CHOICES, UPLOAD_GRACE, auth::authorize, find, normalize_code};
 use crate::{
     Shared,
     error::{AppError, Result},
@@ -32,6 +32,7 @@ pub struct Updated {
     closed: bool,
     editable: bool,
     public: bool,
+    lifetime: Option<i32>,
 }
 
 /// Changes what its owner may change about a transfer after making it.
@@ -43,10 +44,18 @@ pub async fn update(
 ) -> Result<Json<Updated>> {
     let transfer = find(&state.db, &code).await?;
     authorize(&headers, &transfer)?;
-    let expires_at = match req.expires_in {
-        Some(seconds) if EXPIRY_CHOICES.contains(&seconds) => Utc::now() + chrono::Duration::seconds(seconds),
-        Some(_) => return Err(AppError::bad_request("invalid expiry")),
-        None => transfer.expires_at,
+    let (expires_at, lifetime) = match req.expires_in {
+        Some(seconds) if !EXPIRY_CHOICES.contains(&seconds) => return Err(AppError::bad_request("invalid expiry")),
+        // An upload still under way keeps the new lifetime for when it completes.
+        Some(seconds) if transfer.lifetime.is_some() && uploading(&state.db, transfer.id).await? => (
+            Utc::now() + chrono::Duration::seconds(seconds.max(UPLOAD_GRACE as i64)),
+            Some(seconds as i32),
+        ),
+        Some(seconds) => (
+            Utc::now() + chrono::Duration::seconds(seconds),
+            transfer.lifetime.map(|_| seconds as i32),
+        ),
+        None => (transfer.expires_at, transfer.lifetime),
     };
     if req.closed.is_some() && !transfer.collect {
         return Err(AppError::bad_request("only a collection can be closed"));
@@ -57,21 +66,34 @@ pub async fn update(
     let closed = req.closed.unwrap_or(transfer.closed);
     let editable = req.editable.unwrap_or(transfer.editable);
     let public = req.public.unwrap_or(transfer.public);
-    sqlx::query("UPDATE transfers SET expires_at = $2, closed = $3, editable = $4, public = $5 WHERE id = $1")
-        .bind(transfer.id)
-        .bind(expires_at)
-        .bind(closed)
-        .bind(editable)
-        .bind(public)
-        .execute(&state.db)
-        .await?;
+    sqlx::query(
+        "UPDATE transfers SET expires_at = $2, closed = $3, editable = $4, public = $5, lifetime = $6 WHERE id = $1",
+    )
+    .bind(transfer.id)
+    .bind(expires_at)
+    .bind(closed)
+    .bind(editable)
+    .bind(public)
+    .bind(lifetime)
+    .execute(&state.db)
+    .await?;
     state.notes.changed(transfer.id);
     Ok(Json(Updated {
         expires_at,
         closed,
         editable,
         public,
+        lifetime,
     }))
+}
+
+async fn uploading(db: &sqlx::PgPool, id: uuid::Uuid) -> Result<bool> {
+    Ok(
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM files WHERE transfer_id = $1 AND hash IS NULL)")
+            .bind(id)
+            .fetch_one(db)
+            .await?,
+    )
 }
 
 /// Counts one download of a transfer. Called by the page a download starts from, which is the

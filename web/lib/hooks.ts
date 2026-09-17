@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getTransfer, type TransferMeta } from "./api";
 import { notify } from "./alerts/notify";
-import { getOwned, ownedVersion, subscribeOwned } from "./storage/owned";
+import { getOwned, ownedVersion, saveOwned, subscribeOwned } from "./storage/owned";
 import type { SocketLike } from "./nearby/nearby";
 import { NoteLive } from "./transfer/live";
 
@@ -319,6 +319,12 @@ export function useTransferMeta(code: string, enabled: boolean) {
         setMeta(next);
         setOffline(false);
         if (!next) return;
+        // The server moves the expiry when an upload completes, and this device's record of the
+        // transfer is forgotten at the expiry it holds, so it has to follow.
+        const owned = getOwned(code);
+        if (owned && (owned.expiresAt !== next.expiresAt || (owned.lifetime ?? null) !== next.lifetime)) {
+          saveOwned(code, { ...owned, expiresAt: next.expiresAt, lifetime: next.lifetime ?? undefined });
+        }
         // A collection can gain files at any moment, however finished it looks. A transfer
         // served from a device never gets hashes, which would otherwise read as always uploading.
         // Text can change under the reader at any moment too — its owner can always edit it.

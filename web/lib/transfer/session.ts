@@ -70,6 +70,7 @@ export async function send(picked: Picked[], expiresIn: number, isPublic: boolea
     expiresAt: created.expiresAt,
     public: isPublic,
     hosted,
+    lifetime: hosted ? undefined : expiresIn,
     count: files.length,
     size: files.reduce((sum, p) => sum + p.file.size, 0),
     createdAt: Date.now(),

@@ -126,7 +126,9 @@ export function TransferHeading({ meta, badges }: { meta: TransferMeta; badges?:
         <Badge>
           <span className="font-mono">{formatCode(meta.code)}</span>
         </Badge>
-        <Badge icon={<ClockIcon />}>{formatRemaining(meta.expiresAt, now)}</Badge>
+        <Badge icon={<ClockIcon />}>
+          {formatRemaining(meta.expiresAt, now, meta.files.some((f) => f.hash === null) ? meta.lifetime : null)}
+        </Badge>
         {badges}
       </div>
       <div className="mt-4 flex items-center gap-3">

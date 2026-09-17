@@ -196,6 +196,7 @@ async fn write_chunk(
             "this transfer is served from the sender's device",
         ));
     }
+    transfers::keep_uploading(&state.db, transfer.id).await?;
     let (size, hash): (i64, Option<Vec<u8>>) =
         sqlx::query_as("SELECT size, hash FROM files WHERE transfer_id = $1 AND idx = $2")
             .bind(transfer.id)
@@ -312,6 +313,7 @@ async fn write_chunk(
         .bind(finished.crc.finalize() as i32)
         .execute(&state.db)
         .await?;
+    transfers::start_lifetime(&state.db, transfer.id).await?;
     drop(slot);
     state.uploads.remove(key);
     Ok(progress(StatusCode::OK, size, true))

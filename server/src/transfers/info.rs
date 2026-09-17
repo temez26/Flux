@@ -44,6 +44,8 @@ pub struct TransferInfo {
     expires_at: DateTime<Utc>,
     hosted: bool,
     public: bool,
+    /// Seconds it lasts once its upload completes; absent when it counts from creation.
+    lifetime: Option<i32>,
     files: Vec<FileInfo>,
 }
 
@@ -123,6 +125,7 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
         expires_at: transfer.expires_at,
         hosted: transfer.hosted,
         public: transfer.public,
+        lifetime: transfer.lifetime,
         files,
     })
     .map_err(|_| AppError::INTERNAL)?;

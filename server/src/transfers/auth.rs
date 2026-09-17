@@ -73,6 +73,7 @@ mod tests {
             note: None,
             editable: false,
             note_version: 0,
+            lifetime: None,
         };
         let with = |value: &str| {
             let mut headers = HeaderMap::new();

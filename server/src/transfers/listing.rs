@@ -18,7 +18,7 @@ const PUBLIC_LIST_MAX: i64 = 500;
 const LIKE_ESCAPE: char = '!';
 
 const SUMMARY_SQL: &str =
-    "SELECT t.code, t.title, t.created_at, t.expires_at, t.hosted, t.collect, t.downloads, t.closed,
+    "SELECT t.code, t.title, t.created_at, t.expires_at, t.lifetime, t.hosted, t.collect, t.downloads, t.closed,
         t.note IS NOT NULL AS note,
         count(f.idx) AS files,
         CASE WHEN t.note IS NULL THEN coalesce(sum(f.size), 0) ELSE octet_length(t.note) END::bigint AS size,
@@ -33,6 +33,7 @@ pub struct Summary {
     title: String,
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
+    lifetime: Option<i32>,
     hosted: bool,
     collect: bool,
     downloads: i32,

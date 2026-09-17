@@ -81,7 +81,12 @@ export function OwnerPanel({
 
   return (
     <div className="space-y-4">
-      <ShareCard code={meta.code} expiresAt={meta.expiresAt} hosted={meta.hosted} />
+      <ShareCard
+        code={meta.code}
+        expiresAt={meta.expiresAt}
+        hosted={meta.hosted}
+        uploading={!meta.hosted && meta.files.some((f) => f.hash === null)}
+      />
       <StatusCard
         {...status}
         // Nothing was ever uploaded for a hosted transfer, so there is no progress to show.

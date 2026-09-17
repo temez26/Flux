@@ -17,6 +17,7 @@ function transfer(files: { path: string; size: number; hash?: string }[]): Trans
     expiresAt: "",
     hosted: false,
     public: false,
+    lifetime: null,
     files: files.map((f, idx) => ({
       idx,
       path: f.path,

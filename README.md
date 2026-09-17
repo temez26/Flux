@@ -20,7 +20,7 @@ And throughout:
 - BLAKE3 integrity check end to end
 - Upload to the server, or send straight from your device
 - Send to another device on your network without a code
-- Expires after 5 minutes to 7 days, set once in Settings for everything you share
+- Expires after 5 minutes to 7 days, set once in Settings; uploads count from when they finish
 - Installable, mobile-first, keyboard and screen reader friendly web app
 
 ## Run

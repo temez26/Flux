@@ -51,7 +51,13 @@ export function RecentList() {
               r.note ? "Text" : plural(files, "file"),
               formatBytes(size),
               // How long a device keeps sharing is its sender's business, not the code's expiry.
-              r.hosted ? "From the sender's device" : formatRemaining(summary?.expiresAt ?? r.expiresAt),
+              r.hosted
+                ? "From the sender's device"
+                : formatRemaining(
+                    summary?.expiresAt ?? r.expiresAt,
+                    Date.now(),
+                    summary && !summary.complete ? summary.lifetime : null,
+                  ),
             ].join(" · ")}
             badge={
               saved ? (
