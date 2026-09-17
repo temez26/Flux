@@ -39,7 +39,7 @@ export default function TransferView({ code }: { code: string }) {
   if (meta === undefined) {
     return offline ? (
       <Message icon={<AlertIcon />} title="Can't reach the Flux server">
-        Check your connection. This page retries automatically.
+        Retrying…
       </Message>
     ) : (
       <Message icon={<Spinner className="size-5" />} title="Loading…" />

@@ -28,9 +28,7 @@ export function TextView(view: ViewProps) {
       onExpand={view.onExpand}
       aside={data.text && !data.truncated ? <CopyButton text={data.text} /> : undefined}
     >
-      {data.truncated && (
-        <Note>Showing the first {formatBytes(TEXT_PREVIEW_BYTES)}. Download the file to see all of it.</Note>
-      )}
+      {data.truncated && <Note>Showing the first {formatBytes(TEXT_PREVIEW_BYTES)}.</Note>}
       <pre
         className={`${scrollArea} p-4 font-mono text-[13px] leading-relaxed break-words whitespace-pre-wrap [tab-size:4] sm:p-6`}
       >
@@ -174,7 +172,7 @@ export function SlidesView(view: ViewProps) {
   if (!slides) return <Loading inline={view.inline} />;
   return (
     <Panel inline={view.inline} onExpand={view.onExpand}>
-      <Note>Text only. Download the file to see the slides as designed.</Note>
+      <Note>Text only.</Note>
       <ol className={`${scrollArea} space-y-3 p-3 sm:p-5`}>
         {slides.map((texts, i) => (
           <li key={i} className="rounded-xl border border-line bg-bg p-4 sm:p-5">

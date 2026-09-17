@@ -23,17 +23,12 @@ export function InstallApp() {
     <div className="mt-4 border-t border-line pt-4">
       <p className="text-sm font-medium">Install Flux</p>
       {offered ? (
-        <>
-          <p className="text-xs text-muted">Opens like an app, and shows up when you share from other apps.</p>
-          <Button onClick={start} className="mt-2 w-full">
-            <DownloadIcon className="size-4" />
-            Install
-          </Button>
-        </>
+        <Button onClick={start} className="mt-2 w-full">
+          <DownloadIcon className="size-4" />
+          Install
+        </Button>
       ) : (
-        <p className="text-xs text-muted">
-          Tap Share in the browser, then Add to Home Screen. Flux then opens like an app and can send you notifications.
-        </p>
+        <p className="text-xs text-muted">Tap Share, then Add to Home Screen.</p>
       )}
     </div>
   );

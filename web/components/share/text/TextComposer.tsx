@@ -78,21 +78,13 @@ export function TextComposer() {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit();
         }}
         placeholder="Paste a link, a note, a password…"
-        aria-describedby={`${id}-hint`}
         spellCheck={false}
         className="block min-h-40 w-full resize-y rounded-2xl border-2 border-line bg-bg p-3 text-base outline-none! transition-colors placeholder:text-muted focus:border-accent"
       />
-      <p id={`${id}-hint`} className="mt-1.5 text-xs text-muted">
-        Always kept on the server.<span className="hidden pointer-fine:inline"> Ctrl+Enter to share.</span>
-      </p>
+      <p className="mt-1.5 hidden text-xs text-muted pointer-fine:block">Ctrl+Enter to share</p>
 
       <div className="mt-4 grid gap-4 @xl:grid-cols-2">
-        <Field
-          label="Who can find it"
-          hint={
-            isPublic ? "Listed in Public shares for anyone who opens Flux." : "Only people with the link or QR code."
-          }
-        >
+        <Field label="Who can find it">
           <Segmented
             label="Who can find it"
             value={isPublic ? "public" : "link"}
@@ -100,10 +92,7 @@ export function TextComposer() {
             onChange={(v) => setIsPublic(v === "public")}
           />
         </Field>
-        <Field
-          label="Who can edit"
-          hint={editable ? "Anyone who can open it can change it." : "Only you can change it; others read."}
-        >
+        <Field label="Who can edit">
           <Segmented
             label="Who can edit"
             value={editable ? "anyone" : "owner"}
@@ -121,20 +110,10 @@ export function TextComposer() {
       )}
       <div className="mt-5 rounded-2xl border border-line p-3">
         <div className="flex min-h-11 items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p id={`${id}-device`} className="text-sm font-medium">
-              Send to a device too
-            </p>
-            <p id={`${id}-device-hint`} className="text-xs text-muted">
-              A nearby device gets it right away. The text stays on the server, where edits happen.
-            </p>
-          </div>
-          <Switch
-            checked={toDevice}
-            onChange={setToDevice}
-            labelledBy={`${id}-device`}
-            describedBy={`${id}-device-hint`}
-          />
+          <p id={`${id}-device`} className="min-w-0 flex-1 text-sm font-medium">
+            Send to a device too
+          </p>
+          <Switch checked={toDevice} onChange={setToDevice} labelledBy={`${id}-device`} />
         </div>
         {toDevice && (
           <div className="mt-3">

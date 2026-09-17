@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useSyncExternalStore } from "react";
 import { EXPIRY_OPTIONS } from "@/lib/api";
 import { SettingsIcon } from "../ui/icons";
 import { IconButton } from "../ui/ui";
-import { expiryLabel, useExpiry } from "./expiry";
+import { useExpiry } from "./expiry";
 import { InstallApp } from "./InstallApp";
 import { NotificationSwitch } from "./NotificationSwitch";
 
@@ -84,23 +84,22 @@ export function SettingsMenu() {
           id={`${id}-panel`}
           role="dialog"
           aria-labelledby={`${id}-title`}
-          className="absolute top-full right-0 z-40 mt-2 w-[min(20rem,calc(100vw-2rem))] animate-[toast-in_.15s_ease-out] rounded-2xl border border-line bg-surface p-4 shadow-lg"
+          className="absolute top-full right-0 z-40 mt-2 w-[min(17rem,calc(100vw-2rem))] animate-[toast-in_.15s_ease-out] rounded-2xl border border-line bg-surface p-4 shadow-lg"
         >
           <h2 id={`${id}-title`} className="text-base font-semibold">
             Settings
           </h2>
 
-          <div className="mt-4">
+          <div className="mt-4 flex items-center justify-between gap-3">
             <label htmlFor={`${id}-expiry`} className="text-sm font-medium">
-              Delete new shares after
+              Keep shares for
             </label>
             <select
               ref={firstField}
               id={`${id}-expiry`}
               value={expiresIn}
               onChange={(e) => setExpiresIn(Number(e.target.value))}
-              aria-describedby={`${id}-expiry-hint`}
-              className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-bg px-3 text-base outline-none focus:border-accent"
+              className="min-h-11 rounded-xl border border-line bg-bg px-3 text-base outline-none focus:border-accent"
             >
               {EXPIRY_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -108,10 +107,6 @@ export function SettingsMenu() {
                 </option>
               ))}
             </select>
-            <p id={`${id}-expiry-hint`} className="mt-1.5 text-xs text-muted">
-              Files and texts you share from now on are removed after {expiryLabel(expiresIn)}. You can keep a share
-              longer from its page.
-            </p>
           </div>
 
           <div className="mt-4 border-t border-line pt-4">

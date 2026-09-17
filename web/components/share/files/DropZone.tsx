@@ -12,7 +12,6 @@ export function DropZone({
   stalled,
   disabled,
   title,
-  hint,
   onPick,
   onDrop,
 }: {
@@ -22,7 +21,6 @@ export function DropZone({
   /** Files can't be chosen yet; dropped ones are still taken, to wait. */
   disabled: boolean;
   title: string;
-  hint: string;
   onPick: (kind: PickerKind) => void;
   onDrop: (picked: Promise<Picked[]>) => void;
 }) {
@@ -49,18 +47,11 @@ export function DropZone({
           <p role="status" className="font-medium">
             {status}
           </p>
-          {stalled && (
-            <p className="max-w-xs text-sm text-muted">
-              Still nothing. Phones quietly give up on very large selections — try a few hundred files at a time.
-            </p>
-          )}
+          {stalled && <p className="max-w-xs text-sm text-muted">Still waiting. Try fewer files at a time.</p>}
         </>
       ) : (
         <>
-          <div className={disabled ? "text-muted" : ""}>
-            <p className="font-semibold">{title}</p>
-            <p className="mt-1 text-sm text-muted">{hint}</p>
-          </div>
+          <p className={`font-semibold ${disabled ? "text-muted" : ""}`}>{title}</p>
           <div className="flex flex-wrap justify-center gap-2">
             {photos && (
               <Button variant="primary" onClick={pick("media")} disabled={disabled}>

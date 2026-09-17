@@ -209,28 +209,25 @@ export function SectionTitle({ icon, children, aside }: { icon: ReactNode; child
   );
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <p className="mb-1.5 text-xs font-medium tracking-wide text-muted uppercase">{label}</p>
       {children}
-      {hint && <p className="mt-1.5 text-xs text-muted">{hint}</p>}
     </div>
   );
 }
 
-/** An on/off setting, named and explained by the elements whose ids it is given. */
+/** An on/off setting, named by the element whose id it is given. */
 export function Switch({
   checked,
   onChange,
   labelledBy,
-  describedBy,
   disabled,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   labelledBy: string;
-  describedBy?: string;
   disabled?: boolean;
 }) {
   return (
@@ -239,7 +236,6 @@ export function Switch({
       role="switch"
       aria-checked={checked}
       aria-labelledby={labelledBy}
-      aria-describedby={describedBy}
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition disabled:opacity-50 ${

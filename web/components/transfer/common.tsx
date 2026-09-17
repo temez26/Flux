@@ -46,11 +46,8 @@ export const percent = (part: number, whole: number) => (whole ? Math.floor((par
 
 const onPhone = () => window.matchMedia("(pointer: coarse)").matches;
 
-/** What a transfer needs from whoever started it; a phone pauses any page it isn't showing. */
-export const keepOpen = (until: string) =>
-  onPhone()
-    ? `Keep Flux on screen until ${until}. Phones pause it in the background.`
-    : `Keep this page open until ${until}.`;
+/** What a running transfer needs; a phone pauses any page it isn't showing. */
+export const keepOpen = () => (onPhone() ? "Keep Flux on screen." : "Keep this page open.");
 
 /** Says why a running transfer stood still, when a phone has just brought Flux back from the background. */
 export function BackgroundNotice({ active }: { active: boolean }) {
@@ -58,7 +55,7 @@ export function BackgroundNotice({ active }: { active: boolean }) {
   if (!back || !onPhone()) return null;
   return (
     <Notice tone="warn" role="status" icon={<Spinner />} className="mt-4">
-      Paused while Flux was in the background. Picking up where it left off.
+      Paused in the background. Resuming…
     </Notice>
   );
 }

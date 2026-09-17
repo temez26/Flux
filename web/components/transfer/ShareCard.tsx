@@ -142,8 +142,7 @@ export function ShareCard({
       )}
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-muted">Send the link, or scan the QR code with the other device.</p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="primary" onClick={shareLink}>
               <LinkIcon className="size-4" />
               {canShare ? "Share link" : "Copy link"}
@@ -160,23 +159,10 @@ export function ShareCard({
       </div>
       {owned && open !== undefined && (
         <div className="mt-4 flex items-center gap-3 border-t border-line pt-4">
-          <div className="min-w-0 flex-1">
-            <p id={`${openId}-label`} className="text-sm font-medium">
-              Let others add files
-            </p>
-            <p id={`${openId}-hint`} className="text-xs text-muted">
-              {open
-                ? "Anyone who opens this share can add their files to it."
-                : "Only you can add files. Turn on to let anyone who opens it add theirs."}
-            </p>
-          </div>
-          <Switch
-            checked={open}
-            onChange={setOpen}
-            disabled={opening}
-            labelledBy={`${openId}-label`}
-            describedBy={`${openId}-hint`}
-          />
+          <p id={`${openId}-label`} className="min-w-0 flex-1 text-sm font-medium">
+            Let others add files
+          </p>
+          <Switch checked={open} onChange={setOpen} disabled={opening} labelledBy={`${openId}-label`} />
         </div>
       )}
     </Card>

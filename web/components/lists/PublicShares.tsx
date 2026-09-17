@@ -5,7 +5,7 @@ import { listPublic, type Summary } from "@/lib/api";
 import { useNow, usePolling } from "@/lib/hooks";
 import { formatBytes, formatRemaining, plural } from "@/lib/util/format";
 import { DeviceIcon, FileTypeIcon, FolderIcon, GlobeIcon, SearchIcon, TextIcon } from "../ui/icons";
-import { Badge, Button, Spinner } from "../ui/ui";
+import { Badge, Button, SectionTitle, Spinner } from "../ui/ui";
 import { TransferRow } from "./TransferRow";
 import { LIST_POLL_MS } from "./useSummaries";
 
@@ -29,17 +29,7 @@ export function PublicShares() {
 
   return (
     <div>
-      <div className="mb-3 flex items-start gap-3">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
-          <GlobeIcon className="size-5.5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="font-semibold">Public shares</h2>
-          <p className="mt-0.5 text-sm text-muted">
-            What anyone on this Flux shared publicly. Open one to see or download it.
-          </p>
-        </div>
-      </div>
+      <SectionTitle icon={<GlobeIcon className="size-4.5" />}>Public shares</SectionTitle>
 
       <div className="relative mb-4">
         <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
@@ -103,7 +93,7 @@ function PublicGroup({ kind, needle }: { kind: Kind; needle: string }) {
         </ul>
       ) : (
         <p className="mt-2 rounded-xl border border-dashed border-line p-4 text-center text-sm text-muted">
-          {needle ? `No public ${group.noun} match “${needle}”.` : `No public ${group.noun} right now.`}
+          {needle ? "No matches" : `No public ${group.noun}`}
         </p>
       )}
       {more && (

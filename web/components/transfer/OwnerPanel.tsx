@@ -22,16 +22,16 @@ function ownerStatus(hosted: boolean, ready: boolean): StatusProps {
       tone: "warn",
       icon: <DeviceIcon />,
       title: "Not being shared",
-      subtitle: "Nothing was uploaded, so add the files again to serve them from this device.",
+      subtitle: "Add the files again to share them.",
     };
   }
   return ready
-    ? { tone: "ok", icon: <CheckIcon />, title: "Ready to receive", subtitle: "Every file is uploaded and verified." }
+    ? { tone: "ok", icon: <CheckIcon />, title: "Ready to receive" }
     : {
         tone: "warn",
         icon: <AlertIcon />,
         title: "Upload interrupted",
-        subtitle: "Add the same files again to continue where it stopped.",
+        subtitle: "Add the same files again to continue.",
       };
 }
 
@@ -153,8 +153,7 @@ export function OwnerPanel({
         {picker.inputs}
         {shortfall && !shortfall.matched && (
           <Notice tone="warn" icon={<AlertIcon />} className="mt-4">
-            None of the {plural(shortfall.missing.length, "file")} still needed were in what you picked. Choose the same
-            files or folder you sent — still missing {shortfall.missing.slice(0, 3).map(basename).join(", ")}
+            None of those match. Still missing {shortfall.missing.slice(0, 3).map(basename).join(", ")}
             {shortfall.missing.length > 3 ? ` and ${(shortfall.missing.length - 3).toLocaleString()} more` : ""}.
           </Notice>
         )}

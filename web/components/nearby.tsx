@@ -128,14 +128,14 @@ export function NearbyDevices({ target, onChoose }: { target: Peer | null; onCho
           <Spinner className="mt-0.5 size-4 shrink-0 text-muted" />
           <div>
             <p className="font-medium">Looking for devices…</p>
-            <p className="mt-0.5 text-muted">Open Flux on the other device. It needs to be on the same network.</p>
+            <p className="mt-0.5 text-muted">Open Flux on another device on this network.</p>
           </div>
         </div>
       )}
       <div className="mt-2 flex min-h-9 pointer-coarse:min-h-11 flex-wrap items-center gap-x-1 text-sm text-muted">
         {draft === null ? (
           <>
-            Others see this device as <span className="font-medium text-fg">{nearby.device.name}</span>
+            Visible as <span className="font-medium text-fg">{nearby.device.name}</span>
             <span aria-hidden="true">·</span>
             <button
               type="button"

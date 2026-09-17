@@ -8,7 +8,7 @@ export interface ShareTab {
   id: TabId;
   path: string;
   name: string;
-  /** What it does, in a sentence someone new to Flux understands. */
+  /** What it does, in a few words. */
   summary: string;
   Icon: ComponentType<IconProps>;
 }
@@ -18,21 +18,21 @@ export const TABS: ShareTab[] = [
     id: "public",
     path: "/public",
     name: "Public",
-    summary: "Upload files that anyone who opens Flux can see and download.",
+    summary: "Files anyone on Flux can download.",
     Icon: GlobeIcon,
   },
   {
     id: "device",
     path: "/device",
     name: "Device",
-    summary: "Send files straight to another device nearby. Nothing is uploaded.",
+    summary: "Straight to a nearby device, no upload.",
     Icon: DeviceIcon,
   },
   {
     id: "text",
     path: "/text",
     name: "Text",
-    summary: "Share a note, link or password, to read or to edit together.",
+    summary: "A note, link or password.",
     Icon: TextIcon,
   },
 ];
