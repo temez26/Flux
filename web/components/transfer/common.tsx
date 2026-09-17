@@ -22,6 +22,7 @@ import { toast } from "@/lib/alerts/toast";
 import { FileRow, FileTile } from "../files/FileList";
 import { CheckIcon, ClockIcon, DownloadIcon, FileTypeIcon, FolderIcon, TrashIcon } from "../ui/icons";
 import { FileThumb } from "../preview/Preview";
+import { ShareFilesButton } from "./ShareFiles";
 import { Badge, ConfirmIconButton, Spinner, buttonClass } from "../ui/ui";
 
 /** Stand-ins for a store that doesn't exist yet, for useSyncExternalStore. */
@@ -251,7 +252,7 @@ export function MetaTile({
 /** A request line a reverse proxy will still accept, with room to spare. */
 const MAX_URL = 4000;
 
-/** Downloads chosen files that the server holds: one directly, several as a zip. */
+/** Downloads chosen files that the server holds: one directly, several as a zip. Phones can share them too. */
 export function SelectionDownload({
   code,
   files,
@@ -261,6 +262,15 @@ export function SelectionDownload({
   files: FileMeta[];
   counted?: boolean;
 }) {
+  return (
+    <span className="flex flex-wrap justify-end gap-2">
+      <ShareFilesButton code={code} files={files} counted={counted} className="min-h-9" />
+      <DownloadButton code={code} files={files} counted={counted} />
+    </span>
+  );
+}
+
+function DownloadButton({ code, files, counted }: { code: string; files: FileMeta[]; counted: boolean }) {
   const count = counted ? () => countDownload(code) : undefined;
   const primary = buttonClass("primary", "min-h-9");
   if (files.some((f) => !f.hash)) {

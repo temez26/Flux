@@ -25,6 +25,7 @@ import {
   ZapIcon,
 } from "../ui/icons";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
+import { ShareFilesButton } from "./ShareFiles";
 import {
   Badge,
   Button,
@@ -237,6 +238,9 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
             >
               {label}
             </a>
+          )}
+          {!meta.hosted && !viaDirect && ready && (
+            <ShareFilesButton code={meta.code} files={meta.files} counted className="min-h-12 max-sm:flex-1" />
           )}
           {complete > 0 && (
             <a

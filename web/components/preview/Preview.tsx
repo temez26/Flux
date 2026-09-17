@@ -6,6 +6,7 @@ import { basename } from "@/lib/platform/files";
 import { formatBytes } from "@/lib/util/format";
 import { canPreview, OFFICE_PREVIEW_BYTES, previewKind, thumbnailSource } from "@/lib/preview/preview";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, DownloadIcon, ExternalIcon, FileTypeIcon } from "../ui/icons";
+import { ShareFilesButton } from "../transfer/ShareFiles";
 import { Unavailable, overlayButton, overlayTextButton, type Target, type ViewProps } from "./chrome";
 import { DocxView, SheetView, SlidesView, TextView } from "./documents";
 import { AudioView, ImageView, PdfView, VideoView } from "./media";
@@ -181,6 +182,7 @@ function Viewer({
             <ExternalIcon />
           </a>
         )}
+        <ShareFilesButton code={code} files={[file]} overlay />
         <a
           href={fileUrl(code, file.idx)}
           download
