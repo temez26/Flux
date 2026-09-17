@@ -287,11 +287,23 @@ export function Segmented<T extends string | number>({
   );
 }
 
-export function ProgressBar({ value, tone = "accent", thin = false }: { value: number; tone?: Tone; thin?: boolean }) {
+/** How far a transfer has got; `label` says what is progressing, since a bar alone is only a number to a screen reader. */
+export function ProgressBar({
+  value,
+  label,
+  tone = "accent",
+  thin = false,
+}: {
+  value: number;
+  label: string;
+  tone?: Tone;
+  thin?: boolean;
+}) {
   const pct = Math.max(0, Math.min(1, value || 0)) * 100;
   return (
     <div
       role="progressbar"
+      aria-label={label}
       aria-valuenow={Math.round(pct)}
       aria-valuemin={0}
       aria-valuemax={100}
@@ -344,8 +356,14 @@ export function StatusCard({
       </div>
       {progress !== undefined && (
         <div className="mt-4">
-          <ProgressBar value={progress} tone={tone} />
+          <ProgressBar value={progress} tone={tone} label={title} />
         </div>
+      )}
+      {percent !== undefined && (
+        // A bar changing says nothing unless it's looked at, so reaching each quarter is announced.
+        <p role="status" className="sr-only">
+          {title}, {Math.floor(percent / 25) * 25}%
+        </p>
       )}
       {stats && (
         <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">

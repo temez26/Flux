@@ -208,7 +208,7 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
               <span className="flex-1">Waiting for the sender to finish uploading</span>
               <span className="font-medium tabular-nums">{percent(received, size)}%</span>
             </div>
-            <ProgressBar value={size ? received / size : 0} />
+            <ProgressBar value={size ? received / size : 0} label="Uploaded by the sender" />
             <p className="mt-2 text-xs text-muted">
               {complete.toLocaleString()} of {plural(meta.files.length, "file")} ready. Uploaded files can already be
               downloaded below.

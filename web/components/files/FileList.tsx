@@ -361,7 +361,7 @@ export function FileBrowser({
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
-              className="min-h-11 w-full rounded-xl border border-line bg-bg pr-3 pl-9 text-base outline-none placeholder:text-muted/60 focus:border-accent"
+              className="min-h-11 w-full rounded-xl border border-line bg-bg pr-3 pl-9 text-base outline-none placeholder:text-muted focus:border-accent"
             />
           </div>
         )}
@@ -427,7 +427,7 @@ export function FileRow({
         </p>
         {progress !== undefined && (
           <div className="mt-1.5">
-            <ProgressBar value={progress} tone={progressTone} thin />
+            <ProgressBar value={progress} tone={progressTone} label={name} thin />
           </div>
         )}
       </div>
