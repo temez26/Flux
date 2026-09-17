@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { countDownload, errorMessage, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
 import { DirectClient } from "@/lib/transfer/direct";
 import { basename } from "@/lib/platform/files";
-import { formatBytes, formatCode, formatDuration, plural } from "@/lib/util/format";
+import { formatBytes, formatDuration, plural } from "@/lib/util/format";
 import { useLeaveGuard, useNotifyWhen, useTitle, useWakeLock } from "@/lib/hooks";
 import { canPreview } from "@/lib/preview/preview";
 import { Receiver, type ReceiveItem } from "@/lib/transfer/receive";
@@ -398,7 +398,7 @@ function ReceivingPanel({ receiver, meta, onBack }: { receiver: Receiver; meta: 
         {receiver.items.some((item) => item.source === "direct") && (
           <div className="mt-4">
             <Badge tone="ok" icon={<ZapIcon />}>
-              Direct from the sender · {formatCode(meta.code)}
+              Direct from the sender
             </Badge>
           </div>
         )}

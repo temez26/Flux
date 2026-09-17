@@ -123,9 +123,6 @@ export function TransferHeading({ meta, badges }: { meta: TransferMeta; badges?:
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge>
-          <span className="font-mono">{formatCode(meta.code)}</span>
-        </Badge>
         <Badge icon={<ClockIcon />}>
           {formatRemaining(meta.expiresAt, now, meta.files.some((f) => f.hash === null) ? meta.lifetime : null)}
         </Badge>

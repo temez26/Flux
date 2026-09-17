@@ -5,7 +5,7 @@ import type { TransferMeta } from "@/lib/api";
 import { toast } from "@/lib/alerts/toast";
 import { useNoteLive, useNow, useTitle } from "@/lib/hooks";
 import { copyText } from "@/lib/platform/clipboard";
-import { formatCode, formatRemaining } from "@/lib/util/format";
+import { formatRemaining } from "@/lib/util/format";
 import { linkify } from "@/lib/util/links";
 import {
   AlertIcon,
@@ -122,11 +122,6 @@ export function NotePanel({ meta, token }: { meta: TransferMeta; token?: string 
             </Badge>
           )}
           {!owner && <Badge icon={<ClockIcon />}>{formatRemaining(meta.expiresAt, now)}</Badge>}
-          {!owner && (
-            <Badge>
-              <span className="font-mono">{formatCode(meta.code)}</span>
-            </Badge>
-          )}
         </div>
 
         {editor.editing ? (

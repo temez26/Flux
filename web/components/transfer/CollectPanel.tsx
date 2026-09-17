@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { errorMessage, updateTransfer, zipUrl, type TransferMeta } from "@/lib/api";
-import { formatBytes, formatCode, plural } from "@/lib/util/format";
+import { formatBytes, plural } from "@/lib/util/format";
 import { reloadTransfer, useTitle } from "@/lib/hooks";
 import { notify } from "@/lib/alerts/notify";
 import { toast } from "@/lib/alerts/toast";
@@ -44,7 +44,7 @@ export function CollectPanel({ meta, token }: { meta: TransferMeta; token: strin
     if (complete > arrived.current) {
       void notify(
         `${plural(complete - arrived.current, "new file")} in ${meta.title}`,
-        formatCode(meta.code),
+        "Open Flux to see them",
         `collect-${meta.code}`,
       );
     }

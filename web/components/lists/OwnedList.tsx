@@ -4,7 +4,7 @@ import { useSyncExternalStore, type ReactNode } from "react";
 import type { Summary } from "@/lib/api";
 import { listOwned, ownedVersion, removeOwned, subscribeOwned } from "@/lib/storage/owned";
 import { live } from "@/lib/transfer/session";
-import { formatBytes, formatCode, formatLifetime, plural } from "@/lib/util/format";
+import { formatBytes, formatLifetime, plural } from "@/lib/util/format";
 import {
   AlertIcon,
   CheckIcon,
@@ -87,7 +87,6 @@ export function OwnedList() {
           <TransferRow
             key={code}
             code={code}
-            mono
             icon={
               o.note ? (
                 <TextIcon className="size-4.5" />
@@ -99,7 +98,7 @@ export function OwnedList() {
                 <LockIcon className="size-4.5" />
               )
             }
-            title={o.collect && summary ? `${formatCode(code)} · ${summary.title}` : formatCode(code)}
+            title={summary?.title ?? (o.note ? "Text" : o.collect ? "Collection" : plural(o.count, "file"))}
             detail={[
               o.note ? "Text" : plural(count, "file"),
               formatBytes(size),

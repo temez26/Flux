@@ -34,7 +34,7 @@ export function FileSender({ mode }: { mode: "public" | "device" }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [target, setTarget] = useState<Peer | null>(null);
-  /** Files dropped, pasted or handed over, waiting for the go-ahead. */
+  /** Files chosen, dropped, pasted or handed over, waiting for Send. */
   const [staged, setStaged] = useState<Picked[] | null>(null);
 
   async function start(files: Picked[]) {
@@ -57,7 +57,7 @@ export function FileSender({ mode }: { mode: "public" | "device" }) {
     }
   }
 
-  /** What arrives without the picker is shown first, so nothing is shared by a stray drop or paste. */
+  /** Files are shown before they go, so nothing is shared until Send says so. */
   async function stage(picked: Picked[] | Promise<Picked[]>) {
     setError(null);
     setBusy("Reading files…");
@@ -71,7 +71,7 @@ export function FileSender({ mode }: { mode: "public" | "device" }) {
     }
   }
 
-  const picker = useFilePickers((picked) => void start(picked));
+  const picker = useFilePickers((picked) => void stage(picked));
   const status = busy ?? (picker.waiting ? "Getting your files…" : null);
   const dragging = useWindowDrop((picked) => void stage(picked));
   usePaste({ files: (picked) => void stage(picked) });

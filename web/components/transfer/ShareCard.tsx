@@ -8,8 +8,8 @@ import { formatCode, formatRemaining } from "@/lib/util/format";
 import { reloadTransfer, useNow, useOwned } from "@/lib/hooks";
 import { saveOwned } from "@/lib/storage/owned";
 import { toast } from "@/lib/alerts/toast";
-import { ClockIcon, CopyIcon, GlobeIcon, LinkIcon, LockIcon, QrIcon } from "../ui/icons";
-import { Badge, Button, Card, IconButton } from "../ui/ui";
+import { ClockIcon, GlobeIcon, LinkIcon, LockIcon, QrIcon } from "../ui/icons";
+import { Badge, Button, Card } from "../ui/ui";
 
 function QrCode({ text }: { text: string }) {
   const { path, size } = useMemo(() => {
@@ -118,15 +118,7 @@ export function ShareCard({
       )}
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 rounded-xl border border-line bg-bg py-1 pr-1 pl-4">
-            <span className="flex-1 font-mono text-2xl font-semibold tracking-widest sm:text-3xl">{formatted}</span>
-            <IconButton label="Copy code" onClick={() => copy(formatted, "Code")}>
-              <CopyIcon className="size-5" />
-            </IconButton>
-          </div>
-          <p className="mt-2 text-sm text-muted">
-            Enter this code on the other device, scan the QR code, or send the link.
-          </p>
+          <p className="text-sm text-muted">Send the link, or scan the QR code with the other device.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="primary" onClick={shareLink}>
               <LinkIcon className="size-4" />
