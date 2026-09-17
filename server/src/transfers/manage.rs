@@ -65,6 +65,7 @@ pub async fn update(
         .bind(public)
         .execute(&state.db)
         .await?;
+    state.notes.changed(transfer.id);
     Ok(Json(Updated {
         expires_at,
         closed,
@@ -94,6 +95,7 @@ pub async fn delete(State(state): State<Shared>, Path(code): Path<String>, heade
         .bind(transfer.id)
         .execute(&state.db)
         .await?;
+    state.notes.changed(transfer.id);
     crate::cleanup::remove_transfer_data(&state, transfer.id).await;
     Ok(StatusCode::NO_CONTENT)
 }

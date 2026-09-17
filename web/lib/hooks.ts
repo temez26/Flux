@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { getTransfer, type TransferMeta } from "./api";
 import { notify } from "./alerts/notify";
 import { getOwned, ownedVersion, subscribeOwned } from "./storage/owned";
+import type { SocketLike } from "./nearby/nearby";
+import { NoteLive } from "./transfer/live";
 
 const noSubscribe = () => () => {};
 
@@ -132,6 +134,25 @@ const reloads = new Map<string, Set<() => void>>();
 /** Asks every page following a transfer to load it again now, rather than at its next poll. */
 export function reloadTransfer(code: string) {
   for (const reload of reloads.get(code) ?? []) reload();
+}
+
+/**
+ * Follows an open text as it changes, loading it again the moment anyone saves or its owner
+ * changes it, and returns how many pages have it open (0 while that isn't known).
+ */
+export function useNoteLive(code: string): number {
+  const [viewers, setViewers] = useState(0);
+  useEffect(() => {
+    const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const url = `${scheme}://${window.location.host}/api/transfers/${code}/note/live`;
+    const live = new NoteLive(
+      () => new WebSocket(url) as unknown as SocketLike,
+      () => reloadTransfer(code),
+      setViewers,
+    );
+    return () => live.close();
+  }, [code]);
+  return viewers;
 }
 
 export function useMounted(): boolean {
