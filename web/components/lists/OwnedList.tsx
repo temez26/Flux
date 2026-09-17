@@ -5,16 +5,7 @@ import type { Summary } from "@/lib/api";
 import { listOwned, ownedVersion, removeOwned, subscribeOwned } from "@/lib/storage/owned";
 import { live } from "@/lib/transfer/session";
 import { formatBytes, formatLifetime, plural } from "@/lib/util/format";
-import {
-  AlertIcon,
-  CheckIcon,
-  ClockIcon,
-  DeviceIcon,
-  GlobeIcon,
-  LockIcon,
-  PauseIcon,
-  TextIcon,
-} from "../ui/icons";
+import { AlertIcon, CheckIcon, ClockIcon, DeviceIcon, GlobeIcon, LockIcon, PauseIcon, TextIcon } from "../ui/icons";
 import { Badge, Card, SectionTitle, Spinner } from "../ui/ui";
 import { TransferRow } from "./TransferRow";
 import { useSummaries } from "./useSummaries";

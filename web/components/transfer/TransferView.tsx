@@ -12,7 +12,6 @@ import { NotePanel } from "./note/NotePanel";
 import { OwnerPanel } from "./OwnerPanel";
 import { ReceiverPanel } from "./ReceiverPanel";
 import { SenderPanel } from "./SenderPanel";
-import { pageTitle } from "./common";
 
 /**
  * One transfer, seen from wherever this device stands in it: the tab that is sending,
@@ -24,7 +23,7 @@ export default function TransferView({ code }: { code: string }) {
   const owned = useOwned(code);
   const { meta, offline } = useTransferMeta(code, !session);
   // Panels set their own title (with progress); this covers the loading and error screens.
-  useTitle(session || meta ? undefined : pageTitle(code));
+  useTitle(session || meta ? undefined : "Flux");
 
   useEffect(() => {
     if (meta === null) removeOwned(code);

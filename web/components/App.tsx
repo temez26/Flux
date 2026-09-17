@@ -5,7 +5,7 @@ import { normalizeCode } from "@/lib/util/format";
 import { useMounted, useOnline } from "@/lib/hooks";
 import { navigate, usePath } from "@/lib/platform/router";
 import Home from "./home/Home";
-import { tabAt } from "./rooms/tabs";
+import { tabAt } from "./share/tabs";
 import { AlertIcon, BackIcon, LogoIcon } from "./ui/icons";
 import { IncomingOffers } from "./nearby";
 import { SettingsMenu } from "./settings/SettingsMenu";
@@ -69,7 +69,7 @@ export default function App() {
     else
       view = (
         <Message icon={<AlertIcon />} title="Nothing here">
-          Check the link or code and try again.
+          Check the link and try again.
         </Message>
       );
   }

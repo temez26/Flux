@@ -32,9 +32,7 @@ export function NoteSettings({ meta, token }: { meta: TransferMeta; token: strin
       <Field
         label="Who can find it"
         hint={
-          meta.public
-            ? "Listed in Public shares for anyone who opens Flux."
-            : "Only people with the code, link or QR code."
+          meta.public ? "Listed in Public shares for anyone who opens Flux." : "Only people with the link or QR code."
         }
       >
         <Segmented

@@ -70,7 +70,7 @@ export function NotePanel({ meta, token }: { meta: TransferMeta; token?: string 
   /** Said to screen readers: what changed that can't be seen from where focus is. */
   const [announcement, setAnnouncement] = useState("");
   const [seen, setSeen] = useState({ version: meta.noteVersion, editable: meta.editable });
-  useTitle(pageTitle(meta.code));
+  useTitle(pageTitle(meta.title));
   useRememberRecent(meta, !owner);
 
   if (seen.version !== meta.noteVersion || seen.editable !== meta.editable) {

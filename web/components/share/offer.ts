@@ -11,6 +11,6 @@ export function offerTo(to: Peer | null, code: string, offer: { title: string; f
     nearby.offer(to, { code, ...offer });
     toast(`Offered to ${to.name}`);
   } else {
-    toast(`${to.name} is no longer nearby — share the code instead`, "err");
+    toast(`${to.name} is no longer nearby — share the link instead`, "err");
   }
 }

@@ -16,8 +16,8 @@ export function describeFiles(files: Picked[]): string {
   return `${size} · ${names}${rest}`;
 }
 
-/** Files dropped, pasted or shared from another app, waiting for the go-ahead. */
-export function SharedFiles({
+/** Files chosen, dropped, pasted or shared from another app, waiting for Send. */
+export function StagedFiles({
   files,
   action,
   disabled,

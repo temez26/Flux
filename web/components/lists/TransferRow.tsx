@@ -11,14 +11,12 @@ export function TransferRow({
   title,
   detail,
   badge,
-  mono = false,
 }: {
   code: string;
   icon: ReactNode;
   title: string;
   detail: string;
   badge?: ReactNode;
-  mono?: boolean;
 }) {
   return (
     <Link
@@ -27,7 +25,7 @@ export function TransferRow({
     >
       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-hover text-muted">{icon}</span>
       <span className="min-w-0 flex-1">
-        <span className={`block truncate text-sm font-medium ${mono ? "font-mono" : ""}`}>{title}</span>
+        <span className="block truncate text-sm font-medium">{title}</span>
         <span className="block truncate text-xs text-muted">{detail}</span>
       </span>
       {badge && <span className="shrink-0">{badge}</span>}

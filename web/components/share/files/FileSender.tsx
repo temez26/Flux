@@ -18,7 +18,7 @@ import { useHandoff } from "../handoff";
 import { usePaste, useWindowDrop } from "../incoming";
 import { offerTo } from "../offer";
 import { DropOverlay, DropZone } from "./DropZone";
-import { SharedFiles } from "./SharedFiles";
+import { StagedFiles } from "./StagedFiles";
 
 // Files sent to a device end with the page, so the code behind them only needs to outlast any
 // plausible sitting; the row holds a file list and nothing else.
@@ -80,7 +80,7 @@ export function FileSender({ mode }: { mode: "public" | "device" }) {
   const blocked = toDevice && !target;
   const files =
     staged && !status ? (
-      <SharedFiles
+      <StagedFiles
         files={staged}
         action={toDevice ? (target ? `Send to ${target.name}` : "Send") : "Share publicly"}
         disabled={blocked}

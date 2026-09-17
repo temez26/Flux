@@ -2,9 +2,9 @@
 
 import { useId, type KeyboardEvent } from "react";
 import { navigate } from "@/lib/platform/router";
-import { FileSender } from "../rooms/files/FileSender";
-import { TABS, type ShareTab, type TabId } from "../rooms/tabs";
-import { TextComposer } from "../rooms/text/TextComposer";
+import { FileSender } from "../share/files/FileSender";
+import { TABS, type ShareTab, type TabId } from "../share/tabs";
+import { TextComposer } from "../share/text/TextComposer";
 import { Card } from "../ui/ui";
 
 function TabBody({ id }: { id: TabId }) {

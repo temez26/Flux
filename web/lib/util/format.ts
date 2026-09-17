@@ -23,7 +23,7 @@ export function formatDuration(seconds: number): string {
 }
 
 /** A length of time as a setting reads, e.g. "5 minutes" or "1 day". */
-export function formatLength(seconds: number): string {
+function formatLength(seconds: number): string {
   if (seconds < 3600) return plural(Math.round(seconds / 60), "minute");
   if (seconds < 86_400) return plural(Math.round(seconds / 3600), "hour");
   return plural(Math.round(seconds / 86_400), "day");

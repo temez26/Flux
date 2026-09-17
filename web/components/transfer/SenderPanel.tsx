@@ -1,5 +1,6 @@
 "use client";
 
+import { offerTitle } from "@/lib/nearby/nearby";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { errorMessage } from "@/lib/api";
 import { formatBytes, formatDuration, plural } from "@/lib/util/format";
@@ -133,7 +134,11 @@ export function SenderPanel({
     `${plural(counts.failed, "file")} failed to upload`,
   );
   useNotifyWhen(serving, "A device is downloading", "Straight from this device");
-  useTitle(running ? `${percent(sent, total)}% uploaded · Flux` : pageTitle(uploader.code));
+  useTitle(
+    running
+      ? `${percent(sent, total)}% uploaded · Flux`
+      : pageTitle(offerTitle(uploader.items.map((item) => item.path))),
+  );
 
   // The server deletes expired transfers, so stop uploading and serving at the same moment.
   useEffect(() => {

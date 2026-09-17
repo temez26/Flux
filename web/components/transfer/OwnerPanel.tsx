@@ -80,7 +80,7 @@ export function OwnerPanel({
     }
     onResume(resume(meta, token, match));
   });
-  useTitle(pageTitle(meta.code));
+  useTitle(pageTitle(meta.title));
 
   const status = ownerStatus(meta.hosted, ready);
 

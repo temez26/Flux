@@ -39,7 +39,7 @@ export function useRememberRecent(meta: TransferMeta, enabled = true) {
   }, [enabled, code, title, files, size, expiresAt, hosted, note]);
 }
 
-export const pageTitle = (code: string) => `${formatCode(code)} · Flux`;
+export const pageTitle = (title: string) => `${title} · Flux`;
 
 export const percent = (part: number, whole: number) => (whole ? Math.floor((part / whole) * 100) : 100);
 

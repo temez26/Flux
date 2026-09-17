@@ -1,7 +1,7 @@
 # Flux
 
-Self-hosted file transfer for your home network. Drop files or folders, share a code, link or QR
-code. Receivers take single files or the lot as one zip.
+Self-hosted file transfer for your home network. Drop files or folders, share a link or QR code.
+Receivers take single files or the lot as one zip.
 
 The home page has a tab for each way to share, with everything shared publicly listed below:
 
@@ -100,6 +100,6 @@ Before a PR, `npm run lint` and `npm run format` in `web/`, `cargo clippy --all-
 `web/` — Next.js, static export. `lib/` is the transfer engine and never imports a component:
 `transfer/` uploads, downloads and direct sends, `nearby/` device discovery, `save/` writing to
 disk, `storage/` what the browser remembers, `preview/`, `platform/` browser integrations,
-`alerts/` toasts and notifications, `util/`. `components/` renders it: `home/` the start page and its tabs, `rooms/` what each tab
+`alerts/` toasts and notifications, `util/`. `components/` renders it: `home/` the start page and its tabs, `share/` what each tab
 shares, `lists/` the transfer listings, `transfer/` a file per panel, `preview/` a file per viewer family, `files/` the file browser and pickers, `ui/` the
 shared primitives.

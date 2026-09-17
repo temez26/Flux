@@ -1,5 +1,6 @@
 "use client";
 
+import { offerTitle } from "@/lib/nearby/nearby";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { formatBytes, plural } from "@/lib/util/format";
 import { useLeaveGuard, useNotifyWhen, useNow, useTitle, useTransferMeta, useWakeLock } from "@/lib/hooks";
@@ -16,7 +17,7 @@ function hostedStatus(serving: number, sent: number, expired: boolean): StatusPr
       tone: "err",
       icon: <AlertIcon />,
       title: "Link expired",
-      subtitle: "The code no longer works. Send the files again to share them.",
+      subtitle: "The link no longer works. Send the files again to share them.",
     };
   if (serving > 0) {
     return {
@@ -52,7 +53,7 @@ export function HostedPanel({ session, expiresAt }: { session: Session; expiresA
   // Closing this page is the only thing that can end the transfer, so always ask.
   useLeaveGuard(!expired);
   useNotifyWhen(serving > 0, "A device is downloading", "Straight from this device");
-  useTitle(pageTitle(code));
+  useTitle(pageTitle(offerTitle(paths)));
 
   useEffect(() => {
     if (expired) host.close();

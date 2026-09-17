@@ -77,7 +77,7 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
   const [previewing, setPreviewing] = useState<number | null>(null);
   const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
   useSyncExternalStore(direct?.subscribe ?? subscribeNothing, direct?.getVersion ?? versionZero, versionZero);
-  useTitle(pageTitle(meta.code));
+  useTitle(pageTitle(meta.title));
   useRememberRecent(meta);
 
   useEffect(() => () => direct?.close(), [direct]);

@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import type { Picked } from "@/lib/platform/files";
 import { DeviceIcon, GlobeIcon } from "../ui/icons";
 import { Button, Card } from "../ui/ui";
-import { describeFiles } from "../rooms/files/SharedFiles";
+import { describeFiles } from "../share/files/StagedFiles";
 
 /** Files that arrived with nowhere chosen to send them, asking where to go. */
 export function IncomingChooser({

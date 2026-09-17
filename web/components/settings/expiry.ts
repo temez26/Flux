@@ -32,8 +32,7 @@ function choose(seconds: number) {
 }
 
 /**
- * How long new shares last, set in Settings, remembered between visits and used by every room, so
- * rooms shown side by side never disagree about it.
+ * How long new shares last: set once in Settings, remembered between visits, and used by every tab.
  */
 export function useExpiry(): [number, (seconds: number) => void] {
   return [useSyncExternalStore(subscribe, read, () => DEFAULT), choose];
