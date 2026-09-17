@@ -54,7 +54,7 @@ export function IncomingOffers() {
           {nearby.offers.map((offer) => (
             <div
               key={offer.code}
-              className="pointer-events-auto flex animate-[toast-in_.2s_ease-out] items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-lg"
+              className="pointer-events-auto flex animate-[toast-in_.2s_ease-out] surface floating items-center gap-3 rounded-2xl p-3"
             >
               <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
                 <DownloadIcon className="size-5" />

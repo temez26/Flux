@@ -130,7 +130,7 @@ export function ShareCard({
         )}
       </div>
       {choosing && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+        <div className="mt-3 flex animate-view-in flex-wrap items-center gap-2 text-sm">
           <span className="text-muted">Keep it for</span>
           {EXPIRY_OPTIONS.map(({ label, value }) => (
             <Button key={value} className="min-h-9 pointer-coarse:min-h-11 px-3" onClick={() => keep(value, label)}>

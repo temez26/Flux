@@ -116,7 +116,7 @@ export function TextComposer() {
           <Switch checked={toDevice} onChange={setToDevice} labelledBy={`${id}-device`} />
         </div>
         {toDevice && (
-          <div className="mt-3">
+          <div className="mt-3 animate-view-in">
             <NearbyDevices
               target={target}
               onChoose={(peer) => setTarget(target?.device === peer.device ? null : peer)}

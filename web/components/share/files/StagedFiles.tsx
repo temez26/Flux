@@ -86,7 +86,7 @@ export function StagedFiles({
   }, [files]);
 
   return (
-    <div className="rounded-2xl border-2 border-accent/60 bg-accent/5 p-4 sm:p-5">
+    <div className="animate-view-in rounded-2xl border-2 border-accent/60 bg-accent/5 p-4 sm:p-5">
       <div className="flex items-baseline justify-between gap-3">
         <p ref={heading} tabIndex={-1} className="font-semibold outline-none!">
           {plural(files.length, "file")} ready

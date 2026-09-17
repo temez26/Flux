@@ -21,7 +21,7 @@ export function IncomingChooser({
   useEffect(() => heading.current?.focus(), [files]);
 
   return (
-    <Card aria-labelledby="incoming-heading" className="border-2 border-accent/60">
+    <Card aria-labelledby="incoming-heading" className="animate-view-in border-2 border-accent/60">
       <h2 id="incoming-heading" ref={heading} tabIndex={-1} className="font-semibold outline-none!">
         How do you want to share {files.length === 1 ? "this file" : `these ${files.length.toLocaleString()} files`}?
       </h2>
