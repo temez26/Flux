@@ -84,6 +84,8 @@ cd web && npm install && npm run dev    # UI on :3000, proxies /api to :8080
 
 `npm test` in `web/` and `cargo test` in `server/` cover the two zip writers, where a mistake
 yields an archive that looks fine until someone opens it somewhere else.
+Before a PR, `npm run lint` and `npm run format` in `web/`, `cargo clippy --all-targets` and
+`cargo fmt` in `server/`.
 
 `server/` — Rust API (axum, sqlx, PostgreSQL), also serves the web app. A module per concern:
 `upload`, `download`, `zip`, `thumbs`, `signal`, `nearby`, `stun`, `cleanup`.

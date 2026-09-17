@@ -145,9 +145,8 @@ fn valid_path(path: &str) -> bool {
 fn title(files: &[NewFile]) -> String {
     let first = files[0].path.as_str();
     let top = first.split('/').next().unwrap_or(first);
-    let one_folder = files.len() > 1
-        && first.contains('/')
-        && files.iter().all(|f| f.path.split('/').next() == Some(top));
+    let one_folder =
+        files.len() > 1 && first.contains('/') && files.iter().all(|f| f.path.split('/').next() == Some(top));
     if one_folder {
         top.to_owned()
     } else {
@@ -191,16 +190,33 @@ pub struct NewTransfer {
 
 /// A text transfer is called by its first line, the way a note app lists notes.
 fn note_title(text: &str) -> String {
-    let line = text.lines().map(str::trim).find(|line| !line.is_empty()).unwrap_or_default();
+    let line = text
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or_default();
     let title: String = line.chars().filter(|c| !c.is_control()).take(MAX_TITLE).collect();
     let title = title.trim();
-    if title.is_empty() { NOTE_TITLE.to_owned() } else { title.to_owned() }
+    if title.is_empty() {
+        NOTE_TITLE.to_owned()
+    } else {
+        title.to_owned()
+    }
 }
 
 fn collection_title(title: Option<&str>) -> String {
-    let title: String = title.unwrap_or_default().chars().filter(|c| !c.is_control()).take(MAX_TITLE).collect();
+    let title: String = title
+        .unwrap_or_default()
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(MAX_TITLE)
+        .collect();
     let title = title.trim();
-    if title.is_empty() { COLLECTION_TITLE.to_owned() } else { title.to_owned() }
+    if title.is_empty() {
+        COLLECTION_TITLE.to_owned()
+    } else {
+        title.to_owned()
+    }
 }
 
 /// A contributor's name as the one folder their files go into, or None if nothing usable is left.
@@ -236,13 +252,18 @@ fn checked_total(files: &[NewFile]) -> Result<u64> {
 }
 
 async fn ensure_room(state: &Shared, total: u64) -> Result<()> {
-    let Some(free) = available_space(&state.data_dir) else { return Ok(()) };
+    let Some(free) = available_space(&state.data_dir) else {
+        return Ok(());
+    };
     // Free space already accounts for every byte written so far, but not for the ones
     // transfers accepted earlier are still expecting. Without holding those back, two large
     // transfers created moments apart both pass and then fight over the same room.
     let promised = outstanding(state).await?;
     if total > free.saturating_sub(promised) {
-        return Err(AppError(StatusCode::INSUFFICIENT_STORAGE, "not enough free space on server"));
+        return Err(AppError(
+            StatusCode::INSUFFICIENT_STORAGE,
+            "not enough free space on server",
+        ));
     }
     Ok(())
 }
@@ -284,7 +305,11 @@ async fn insert_files(
         idxs.push(first_idx + offset as i32);
         paths.push(file.path);
         sizes.push(file.size);
-        mimes.push(if file.mime.is_empty() { "application/octet-stream".to_owned() } else { file.mime });
+        mimes.push(if file.mime.is_empty() {
+            "application/octet-stream".to_owned()
+        } else {
+            file.mime
+        });
         modified.push(file.modified);
     }
     sqlx::query(
@@ -370,7 +395,11 @@ pub async fn create(State(state): State<Shared>, Json(req): Json<NewTransfer>) -
     }
     tx.commit().await?;
 
-    Ok(Json(Created { code, token, expires_at }))
+    Ok(Json(Created {
+        code,
+        token,
+        expires_at,
+    }))
 }
 
 #[derive(Deserialize)]
@@ -421,7 +450,11 @@ pub async fn update(
         .bind(editable)
         .execute(&state.db)
         .await?;
-    Ok(Json(Updated { expires_at, closed, editable }))
+    Ok(Json(Updated {
+        expires_at,
+        closed,
+        editable,
+    }))
 }
 
 #[derive(Deserialize)]
@@ -469,13 +502,25 @@ pub async fn save_note(
     .fetch_optional(&state.db)
     .await?;
     if let Some(version) = saved {
-        return Ok(Json(NoteState { text: req.text, version }).into_response());
+        return Ok(Json(NoteState {
+            text: req.text,
+            version,
+        })
+        .into_response());
     }
-    let (text, version): (Option<String>, i32) = sqlx::query_as("SELECT note, note_version FROM transfers WHERE id = $1")
-        .bind(transfer.id)
-        .fetch_one(&state.db)
-        .await?;
-    Ok((StatusCode::CONFLICT, Json(NoteState { text: text.unwrap_or_default(), version })).into_response())
+    let (text, version): (Option<String>, i32) =
+        sqlx::query_as("SELECT note, note_version FROM transfers WHERE id = $1")
+            .bind(transfer.id)
+            .fetch_one(&state.db)
+            .await?;
+    Ok((
+        StatusCode::CONFLICT,
+        Json(NoteState {
+            text: text.unwrap_or_default(),
+            version,
+        }),
+    )
+        .into_response())
 }
 
 #[derive(Deserialize)]
@@ -523,13 +568,20 @@ pub async fn add_files(
         (false, true) => Some(bearer(&headers).map_or_else(|| hex(&rand::random::<[u8; 32]>()), str::to_owned)),
         (false, false) => return Err(AppError::UNAUTHORIZED),
     };
-    if let Some(folder) = contributor.as_ref().and(req.from.as_deref()).and_then(contributor_folder) {
+    if let Some(folder) = contributor
+        .as_ref()
+        .and(req.from.as_deref())
+        .and_then(contributor_folder)
+    {
         for file in &mut req.files {
             file.path = format!("{folder}/{}", file.path);
         }
     }
     if transfer.hosted {
-        return Err(AppError(StatusCode::FORBIDDEN, "this transfer is served from the sender's device"));
+        return Err(AppError(
+            StatusCode::FORBIDDEN,
+            "this transfer is served from the sender's device",
+        ));
     }
     if req.files.is_empty() {
         return Err(AppError::bad_request("invalid file count"));
@@ -541,11 +593,12 @@ pub async fn add_files(
     // Taking the indices first also locks the transfer's row, so a second addition waits here
     // and then sees this one's paths, rather than both picking the same names. A removed
     // file's index is never handed out again.
-    let first: i32 = sqlx::query_scalar("UPDATE transfers SET next_idx = next_idx + $2 WHERE id = $1 RETURNING next_idx - $2")
-        .bind(transfer.id)
-        .bind(req.files.len() as i32)
-        .fetch_one(&mut *tx)
-        .await?;
+    let first: i32 =
+        sqlx::query_scalar("UPDATE transfers SET next_idx = next_idx + $2 WHERE id = $1 RETURNING next_idx - $2")
+            .bind(transfer.id)
+            .bind(req.files.len() as i32)
+            .fetch_one(&mut *tx)
+            .await?;
     let existing: Vec<String> = sqlx::query_scalar("SELECT path FROM files WHERE transfer_id = $1")
         .bind(transfer.id)
         .fetch_all(&mut *tx)
@@ -563,12 +616,25 @@ pub async fn add_files(
     let added = files
         .iter()
         .enumerate()
-        .map(|(offset, file)| AddedFile { idx: first + offset as i32, path: file.path.clone() })
+        .map(|(offset, file)| AddedFile {
+            idx: first + offset as i32,
+            path: file.path.clone(),
+        })
         .collect();
     let token_hash = contributor.as_ref().map(|token| blake3::hash(token.as_bytes()));
-    insert_files(&mut tx, transfer.id, first, files, token_hash.as_ref().map(|hash| hash.as_bytes().as_slice())).await?;
+    insert_files(
+        &mut tx,
+        transfer.id,
+        first,
+        files,
+        token_hash.as_ref().map(|hash| hash.as_bytes().as_slice()),
+    )
+    .await?;
     tx.commit().await?;
-    Ok(Json(Added { files: added, token: contributor }))
+    Ok(Json(Added {
+        files: added,
+        token: contributor,
+    }))
 }
 
 #[derive(Serialize)]
@@ -605,7 +671,9 @@ pub struct TransferInfo {
 
 /// Sizes of the partial files among `wanted`, read with one directory listing.
 fn sizes_on_disk(dir: &std::path::Path, wanted: &HashSet<i32>) -> HashMap<i32, u64> {
-    let Ok(entries) = std::fs::read_dir(dir) else { return HashMap::new() };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return HashMap::new();
+    };
     entries
         .filter_map(|entry| {
             let entry = entry.ok()?;
@@ -618,14 +686,16 @@ fn sizes_on_disk(dir: &std::path::Path, wanted: &HashSet<i32>) -> HashMap<i32, u
         .collect()
 }
 
+/// idx, path, size, mime, modified, hash
+type FileRow = (i32, String, i64, String, Option<i64>, Option<Vec<u8>>);
+
 pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers: HeaderMap) -> Result<Response> {
     let transfer = find(&state.db, &code).await?;
-    let rows: Vec<(i32, String, i64, String, Option<i64>, Option<Vec<u8>>)> = sqlx::query_as(
-        "SELECT idx, path, size, mime, modified, hash FROM files WHERE transfer_id = $1 ORDER BY idx",
-    )
-    .bind(transfer.id)
-    .fetch_all(&state.db)
-    .await?;
+    let rows: Vec<FileRow> =
+        sqlx::query_as("SELECT idx, path, size, mime, modified, hash FROM files WHERE transfer_id = $1 ORDER BY idx")
+            .bind(transfer.id)
+            .fetch_all(&state.db)
+            .await?;
 
     let mut received = state.uploads.received_for(transfer.id);
     // In-memory progress is lost on restart; partial files on disk still tell it.
@@ -645,8 +715,20 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
     let files = rows
         .into_iter()
         .map(|(idx, path, size, mime, modified, hash)| {
-            let received = if hash.is_some() { size as u64 } else { received.get(&idx).copied().unwrap_or(0) };
-            FileInfo { idx, path, size, mime, modified, hash: hash.as_deref().map(hex), received }
+            let received = if hash.is_some() {
+                size as u64
+            } else {
+                received.get(&idx).copied().unwrap_or(0)
+            };
+            FileInfo {
+                idx,
+                path,
+                size,
+                mime,
+                modified,
+                hash: hash.as_deref().map(hex),
+                received,
+            }
         })
         .collect();
 
@@ -668,19 +750,25 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
 
     // Receivers poll this; when nothing changed they get a 304 instead of the whole file list.
     let etag = format!("\"{}\"", blake3::hash(&body).to_hex());
-    let unchanged = headers.get(header::IF_NONE_MATCH).is_some_and(|v| v.as_bytes() == etag.as_bytes());
+    let unchanged = headers
+        .get(header::IF_NONE_MATCH)
+        .is_some_and(|v| v.as_bytes() == etag.as_bytes());
     let mut response = if unchanged {
         StatusCode::NOT_MODIFIED.into_response()
     } else {
         ([(header::CONTENT_TYPE, "application/json")], body).into_response()
     };
     let response_headers = response.headers_mut();
-    response_headers.insert(header::ETAG, HeaderValue::from_str(&etag).map_err(|_| AppError::INTERNAL)?);
+    response_headers.insert(
+        header::ETAG,
+        HeaderValue::from_str(&etag).map_err(|_| AppError::INTERNAL)?,
+    );
     response_headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
     Ok(response)
 }
 
-const SUMMARY_SQL: &str = "SELECT t.code, t.title, t.created_at, t.expires_at, t.hosted, t.collect, t.downloads, t.closed,
+const SUMMARY_SQL: &str =
+    "SELECT t.code, t.title, t.created_at, t.expires_at, t.hosted, t.collect, t.downloads, t.closed,
         t.note IS NOT NULL AS note,
         count(f.idx) AS files,
         CASE WHEN t.note IS NULL THEN coalesce(sum(f.size), 0) ELSE octet_length(t.note) END::bigint AS size,
@@ -728,10 +816,7 @@ pub struct PublicQuery {
 }
 
 /// Public transfers, newest first, narrowed by `q` and capped at `limit`.
-pub async fn list_public(
-    State(state): State<Shared>,
-    Query(query): Query<PublicQuery>,
-) -> Result<Json<Vec<Summary>>> {
+pub async fn list_public(State(state): State<Shared>, Query(query): Query<PublicQuery>) -> Result<Json<Vec<Summary>>> {
     let limit = query.limit.unwrap_or(PUBLIC_LIST_LIMIT).clamp(1, PUBLIC_LIST_MAX);
     let search = query
         .q
@@ -744,7 +829,11 @@ pub async fn list_public(
            AND ($2::text IS NULL OR t.title ILIKE $2 ESCAPE '{LIKE_ESCAPE}')
          GROUP BY t.id ORDER BY t.created_at DESC LIMIT $1"
     );
-    let transfers = sqlx::query_as(&sql).bind(limit).bind(search).fetch_all(&state.db).await?;
+    let transfers = sqlx::query_as(&sql)
+        .bind(limit)
+        .bind(search)
+        .fetch_all(&state.db)
+        .await?;
     Ok(Json(transfers))
 }
 
@@ -773,14 +862,13 @@ pub async fn count_download(State(state): State<Shared>, Path(code): Path<String
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn delete(
-    State(state): State<Shared>,
-    Path(code): Path<String>,
-    headers: HeaderMap,
-) -> Result<StatusCode> {
+pub async fn delete(State(state): State<Shared>, Path(code): Path<String>, headers: HeaderMap) -> Result<StatusCode> {
     let transfer = find(&state.db, &code).await?;
     authorize(&headers, &transfer)?;
-    sqlx::query("DELETE FROM transfers WHERE id = $1").bind(transfer.id).execute(&state.db).await?;
+    sqlx::query("DELETE FROM transfers WHERE id = $1")
+        .bind(transfer.id)
+        .execute(&state.db)
+        .await?;
     crate::cleanup::remove_transfer_data(&state, transfer.id).await;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -881,7 +969,11 @@ mod tests {
     #[test]
     fn a_text_is_called_by_its_first_line() {
         assert_eq!(note_title("Wifi password\nhunter2"), "Wifi password");
-        assert_eq!(note_title("\n\n   Shopping list  \nmilk"), "Shopping list", "past blank lines");
+        assert_eq!(
+            note_title("\n\n   Shopping list  \nmilk"),
+            "Shopping list",
+            "past blank lines"
+        );
         assert_eq!(note_title("   \n\t"), NOTE_TITLE);
         assert_eq!(note_title(&"x".repeat(200)).chars().count(), MAX_TITLE);
     }
@@ -889,7 +981,11 @@ mod tests {
     #[test]
     fn a_contributor_name_makes_one_folder_and_no_more() {
         assert_eq!(contributor_folder("Bob's iPhone").as_deref(), Some("Bob's iPhone"));
-        assert_eq!(contributor_folder("a/b\\c").as_deref(), Some("abc"), "no nesting, no escaping upwards");
+        assert_eq!(
+            contributor_folder("a/b\\c").as_deref(),
+            Some("abc"),
+            "no nesting, no escaping upwards"
+        );
         for unusable in ["", "   ", ".", "..", "/"] {
             assert_eq!(contributor_folder(unusable), None, "{unusable:?}");
         }
@@ -920,27 +1016,49 @@ mod tests {
         };
         assert!(authorize(&with("Bearer owner-token"), &transfer).is_ok());
         assert!(authorize(&with("Bearer someone-else"), &transfer).is_err());
-        assert!(authorize(&with("owner-token"), &transfer).is_err(), "only as a bearer token");
+        assert!(
+            authorize(&with("owner-token"), &transfer).is_err(),
+            "only as a bearer token"
+        );
         assert!(authorize(&HeaderMap::new(), &transfer).is_err());
     }
 
     fn file(path: &str, size: i64) -> NewFile {
-        NewFile { path: path.into(), size, mime: String::new(), modified: None }
+        NewFile {
+            path: path.into(),
+            size,
+            mime: String::new(),
+            modified: None,
+        }
     }
 
     #[test]
     fn renames_a_path_already_taken() {
-        let taken: HashSet<String> = ["photo.jpg", "photo (1).jpg", "trip/.env", "notes"].map(String::from).into();
+        let taken: HashSet<String> = ["photo.jpg", "photo (1).jpg", "trip/.env", "notes"]
+            .map(String::from)
+            .into();
         assert_eq!(unique_path("new.jpg", &taken), "new.jpg", "a free name is kept");
-        assert_eq!(unique_path("photo.jpg", &taken), "photo (2).jpg", "past every name in use");
-        assert_eq!(unique_path("trip/.env", &taken), "trip/.env (1)", "a hidden file has no extension");
+        assert_eq!(
+            unique_path("photo.jpg", &taken),
+            "photo (2).jpg",
+            "past every name in use"
+        );
+        assert_eq!(
+            unique_path("trip/.env", &taken),
+            "trip/.env (1)",
+            "a hidden file has no extension"
+        );
         assert_eq!(unique_path("notes", &taken), "notes (1)");
     }
 
     #[test]
     fn refuses_a_batch_the_server_couldnt_store() {
         assert_eq!(checked_total(&[file("a", 10), file("b/c", 5)]).ok(), Some(15));
-        for bad in [vec![file("a", -1)], vec![file("../a", 1)], vec![file("a", 1), file("a", 2)]] {
+        for bad in [
+            vec![file("a", -1)],
+            vec![file("../a", 1)],
+            vec![file("a", 1), file("a", 2)],
+        ] {
             assert!(checked_total(&bad).is_err());
         }
     }
@@ -965,7 +1083,11 @@ mod tests {
         std::fs::write(dir.join(".0.12345"), vec![0u8; 7000]).unwrap();
 
         assert_eq!(stored_bytes(&dir), 1024);
-        assert_eq!(stored_bytes(&dir.join("missing")), 0, "an absent directory holds nothing");
+        assert_eq!(
+            stored_bytes(&dir.join("missing")),
+            0,
+            "an absent directory holds nothing"
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

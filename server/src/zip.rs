@@ -68,7 +68,10 @@ pub fn build(entries: Vec<Entry>) -> Vec<Part> {
         }
         let header_len = local.len() as u64;
         parts.push(Part::Bytes(local.freeze()));
-        parts.push(Part::File { path: entry.file, len: entry.size });
+        parts.push(Part::File {
+            path: entry.file,
+            len: entry.size,
+        });
 
         let mut extra = BytesMut::new();
         if big_size {
@@ -80,7 +83,11 @@ pub fn build(entries: Vec<Entry>) -> Vec<Part> {
         }
         central.put_u32_le(0x0201_4b50);
         central.put_u16_le(MADE_BY_UNIX);
-        central.put_u16_le(if big_size || big_offset { VERSION_ZIP64 } else { VERSION_DEFAULT });
+        central.put_u16_le(if big_size || big_offset {
+            VERSION_ZIP64
+        } else {
+            VERSION_DEFAULT
+        });
         central.put_u16_le(FLAG_UTF8);
         central.put_u16_le(0);
         central.put_u16_le(time);
@@ -308,13 +315,21 @@ mod tests {
 
         let filler = &central[records[0]..records[1]];
         assert_eq!(u32_at(filler, 42), 0, "the first entry starts at zero");
-        assert_eq!(zip64_extra(filler).map(<[u8]>::len), Some(16), "but is itself oversized");
+        assert_eq!(
+            zip64_extra(filler).map(<[u8]>::len),
+            Some(16),
+            "but is itself oversized"
+        );
 
         let after = &central[records[1]..];
         assert_eq!(u32_at(after, 42), u32::MAX, "the second defers its offset");
         let extra = zip64_extra(after).expect("a ZIP64 extra field");
         assert_eq!(extra.len(), 8, "one 64-bit local header offset");
-        assert_eq!(u64_at(extra, 0), offset_of(&parts, 2), "which is where it really starts");
+        assert_eq!(
+            u64_at(extra, 0),
+            offset_of(&parts, 2),
+            "which is where it really starts"
+        );
     }
 
     #[test]
@@ -327,7 +342,11 @@ mod tests {
         assert_eq!(u64_at(end, 24), count as u64, "entries on this disk");
         assert_eq!(u64_at(end, 32), count as u64, "entries in total");
         assert_eq!(u32_at(end, 56), ZIP64_LOCATOR_SIG);
-        assert_eq!(u64_at(end, 64), offset_of(&parts, parts.len() - 1), "the locator finds it");
+        assert_eq!(
+            u64_at(end, 64),
+            offset_of(&parts, parts.len() - 1),
+            "the locator finds it"
+        );
         assert_eq!(u32_at(end, 76), EOCD_SIG, "the classic record still follows");
         assert_eq!(u16_at(end, 76 + 10), 0xFFFF, "and saturates");
     }
@@ -335,12 +354,19 @@ mod tests {
     #[test]
     fn stores_timestamps_as_dos_date_and_time() {
         // Two-second granularity is all a DOS timestamp has.
-        assert_eq!(dos_datetime(at((2021, 5, 17, 9, 41, 31))), (9 << 11 | 41 << 5 | 15, 41 << 9 | 5 << 5 | 17));
+        assert_eq!(
+            dos_datetime(at((2021, 5, 17, 9, 41, 31))),
+            (9 << 11 | 41 << 5 | 15, 41 << 9 | 5 << 5 | 17)
+        );
     }
 
     #[test]
     fn clamps_timestamps_outside_the_dos_range() {
-        assert_eq!(dos_datetime(at((1975, 6, 15, 12, 0, 0))), (0, (1 << 5) | 1), "1980-01-01 at midnight");
+        assert_eq!(
+            dos_datetime(at((1975, 6, 15, 12, 0, 0))),
+            (0, (1 << 5) | 1),
+            "1980-01-01 at midnight"
+        );
         // The year field is seven bits, so 2107 is as far ahead as a zip can point.
         assert_eq!(dos_datetime(at((2200, 1, 2, 0, 0, 0))).1 >> 9, 127);
     }

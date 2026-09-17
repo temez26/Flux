@@ -45,7 +45,9 @@ const HEIF: [&str; 4] = ["heic", "heif", "hif", "avif"];
 // Decoding is CPU-bound and a listing asks for many tiles at once, so downloads and uploads
 // must not be left waiting behind a burst of them.
 static DECODERS: LazyLock<Semaphore> = LazyLock::new(|| {
-    let permits = std::thread::available_parallelism().map_or(2, |n| n.get().div_ceil(2)).max(1);
+    let permits = std::thread::available_parallelism()
+        .map_or(2, |n| n.get().div_ceil(2))
+        .max(1);
     Semaphore::new(permits)
 });
 
@@ -119,7 +121,9 @@ fn decode_heif(source: &FsPath) -> Result<DynamicImage> {
         let start = y * plane.stride;
         pixels.extend_from_slice(plane.data.get(start..start + row).ok_or(UNREADABLE)?);
     }
-    Ok(DynamicImage::ImageRgb8(RgbImage::from_raw(width, height, pixels).ok_or(UNREADABLE)?))
+    Ok(DynamicImage::ImageRgb8(
+        RgbImage::from_raw(width, height, pixels).ok_or(UNREADABLE)?,
+    ))
 }
 
 fn decode_image(source: &FsPath) -> Result<DynamicImage> {
@@ -135,7 +139,11 @@ fn decode_image(source: &FsPath) -> Result<DynamicImage> {
 
 /// Shrinks `source` to fit `size`, keeping alpha by falling back to PNG when there is any.
 fn encode(source: &FsPath, size: Size, heif: bool) -> Result<(Vec<u8>, &'static str)> {
-    let image = if heif { decode_heif(source)? } else { decode_image(source)? };
+    let image = if heif {
+        decode_heif(source)?
+    } else {
+        decode_image(source)?
+    };
     let edge = size.edge();
     // `thumbnail` fits the image to the box in both directions, so an image already smaller
     // than the box comes back enlarged — bigger to send and blurrier to look at than the
@@ -167,7 +175,11 @@ fn encode(source: &FsPath, size: Size, heif: bool) -> Result<(Vec<u8>, &'static 
 async fn store(dir: PathBuf, idx: i32, size: Size, bytes: &[u8], mime: &str) -> std::io::Result<()> {
     tokio::fs::create_dir_all(&dir).await?;
     let stem = size.stem(idx);
-    let name = if mime == "image/png" { format!("{stem}.png") } else { format!("{stem}.jpg") };
+    let name = if mime == "image/png" {
+        format!("{stem}.png")
+    } else {
+        format!("{stem}.jpg")
+    };
     let temp = dir.join(format!(".{stem}.{}", std::process::id()));
     tokio::fs::write(&temp, bytes).await?;
     tokio::fs::rename(&temp, dir.join(name)).await
@@ -197,19 +209,21 @@ pub async fn thumb(
 ) -> Result<Response> {
     let size = if query.full.is_some() { Size::Full } else { Size::Tile };
     let transfer = transfers::find(&state.db, &code).await?;
-    let (path, hash): (String, Vec<u8>) = sqlx::query_as(
-        "SELECT path, hash FROM files WHERE transfer_id = $1 AND idx = $2 AND hash IS NOT NULL",
-    )
-    .bind(transfer.id)
-    .bind(idx)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or(AppError::NOT_FOUND)?;
+    let (path, hash): (String, Vec<u8>) =
+        sqlx::query_as("SELECT path, hash FROM files WHERE transfer_id = $1 AND idx = $2 AND hash IS NOT NULL")
+            .bind(transfer.id)
+            .bind(idx)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or(AppError::NOT_FOUND)?;
 
     let ext = extension(&path);
     let heif = HEIF.contains(&ext.as_str());
     if !heif && !DECODABLE.contains(&ext.as_str()) {
-        return Err(AppError(StatusCode::UNSUPPORTED_MEDIA_TYPE, "no preview for this file type"));
+        return Err(AppError(
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "no preview for this file type",
+        ));
     }
 
     let etag = format!("\"t{}{}\"", if size == Size::Full { "f" } else { "" }, hex(&hash));
@@ -218,7 +232,10 @@ pub async fn thumb(
 
     for (cache, mime) in cached(&dir, idx, size) {
         if let Ok(meta) = tokio::fs::metadata(&cache).await {
-            let part = Part::File { path: cache, len: meta.len() };
+            let part = Part::File {
+                path: cache,
+                len: meta.len(),
+            };
             // Safe to show inline: these bytes were encoded here, not uploaded.
             return Ok(respond(&headers, vec![part], etag, mime, &name, true));
         }
@@ -234,9 +251,15 @@ pub async fn thumb(
         // One that can't be cached is still worth serving; the next request redoes it.
         tracing::warn!("failed to cache preview: {err}");
     }
-    Ok(respond(&headers, vec![Part::Bytes(bytes.into())], etag, mime, &name, true))
+    Ok(respond(
+        &headers,
+        vec![Part::Bytes(bytes.into())],
+        etag,
+        mime,
+        &name,
+        true,
+    ))
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -291,7 +314,10 @@ mod tests {
         let dir = FsPath::new("/tmp");
         let tile: Vec<_> = cached(dir, 7, Size::Tile).iter().map(|(p, _)| p.clone()).collect();
         let full: Vec<_> = cached(dir, 7, Size::Full).iter().map(|(p, _)| p.clone()).collect();
-        assert!(tile.iter().all(|p| !full.contains(p)), "one must not overwrite the other");
+        assert!(
+            tile.iter().all(|p| !full.contains(p)),
+            "one must not overwrite the other"
+        );
         assert!(full.iter().all(|p| p.to_string_lossy().contains("7.full")));
     }
 }

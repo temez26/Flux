@@ -29,7 +29,9 @@ pub fn local(addr: SocketAddr) -> SocketAddr {
 /// Asks for the cheapest page the server has, which touches neither the disk nor the database:
 /// the question is whether it answers, not whether everything behind it is well.
 fn probe_with(addr: SocketAddr, timeout: Duration) -> bool {
-    let Ok(mut stream) = TcpStream::connect_timeout(&addr, timeout) else { return false };
+    let Ok(mut stream) = TcpStream::connect_timeout(&addr, timeout) else {
+        return false;
+    };
     if stream.set_read_timeout(Some(timeout)).is_err() || stream.set_write_timeout(Some(timeout)).is_err() {
         return false;
     }
@@ -96,12 +98,18 @@ mod tests {
 
     #[test]
     fn a_server_that_answers_is_alive() {
-        assert!(probe_with(server(Some(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}")), QUICK));
+        assert!(probe_with(
+            server(Some(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}")),
+            QUICK
+        ));
     }
 
     #[test]
     fn an_error_is_not_an_answer() {
-        assert!(!probe_with(server(Some(b"HTTP/1.1 500 Internal Server Error\r\n\r\n")), QUICK));
+        assert!(!probe_with(
+            server(Some(b"HTTP/1.1 500 Internal Server Error\r\n\r\n")),
+            QUICK
+        ));
         assert!(!probe_with(server(Some(b"nonsense")), QUICK));
     }
 
@@ -120,9 +128,15 @@ mod tests {
 
     #[test]
     fn probes_a_wildcard_listener_on_loopback() {
-        assert_eq!(local("0.0.0.0:8080".parse().unwrap()), "127.0.0.1:8080".parse().unwrap());
+        assert_eq!(
+            local("0.0.0.0:8080".parse().unwrap()),
+            "127.0.0.1:8080".parse().unwrap()
+        );
         assert_eq!(local("[::]:8080".parse().unwrap()), "[::1]:8080".parse().unwrap());
-        assert_eq!(local("10.0.0.2:8080".parse().unwrap()), "10.0.0.2:8080".parse().unwrap());
+        assert_eq!(
+            local("10.0.0.2:8080".parse().unwrap()),
+            "10.0.0.2:8080".parse().unwrap()
+        );
     }
 
     #[test]

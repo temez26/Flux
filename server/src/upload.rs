@@ -56,6 +56,9 @@ struct Upload {
 }
 
 /// What is known about the checksums of the bytes already on disk.
+// One lives behind each upload's lock and is updated in place, never moved, so the size of
+// `Ready` costs nothing that a box would save.
+#[allow(clippy::large_enum_variant)]
 #[derive(Default)]
 enum Checksums {
     /// Nothing, e.g. after a restart: the file must be re-read before more can be appended.
@@ -166,7 +169,9 @@ pub async fn chunk(
     body: Body,
 ) -> Response {
     let mut stream = body.into_data_stream();
-    let response = write_chunk(state, code, idx, headers, &mut stream).await.into_response();
+    let response = write_chunk(state, code, idx, headers, &mut stream)
+        .await
+        .into_response();
     // Browsers report a response that arrives before their upload finished as a network
     // error, hiding statuses the client needs (404 gone, 409 offset). Read the rest first.
     let _ = tokio::time::timeout(DRAIN_TIMEOUT, async { while let Some(Ok(_)) = stream.next().await {} }).await;
@@ -186,7 +191,10 @@ async fn write_chunk(
     // become a way to store anything. Not 409: that status carries the real offset and the
     // client retries it at once, which here would spin forever.
     if transfer.hosted {
-        return Err(AppError(StatusCode::FORBIDDEN, "this transfer is served from the sender's device"));
+        return Err(AppError(
+            StatusCode::FORBIDDEN,
+            "this transfer is served from the sender's device",
+        ));
     }
     let (size, hash): (i64, Option<Vec<u8>>) =
         sqlx::query_as("SELECT size, hash FROM files WHERE transfer_id = $1 AND idx = $2")
@@ -218,7 +226,12 @@ async fn write_chunk(
     };
 
     let path = transfers::file_path(&state, transfer.id, idx);
-    let mut file = tokio::fs::OpenOptions::new().write(true).create(true).truncate(false).open(&path).await?;
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&path)
+        .await?;
     let on_disk = file.metadata().await?.len();
 
     // An empty digest already describes an empty file, so a new upload never needs a rebuild.
@@ -240,7 +253,9 @@ async fn write_chunk(
     if let Some(len) = rewind {
         file.set_len(len).await?;
     }
-    let Checksums::Ready(digest) = &mut *slot else { return Err(AppError::INTERNAL) };
+    let Checksums::Ready(digest) = &mut *slot else {
+        return Err(AppError::INTERNAL);
+    };
     upload.received.store(digest.len, Ordering::Relaxed);
     if offset != digest.len {
         return Ok(progress(StatusCode::CONFLICT, digest.len, false));
@@ -273,7 +288,10 @@ async fn write_chunk(
         return Err(err.into());
     }
     if oversized {
-        return Err(AppError(StatusCode::PAYLOAD_TOO_LARGE, "data exceeds declared file size"));
+        return Err(AppError(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "data exceeds declared file size",
+        ));
     }
     if digest.len < size {
         return Ok(progress(StatusCode::OK, digest.len, false));

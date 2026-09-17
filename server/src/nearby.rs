@@ -60,9 +60,7 @@ fn send(tx: &Tx, msg: Value) {
 
 /// A device id is only ever compared, so anything short and printable will do.
 fn valid_device(device: &str) -> bool {
-    !device.is_empty()
-        && device.len() <= MAX_DEVICE_ID
-        && device.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+    !device.is_empty() && device.len() <= MAX_DEVICE_ID && device.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
 }
 
 fn clean_name(name: &str) -> String {
@@ -79,7 +77,10 @@ impl Presence {
         }
         let mut peers: Vec<_> = named.into_iter().collect();
         peers.sort();
-        peers.into_iter().map(|(device, name)| json!({ "device": device, "name": name })).collect()
+        peers
+            .into_iter()
+            .map(|(device, name)| json!({ "device": device, "name": name }))
+            .collect()
     }
 
     fn join(&self, device: String, name: String, tx: Tx) -> Option<u64> {
@@ -88,7 +89,10 @@ impl Presence {
             return None;
         }
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
-        send(&tx, json!({ "t": "peers", "peers": Self::peers_of(&connections, &device) }));
+        send(
+            &tx,
+            json!({ "t": "peers", "peers": Self::peers_of(&connections, &device) }),
+        );
         for other in connections.values().filter(|c| c.device != device) {
             send(&other.tx, json!({ "t": "peer", "device": device, "name": name }));
         }
@@ -169,7 +173,13 @@ impl Presence {
     fn handle(&self, id: u64, incoming: Incoming) {
         match incoming {
             Incoming::Rename { name } => self.rename(id, clean_name(&name)),
-            Incoming::Offer { to, code, title, files, size } => {
+            Incoming::Offer {
+                to,
+                code,
+                title,
+                files,
+                size,
+            } => {
                 let title: String = title.chars().filter(|c| !c.is_control()).take(MAX_TITLE).collect();
                 let msg = json!({ "t": "offer", "code": normalize_code(&code), "title": title, "files": files, "size": size });
                 self.deliver(id, &to, msg);
@@ -183,7 +193,8 @@ impl Presence {
 }
 
 pub async fn connect(ws: WebSocketUpgrade, State(state): State<Shared>) -> Response {
-    ws.max_message_size(MAX_MESSAGE).on_upgrade(move |socket| session(state, socket))
+    ws.max_message_size(MAX_MESSAGE)
+        .on_upgrade(move |socket| session(state, socket))
 }
 
 async fn session(state: Shared, socket: WebSocket) {
@@ -192,10 +203,14 @@ async fn session(state: Shared, socket: WebSocket) {
         Ok(Some(Ok(Message::Text(text)))) => serde_json::from_str::<Hello>(text.as_str()).ok(),
         _ => None,
     };
-    let Some(hello) = hello.filter(|h| valid_device(&h.device)) else { return };
+    let Some(hello) = hello.filter(|h| valid_device(&h.device)) else {
+        return;
+    };
 
     let (tx, mut rx) = mpsc::channel(QUEUE);
-    let Some(id) = state.nearby.join(hello.device, clean_name(&hello.name), tx) else { return };
+    let Some(id) = state.nearby.join(hello.device, clean_name(&hello.name), tx) else {
+        return;
+    };
     let mut ping = tokio::time::interval(PING_INTERVAL);
     loop {
         tokio::select! {
@@ -256,7 +271,10 @@ mod tests {
             drain(&mut bob),
             [json!({ "t": "peers", "peers": [{ "device": "alice", "name": "Alice's Mac" }] })]
         );
-        assert_eq!(drain(&mut alice), [json!({ "t": "peer", "device": "bob", "name": "Bob's iPhone" })]);
+        assert_eq!(
+            drain(&mut alice),
+            [json!({ "t": "peer", "device": "bob", "name": "Bob's iPhone" })]
+        );
     }
 
     #[test]
@@ -273,7 +291,15 @@ mod tests {
         let (late_tx, mut late) = channel();
         presence.join("late".into(), "Late".into(), late_tx);
         let peers = &drain(&mut late)[0]["peers"];
-        assert_eq!(peers.as_array().unwrap().iter().filter(|p| p["device"] == "phone").count(), 1);
+        assert_eq!(
+            peers
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|p| p["device"] == "phone")
+                .count(),
+            1
+        );
 
         drain(&mut watcher);
         presence.leave(first);
@@ -299,13 +325,19 @@ mod tests {
 
         presence.handle(
             from,
-            Incoming::Offer { to: "target".into(), code: "ABCD-EFGH".into(), title: "photos".into(), files: 3, size: 1024 },
+            Incoming::Offer {
+                to: "target".into(),
+                code: "ABCD-EFGH".into(),
+                title: "photos".into(),
+                files: 3,
+                size: 1024,
+            },
         );
         let expected = json!({
             "t": "offer", "code": "abcdefgh", "title": "photos", "files": 3, "size": 1024,
             "from": { "device": "sender", "name": "Sender" },
         });
-        assert_eq!(drain(&mut tab1), [expected.clone()]);
+        assert_eq!(drain(&mut tab1), std::slice::from_ref(&expected));
         assert_eq!(drain(&mut tab2), [expected]);
         assert!(drain(&mut bystander).is_empty());
         assert!(drain(&mut sender).is_empty());
@@ -320,10 +352,19 @@ mod tests {
         let target = presence.join("target".into(), "Target".into(), target_tx).unwrap();
         drain(&mut sender);
 
-        presence.handle(target, Incoming::Answer { to: "sender".into(), code: "abcdefgh".into(), accepted: true });
+        presence.handle(
+            target,
+            Incoming::Answer {
+                to: "sender".into(),
+                code: "abcdefgh".into(),
+                accepted: true,
+            },
+        );
         assert_eq!(
             drain(&mut sender),
-            [json!({ "t": "answer", "code": "abcdefgh", "accepted": true, "from": { "device": "target", "name": "Target" } })]
+            [
+                json!({ "t": "answer", "code": "abcdefgh", "accepted": true, "from": { "device": "target", "name": "Target" } })
+            ]
         );
     }
 
@@ -334,7 +375,16 @@ mod tests {
         let id = presence.join("me".into(), "Me".into(), me_tx).unwrap();
         drain(&mut me);
         for to in ["me", "nobody"] {
-            presence.handle(id, Incoming::Offer { to: to.into(), code: "abcdefgh".into(), title: "x".into(), files: 1, size: 1 });
+            presence.handle(
+                id,
+                Incoming::Offer {
+                    to: to.into(),
+                    code: "abcdefgh".into(),
+                    title: "x".into(),
+                    files: 1,
+                    size: 1,
+                },
+            );
         }
         assert!(drain(&mut me).is_empty());
     }
@@ -348,8 +398,16 @@ mod tests {
         let phone = presence.join("phone".into(), "Phone".into(), phone_tx).unwrap();
         drain(&mut watcher);
 
-        presence.handle(phone, Incoming::Rename { name: "  Kitchen iPad  ".into() });
-        assert_eq!(drain(&mut watcher), [json!({ "t": "peer", "device": "phone", "name": "Kitchen iPad" })]);
+        presence.handle(
+            phone,
+            Incoming::Rename {
+                name: "  Kitchen iPad  ".into(),
+            },
+        );
+        assert_eq!(
+            drain(&mut watcher),
+            [json!({ "t": "peer", "device": "phone", "name": "Kitchen iPad" })]
+        );
     }
 
     #[test]

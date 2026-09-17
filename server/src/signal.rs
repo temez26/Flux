@@ -131,11 +131,7 @@ struct Envelope {
     data: Value,
 }
 
-pub async fn connect(
-    ws: WebSocketUpgrade,
-    State(state): State<Shared>,
-    Path(code): Path<String>,
-) -> Result<Response> {
+pub async fn connect(ws: WebSocketUpgrade, State(state): State<Shared>, Path(code): Path<String>) -> Result<Response> {
     let transfer = transfers::find(&state.db, &code).await?;
     Ok(ws
         .max_message_size(MAX_MESSAGE)
@@ -150,12 +146,18 @@ async fn session(state: Shared, transfer: Transfer, socket: WebSocket) {
     };
     let Some(hello) = hello else { return };
     let is_sender = hello.role == "sender";
-    if is_sender && !hello.token.is_some_and(|token| transfers::token_matches(&token, &transfer)) {
+    if is_sender
+        && !hello
+            .token
+            .is_some_and(|token| transfers::token_matches(&token, &transfer))
+    {
         return;
     }
 
     let (tx, mut rx) = mpsc::channel(QUEUE);
-    let Some(id) = state.rooms.join(transfer.id, is_sender, tx) else { return };
+    let Some(id) = state.rooms.join(transfer.id, is_sender, tx) else {
+        return;
+    };
     let mut ping = tokio::time::interval(PING_INTERVAL);
     loop {
         tokio::select! {
