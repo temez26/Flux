@@ -104,7 +104,8 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
   const viaDirect = directOpen && (meta.hosted || !ready);
   // The sender's page is the only source, so its absence is the whole story.
   const senderMissing = meta.hosted && !directOpen;
-  const tooLargeHere = whole === null;
+  // Only a download taken from the sender's device is saved from the page; the server's copy downloads as usual.
+  const tooLargeHere = whole === null && (meta.hosted || !ready);
   const unreachable = direct?.state === "unavailable";
   const remaining = meta.files.filter((f) => !saved.has(f.idx));
 

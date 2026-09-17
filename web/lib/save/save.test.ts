@@ -7,6 +7,8 @@ const DOWNLOAD_PREFIX = "/_flux/download/";
 
 interface Options {
   vendor?: string;
+  /** Above zero on an iPhone or iPad; a Mac has none. */
+  maxTouchPoints?: number;
   /** No controller means the worker isn't driving this page's requests yet. */
   controlled?: boolean;
   /** The worker takes the registration but never answers the handshake. */
@@ -25,6 +27,7 @@ const originals = { navigator: globalThis.navigator, fetch: globalThis.fetch, wi
  */
 function install({
   vendor = "Google Inc.",
+  maxTouchPoints = 0,
   controlled = true,
   mute = false,
   missing = false,
@@ -67,7 +70,7 @@ function install({
   };
 
   Object.defineProperty(globalThis, "navigator", {
-    value: { vendor, serviceWorker: { controller: controlled ? controller : null } },
+    value: { vendor, maxTouchPoints, serviceWorker: { controller: controlled ? controller : null } },
     configurable: true,
   });
   Object.defineProperty(globalThis, "window", { value: globalThis, configurable: true });
@@ -118,4 +121,12 @@ test("refuses a transfer too big to hold in memory when it can't stream", async 
   install({ controlled: false });
   assert.equal(await saveMethod(GIB), "memory", "right at the limit");
   assert.equal(await saveMethod(GIB + 1), null, "and past it there is nowhere to put it");
+});
+
+test("holds far less in memory on an iPhone or iPad, which closes a tab that takes too much", async () => {
+  install({ vendor: "Apple Computer, Inc.", maxTouchPoints: 5 });
+  assert.equal(await saveMethod(512 * 1024 ** 2), "memory");
+  assert.equal(await saveMethod(512 * 1024 ** 2 + 1), null);
+  install({ vendor: "Apple Computer, Inc." });
+  assert.equal(await saveMethod(GIB), "memory", "a Mac keeps the usual limit");
 });
