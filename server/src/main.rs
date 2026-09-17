@@ -17,7 +17,7 @@ use axum::{
     extract::DefaultBodyLimit,
     http::{HeaderValue, header},
     response::Redirect,
-    routing::{get, patch, post},
+    routing::{get, patch, post, put},
 };
 use sqlx::postgres::PgPoolOptions;
 use tower_http::{
@@ -128,6 +128,7 @@ fn app(state: Shared, web_dir: &std::path::Path) -> Router {
         .route("/transfers/{code}/files/{idx}/thumb", get(thumbs::thumb))
         .route("/transfers/{code}/zip", get(download::zip))
         .route("/transfers/{code}/summary", get(transfers::summary))
+        .route("/transfers/{code}/note", put(transfers::save_note).layer(DefaultBodyLimit::max(8 << 20)))
         .route("/transfers/{code}/downloads", post(transfers::count_download))
         .route("/transfers/{code}/signal", get(signal::connect))
         .route("/nearby", get(nearby::connect))

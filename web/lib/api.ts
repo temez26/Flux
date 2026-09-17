@@ -12,6 +12,12 @@ export interface FileMeta {
 export interface TransferMeta {
   code: string;
   title: string;
+  /** The text of a text transfer, which has no files; absent for files. */
+  note?: string;
+  /** Whether anyone with the code may edit the text, not only its owner. */
+  editable: boolean;
+  /** Moves on with every saved edit, so a save can say which text it was edited from. */
+  noteVersion: number;
   /** A collection: anyone with the code may add files, not only whoever created it. */
   collect: boolean;
   /** Downloads started from a page, of all or part of the transfer. */
@@ -48,6 +54,8 @@ export interface Summary {
   collect: boolean;
   downloads: number;
   closed: boolean;
+  /** A text transfer rather than files. */
+  note: boolean;
   files: number;
   size: number;
   complete: boolean;
@@ -129,6 +137,41 @@ export function createTransfer(files: NewFile[], expiresIn: number, isPublic: bo
   });
 }
 
+/** A transfer of text, kept on the server where it can be edited, rather than of files. */
+export function createNote(text: string, editable: boolean, expiresIn: number, isPublic: boolean) {
+  return request<Created>("/api/transfers", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ files: [], note: text, editable, expiresIn, public: isPublic }),
+  });
+}
+
+export interface NoteState {
+  text: string;
+  version: number;
+}
+
+/**
+ * Saves edited text, naming the version it was edited from. When someone else saved first the
+ * save doesn't happen, and what comes back instead is the text as it now is.
+ */
+export async function saveNote(code: string, token: string | undefined, text: string, version: number): Promise<{ saved: NoteState } | { conflict: NoteState }> {
+  let res: Response;
+  try {
+    res = await fetch(`${transferUrl(code)}/note`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...(token ? auth(token) : {}) },
+      body: JSON.stringify({ text, version }),
+    });
+  } catch {
+    throw new ApiError(0, "Can't reach the Flux server");
+  }
+  const body = await res.json().catch(() => null);
+  if (res.ok) return { saved: body };
+  if (res.status === 409) return { conflict: body };
+  throw new ApiError(res.status, body?.error ?? `Request failed (${res.status})`);
+}
+
 /** An empty transfer for other people to send files into. */
 export function createCollection(expiresIn: number, title?: string) {
   return request<Created>("/api/transfers", {
@@ -186,8 +229,8 @@ export function countDownload(code: string) {
 }
 
 /** Changes a transfer its owner holds the token for; `expiresIn` counts from now. */
-export function updateTransfer(code: string, token: string, changes: { expiresIn?: number; closed?: boolean }) {
-  return request<{ expiresAt: string; closed: boolean }>(transferUrl(code), {
+export function updateTransfer(code: string, token: string, changes: { expiresIn?: number; closed?: boolean; editable?: boolean }) {
+  return request<{ expiresAt: string; closed: boolean; editable: boolean }>(transferUrl(code), {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...auth(token) },
     body: JSON.stringify(changes),

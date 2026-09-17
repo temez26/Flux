@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { EXPIRY_OPTIONS, errorMessage, getSummary, listPublic, type Summary } from "@/lib/api";
-import { fromClipboard, fromDataTransfer, fromText, type Picked } from "@/lib/files";
+import { fromClipboard, fromDataTransfer, type Picked } from "@/lib/files";
 import { formatBytes, formatCode, formatLifetime, formatRemaining, normalizeCode, plural } from "@/lib/format";
 import { nextPaint, useNow, usePolling } from "@/lib/hooks";
 import { listOwned, ownedVersion, removeOwned, subscribeOwned } from "@/lib/owned";
@@ -10,7 +10,7 @@ import { clearRecent, forgetRecent, listRecent, recentVersion, subscribeRecent }
 import { getReceived } from "@/lib/received";
 import { navigate } from "@/lib/router";
 import { offerTitle, type Peer } from "@/lib/nearby";
-import { collect, live, send } from "@/lib/session";
+import { collect, live, send, sendNote } from "@/lib/session";
 import { takeShared } from "@/lib/share";
 import { toast } from "@/lib/toast";
 import {
@@ -51,6 +51,24 @@ const LIST_POLL_MS = 15_000;
 const PUBLIC_PAGE = 100;
 const PUBLIC_SEARCH_FROM = 12;
 
+const EDITORS = [
+  { label: "Only me", value: "owner", icon: <LockIcon className="size-4" /> },
+  { label: "Anyone with the code", value: "anyone", icon: <TextIcon className="size-4" /> },
+];
+
+/** Offers a transfer just made to the nearby device chosen for it, if there was one and it's still here. */
+function offerTo(to: Peer | null, code: string, offer: { title: string; files: number; size: number }) {
+  if (!to) return;
+  const nearby = getNearby();
+  // The transfer exists either way, so a device that left only costs the offer.
+  if (nearby.peers.some((p) => p.device === to.device)) {
+    nearby.offer(to, { code, ...offer });
+    toast(`Offered to ${to.name}`);
+  } else {
+    toast(`${to.name} is no longer nearby — share the code instead`, "err");
+  }
+}
+
 function storedExpiry(): number {
   try {
     const value = Number(localStorage.getItem(EXPIRY_KEY));
@@ -73,6 +91,8 @@ export default function Home() {
   const [target, setTarget] = useState<Peer | null>(null);
   /** Text being written to send instead of files; null while choosing files. */
   const [text, setText] = useState<string | null>(null);
+  /** Whether anyone with the code may edit the text, not only this device. */
+  const [textEditable, setTextEditable] = useState(false);
   /** Files another app shared to Flux, waiting to be told where to go. */
   const [shared, setShared] = useState<Picked[] | null>(null);
   const options = useRef({ expiresIn, isPublic, hosted, target: null as Peer | null });
@@ -88,22 +108,11 @@ export default function Home() {
       // Reading every file's metadata blocks the main thread, so let the spinner land first.
       await nextPaint();
       const code = await send(files, options.current.hosted ? HOSTED_EXPIRY : options.current.expiresIn, options.current.isPublic, options.current.hosted);
-      const to = options.current.target;
-      if (to) {
-        const nearby = getNearby();
-        // The transfer exists either way, so a device that left only costs the offer.
-        if (nearby.peers.some((p) => p.device === to.device)) {
-          nearby.offer(to, {
-            code,
-            title: offerTitle(files.map((f) => f.path)),
-            files: files.length,
-            size: files.reduce((sum, f) => sum + f.file.size, 0),
-          });
-          toast(`Offered to ${to.name}`);
-        } else {
-          toast(`${to.name} is no longer nearby — share the code instead`, "err");
-        }
-      }
+      offerTo(options.current.target, code, {
+        title: offerTitle(files.map((f) => f.path)),
+        files: files.length,
+        size: files.reduce((sum, f) => sum + f.file.size, 0),
+      });
       navigate(`/${formatCode(code)}`);
     } catch (err) {
       setError(errorMessage(err));
@@ -218,8 +227,19 @@ export default function Home() {
     void start(shared);
   }
 
-  function sendText() {
-    if (text?.trim()) void start(fromText(text));
+  async function sendText() {
+    if (!text?.trim()) return;
+    setError(null);
+    setBusy("Sending text…");
+    try {
+      const code = await sendNote(text, textEditable, options.current.expiresIn, options.current.isPublic);
+      const title = text.trim().split(/\r?\n/)[0].slice(0, 80);
+      offerTo(options.current.target, code, { title, files: 0, size: new TextEncoder().encode(text).length });
+      navigate(`/${formatCode(code)}`);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(null);
+    }
   }
 
   // The drop zone around these buttons opens the file picker too.
@@ -277,7 +297,12 @@ export default function Home() {
               spellCheck={false}
               className="block min-h-40 w-full resize-y bg-transparent text-base outline-none placeholder:text-muted/60"
             />
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="mt-3">
+              <Field label="Who can edit" hint="Anyone with the code can read it. You can change who can edit after sending.">
+                <Segmented label="Who can edit" value={textEditable ? "anyone" : "owner"} options={EDITORS} onChange={(v) => setTextEditable(v === "anyone")} />
+              </Field>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button variant="primary" onClick={sendText} disabled={!text.trim()}>
                 <TextIcon className="size-4" />
                 {target ? `Send text to ${target.name}` : "Send text"}
@@ -353,16 +378,18 @@ export default function Home() {
         <NearbyDevices target={target} onChoose={chooseDevice} />
 
         <div className="mt-5 space-y-4">
-          <Field
-            label="Where the files live"
-            hint={
-              hosted
-                ? "Nothing is uploaded, and the code works only while this page is open."
-                : "Files are stored on the server, so the link works after you close this page."
-            }
-          >
-            <Segmented label="Delivery" value={hosted ? "device" : "server"} options={DELIVERY} onChange={chooseDelivery} />
-          </Field>
+          {text === null && (
+            <Field
+              label="Where the files live"
+              hint={
+                hosted
+                  ? "Nothing is uploaded, and the code works only while this page is open."
+                  : "Files are stored on the server, so the link works after you close this page."
+              }
+            >
+              <Segmented label="Delivery" value={hosted ? "device" : "server"} options={DELIVERY} onChange={chooseDelivery} />
+            </Field>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Who can open it" hint={isPublic ? "Listed on this page for anyone who opens Flux." : "Only people with the code or link."}>
               <Segmented label="Visibility" value={isPublic ? "public" : "private"} options={VISIBILITY} onChange={chooseVisibility} />
@@ -461,9 +488,9 @@ function PublicList() {
           <TransferRow
             key={t.code}
             code={t.code}
-            icon={t.files > 1 ? <FolderIcon className="size-4.5" /> : <FileTypeIcon path={t.title} className="size-4.5" />}
+            icon={t.note ? <TextIcon className="size-4.5" /> : t.files > 1 ? <FolderIcon className="size-4.5" /> : <FileTypeIcon path={t.title} className="size-4.5" />}
             title={t.title}
-            detail={`${plural(t.files, "file")} · ${formatBytes(t.size)} · ${formatRemaining(t.expiresAt, now)}`}
+            detail={`${t.note ? "Text" : plural(t.files, "file")} · ${formatBytes(t.size)} · ${formatRemaining(t.expiresAt, now)}`}
             badge={
               t.hosted ? (
                 <Badge icon={<DeviceIcon />}>From a device</Badge>
@@ -614,15 +641,17 @@ function RecentList() {
         const summary = summaries[code];
         const files = summary?.files ?? r.files;
         const size = summary?.size ?? r.size;
-        const saved = files > 0 && getReceived(code).size >= files;
+        const saved = !r.note && files > 0 && getReceived(code).size >= files;
         return (
           <TransferRow
             key={code}
             code={code}
-            icon={r.collect || files > 1 ? <FolderIcon className="size-4.5" /> : <FileTypeIcon path={r.title} className="size-4.5" />}
+            icon={
+              r.note ? <TextIcon className="size-4.5" /> : r.collect || files > 1 ? <FolderIcon className="size-4.5" /> : <FileTypeIcon path={r.title} className="size-4.5" />
+            }
             title={summary?.title ?? r.title}
             detail={[
-              plural(files, "file"),
+              r.note ? "Text" : plural(files, "file"),
               formatBytes(size),
               // How long a device keeps sharing is its sender's business, not the code's expiry.
               r.hosted ? "From the sender's device" : formatRemaining(summary?.expiresAt ?? r.expiresAt),
@@ -644,7 +673,7 @@ function RecentList() {
 }
 
 function ownedBadge(code: string, summary: Summary | undefined): ReactNode {
-  if (!summary) return null;
+  if (!summary || summary.note) return null;
   if (summary.collect) {
     return summary.closed ? (
       <Badge icon={<LockIcon />}>Closed</Badge>
@@ -729,10 +758,12 @@ function OwnedList() {
             key={code}
             code={code}
             mono
-            icon={o.collect ? <FolderIcon className="size-4.5" /> : o.public ? <GlobeIcon className="size-4.5" /> : <LockIcon className="size-4.5" />}
+            icon={
+              o.note ? <TextIcon className="size-4.5" /> : o.collect ? <FolderIcon className="size-4.5" /> : o.public ? <GlobeIcon className="size-4.5" /> : <LockIcon className="size-4.5" />
+            }
             title={o.collect && summary ? `${formatCode(code)} · ${summary.title}` : formatCode(code)}
             detail={[
-              plural(count, "file"),
+              o.note ? "Text" : plural(count, "file"),
               formatBytes(size),
               summary?.downloads ? plural(summary.downloads, "download") : null,
               formatLifetime(o.expiresAt, !!o.hosted, live.has(code)),

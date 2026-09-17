@@ -21,13 +21,14 @@ export const subscribeNothing = () => () => {};
 export const versionZero = () => 0;
 
 /** Lists a transfer someone else made among this device's recently received, kept up to date as it changes. */
-export function useRememberRecent(meta: TransferMeta) {
+export function useRememberRecent(meta: TransferMeta, enabled = true) {
   const { code, title, expiresAt, hosted, collect } = meta;
+  const note = meta.note !== undefined;
   const files = meta.files.length;
-  const size = meta.files.reduce((sum, f) => sum + f.size, 0);
+  const size = note ? new TextEncoder().encode(meta.note).length : meta.files.reduce((sum, f) => sum + f.size, 0);
   useEffect(() => {
-    rememberRecent(code, { title, files, size, expiresAt, hosted, collect });
-  }, [code, title, files, size, expiresAt, hosted, collect]);
+    if (enabled) rememberRecent(code, { title, files, size, expiresAt, hosted, collect, note });
+  }, [enabled, code, title, files, size, expiresAt, hosted, collect, note]);
 }
 
 export const pageTitle = (code: string) => `${formatCode(code)} · Flux`;
