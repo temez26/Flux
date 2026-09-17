@@ -21,8 +21,7 @@ cp .env.example .env    # set POSTGRES_PASSWORD
 docker compose up -d --build
 ```
 
-Open `http://<host>:8080`. Update with `git pull && docker compose up -d --build`. Data lives in the
-`flux-data` (files) and `db-data` (PostgreSQL) volumes.
+default port: `http://<host>:8080`.
 
 ### Configuration
 
