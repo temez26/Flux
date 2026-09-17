@@ -1,0 +1,132 @@
+"use client";
+
+import { useId, useState, type FormEvent } from "react";
+import { EXPIRY_OPTIONS, errorMessage } from "@/lib/api";
+import type { Peer } from "@/lib/nearby/nearby";
+import { navigate } from "@/lib/platform/router";
+import { sendNote } from "@/lib/transfer/session";
+import { formatCode } from "@/lib/util/format";
+import { NearbyDevices } from "../../nearby";
+import { AlertIcon, DeviceIcon, GlobeIcon, LinkIcon, LockIcon, TextIcon, UsersIcon } from "../../ui/icons";
+import { Button, Field, Notice, Segmented, Spinner } from "../../ui/ui";
+import { useExpiry } from "../expiry";
+import { useHandoff } from "../handoff";
+import { usePaste } from "../incoming";
+import { offerTo } from "../offer";
+
+const VISIBILITY = [
+  { label: "Link only", value: "link", icon: <LinkIcon className="size-4" /> },
+  { label: "Listed publicly", value: "public", icon: <GlobeIcon className="size-4" /> },
+];
+const EDITORS = [
+  { label: "Read only", value: "owner", icon: <LockIcon className="size-4" /> },
+  { label: "Edit together", value: "anyone", icon: <UsersIcon className="size-4" /> },
+];
+
+/**
+ * Writes text to share. It always lives on the server, where it can be listed, opened by link or
+ * QR code, and edited by its owner or by everyone with the link. `global` makes it take text
+ * pasted anywhere on the page, which only one composer on a page may do.
+ */
+export function TextComposer({ global }: { global: boolean }) {
+  const [text, setText] = useState("");
+  // Neither is remembered: publishing and handing out editing should always be conscious choices.
+  const [isPublic, setIsPublic] = useState(false);
+  const [editable, setEditable] = useState(false);
+  const [expiresIn, setExpiresIn] = useExpiry();
+  const [target, setTarget] = useState<Peer | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const id = useId();
+
+  const append = (more: string) => setText((current) => current + more);
+  useHandoff("text", append);
+  usePaste({ text: global ? append : undefined });
+
+  async function submit(e?: FormEvent) {
+    e?.preventDefault();
+    if (!text.trim() || busy) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const code = await sendNote(text, editable, expiresIn, isPublic);
+      const title = text.trim().split(/\r?\n/)[0].slice(0, 80);
+      offerTo(target, code, { title, files: 0, size: new TextEncoder().encode(text).length });
+      navigate(`/${formatCode(code)}`);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit}>
+      <label htmlFor={id} className="sr-only">
+        Text to share
+      </label>
+      <textarea
+        id={id}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit();
+        }}
+        placeholder="Paste a link, a note, a password…"
+        aria-describedby={`${id}-hint`}
+        spellCheck={false}
+        className="block min-h-40 w-full resize-y rounded-2xl border-2 border-line bg-bg p-3 text-base outline-none placeholder:text-muted/60 focus:border-accent/60"
+      />
+      <p id={`${id}-hint`} className="mt-1.5 text-xs text-muted">
+        Always kept on the server. Ctrl+Enter to share.
+      </p>
+
+      <div className="mt-4 grid gap-4 @xl:grid-cols-2">
+        <Field
+          label="Who can find it"
+          hint={isPublic ? "Listed in Text for anyone who opens Flux." : "Only people with the code, link or QR code."}
+        >
+          <Segmented
+            label="Who can find it"
+            value={isPublic ? "public" : "link"}
+            options={VISIBILITY}
+            onChange={(v) => setIsPublic(v === "public")}
+          />
+        </Field>
+        <Field
+          label="Who can edit"
+          hint={editable ? "Anyone who can open it can change it." : "Only you can change it; others read."}
+        >
+          <Segmented
+            label="Who can edit"
+            value={editable ? "anyone" : "owner"}
+            options={EDITORS}
+            onChange={(v) => setEditable(v === "anyone")}
+          />
+        </Field>
+      </div>
+      <div className="mt-4">
+        <Field label="Delete after" hint="You can change all of these after sharing.">
+          <Segmented label="Delete after" value={expiresIn} options={EXPIRY_OPTIONS} onChange={setExpiresIn} />
+        </Field>
+      </div>
+
+      <NearbyDevices target={target} onChoose={(peer) => setTarget(target?.device === peer.device ? null : peer)} />
+
+      {error && (
+        <Notice tone="err" role="alert" icon={<AlertIcon />} className="mt-4">
+          {error}
+        </Notice>
+      )}
+      <Button type="submit" variant="primary" className="mt-5 w-full @md:w-auto" disabled={!text.trim() || busy}>
+        {busy ? (
+          <Spinner className="size-4" />
+        ) : target ? (
+          <DeviceIcon className="size-4" />
+        ) : (
+          <TextIcon className="size-4" />
+        )}
+        {target ? `Share text with ${target.name}` : "Share text"}
+      </Button>
+    </form>
+  );
+}

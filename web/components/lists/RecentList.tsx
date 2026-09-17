@@ -4,8 +4,8 @@ import { useSyncExternalStore } from "react";
 import { getReceived } from "@/lib/storage/received";
 import { clearRecent, forgetRecent, listRecent, recentVersion, subscribeRecent } from "@/lib/storage/recent";
 import { formatBytes, formatRemaining, plural } from "@/lib/util/format";
-import { CheckIcon, DownloadIcon, FileTypeIcon, FolderIcon, TextIcon } from "../../ui/icons";
-import { Badge, Card, SectionTitle } from "../../ui/ui";
+import { CheckIcon, DownloadIcon, FileTypeIcon, FolderIcon, TextIcon } from "../ui/icons";
+import { Badge, Card, SectionTitle } from "../ui/ui";
 import { TransferRow } from "./TransferRow";
 import { useSummaries } from "./useSummaries";
 

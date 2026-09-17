@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  type AnchorHTMLAttributes,
+  type ButtonHTMLAttributes,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
+import { navigate } from "@/lib/platform/router";
 import { SpinnerIcon } from "./icons";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
@@ -142,11 +150,32 @@ export function Notice({
   );
 }
 
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
+/** A section of a page. Its contents lay out by the card's own width, which differs by where it's shown. */
+export function Card({ className = "", ...props }: HTMLAttributes<HTMLElement>) {
   return (
-    <section className={`rounded-2xl border border-line bg-surface p-4 shadow-sm sm:p-5 ${className}`}>
-      {children}
-    </section>
+    <section
+      className={`@container rounded-2xl border border-line bg-surface p-4 shadow-sm sm:p-5 ${className}`}
+      {...props}
+    />
+  );
+}
+
+/**
+ * A link to a view of this app, followed without reloading the page so running transfers carry
+ * on. Opening it elsewhere (new tab, modifier keys) is left to the browser.
+ */
+export function Link({ href, onClick, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) {
+  return (
+    <a
+      href={href}
+      onClick={(e) => {
+        onClick?.(e);
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        navigate(href);
+      }}
+      {...props}
+    />
   );
 }
 

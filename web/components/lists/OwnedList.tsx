@@ -15,8 +15,8 @@ import {
   LockIcon,
   PauseIcon,
   TextIcon,
-} from "../../ui/icons";
-import { Badge, Card, SectionTitle, Spinner } from "../../ui/ui";
+} from "../ui/icons";
+import { Badge, Card, SectionTitle, Spinner } from "../ui/ui";
 import { TransferRow } from "./TransferRow";
 import { useSummaries } from "./useSummaries";
 

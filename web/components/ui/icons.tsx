@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type IconProps = { className?: string };
+export type IconProps = { className?: string };
 
 function Icon({ d, className = "size-5" }: IconProps & { d: string }) {
   return (
@@ -63,6 +63,12 @@ export const BellIcon = (p: IconProps) => (
 export const TrashIcon = (p: IconProps) => <Icon d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3" {...p} />;
 export const PlusIcon = (p: IconProps) => <Icon d="M12 5v14M5 12h14" {...p} />;
 export const TextIcon = (p: IconProps) => <Icon d="M4 6h16M4 12h16M4 18h10" {...p} />;
+export const UsersIcon = (p: IconProps) => (
+  <Icon
+    d="M16 20v-1.5A3.5 3.5 0 0 0 12.5 15h-5A3.5 3.5 0 0 0 4 18.5V20M10 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM20 20v-1.5a3.5 3.5 0 0 0-2.5-3.35M15.5 4.15a3.5 3.5 0 0 1 0 6.7"
+    {...p}
+  />
+);
 export const DeviceIcon = (p: IconProps) => (
   <Icon d="M7 3h10a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2" {...p} />
 );

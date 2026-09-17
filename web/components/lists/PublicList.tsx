@@ -4,37 +4,49 @@ import { useState } from "react";
 import { listPublic, type Summary } from "@/lib/api";
 import { useNow, usePolling } from "@/lib/hooks";
 import { formatBytes, formatRemaining, plural } from "@/lib/util/format";
-import { DeviceIcon, FileTypeIcon, FolderIcon, GlobeIcon, SearchIcon, TextIcon } from "../../ui/icons";
-import { Badge, Button, Spinner } from "../../ui/ui";
+import { ArrowIcon, DeviceIcon, FileTypeIcon, FolderIcon, GlobeIcon, SearchIcon, TextIcon } from "../ui/icons";
+import { Badge, Button, Link, Spinner } from "../ui/ui";
 import { TransferRow } from "./TransferRow";
 import { LIST_POLL_MS } from "./useSummaries";
 
 /** One page of the public listing, and how many make a listing worth searching. */
 const PUBLIC_PAGE = 100;
 const PUBLIC_SEARCH_FROM = 12;
+/** How many a preview shows before pointing to the whole listing. */
+const PREVIEW_LIMIT = 5;
 
-export function PublicList() {
+/**
+ * What is shared publicly, newest first. A preview shows the newest few and links to the Public
+ * share room, where the listing can be searched and paged through.
+ */
+export function PublicList({ heading: Heading, preview = false }: { heading: "h2" | "h3"; preview?: boolean }) {
   const now = useNow(60_000);
   const [list, setList] = useState<Summary[] | null>(null);
   const [query, setQuery] = useState("");
-  const [limit, setLimit] = useState(PUBLIC_PAGE);
+  const [limit, setLimit] = useState(preview ? PREVIEW_LIMIT : PUBLIC_PAGE);
   const needle = query.trim();
 
   // Asking for the pages already on screen keeps a refresh from dropping what was opened up.
   usePolling(async () => setList(await listPublic({ q: needle, limit })), LIST_POLL_MS);
 
-  if (!list) return null;
+  if (!list) {
+    return (
+      <p role="status" className="flex items-center gap-2 text-sm text-muted">
+        <Spinner /> Loading public shares…
+      </p>
+    );
+  }
   // A full page is the only sign there may be more; the server doesn't count the rest.
   const more = list.length === limit;
-  const searchable = needle !== "" || list.length >= PUBLIC_SEARCH_FROM;
+  const searchable = !preview && (needle !== "" || list.length >= PUBLIC_SEARCH_FROM);
 
   return (
-    <div className="mt-6">
-      <p className="mb-2 flex items-center gap-2 text-sm font-medium">
+    <div>
+      <Heading className="mb-2 flex items-center gap-2 text-sm font-medium">
         <GlobeIcon className="size-4 text-muted" />
-        Public files
+        Public shares
         {list.length > 0 && <Badge>{more ? `${list.length}+` : list.length}</Badge>}
-      </p>
+      </Heading>
       {searchable && (
         <div className="relative mb-2">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
@@ -89,10 +101,20 @@ export function PublicList() {
           {needle ? `Nothing public matches “${needle}”.` : "Nothing is shared publicly right now."}
         </p>
       )}
-      {more && (
-        <Button className="mt-2 w-full" onClick={() => setLimit((n) => n + PUBLIC_PAGE)}>
-          Show more
-        </Button>
+      {preview ? (
+        <Link
+          href="/public"
+          className="mt-2 flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-medium text-accent transition hover:bg-hover"
+        >
+          See all public shares
+          <ArrowIcon className="size-4" />
+        </Link>
+      ) : (
+        more && (
+          <Button className="mt-2 w-full" onClick={() => setLimit((n) => n + PUBLIC_PAGE)}>
+            Show more
+          </Button>
+        )
       )}
     </div>
   );

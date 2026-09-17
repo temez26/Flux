@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { navigate } from "@/lib/platform/router";
 import { formatCode } from "@/lib/util/format";
-import { ArrowIcon } from "../../ui/icons";
+import { ArrowIcon } from "../ui/icons";
 
 export function TransferRow({
   code,
