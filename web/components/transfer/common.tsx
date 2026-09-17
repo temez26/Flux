@@ -12,7 +12,7 @@ import {
 } from "@/lib/api";
 import { basename } from "@/lib/platform/files";
 import { formatBytes, formatCode, formatRemaining, plural } from "@/lib/util/format";
-import { reloadTransfer, useNow } from "@/lib/hooks";
+import { reloadTransfer, useBackFromBackground, useNow } from "@/lib/hooks";
 import { removeOwned } from "@/lib/storage/owned";
 import { canPreview } from "@/lib/preview/preview";
 import { rememberRecent } from "@/lib/storage/recent";
@@ -23,7 +23,7 @@ import { FileRow, FileTile } from "../files/FileList";
 import { CheckIcon, ClockIcon, DownloadIcon, FileTypeIcon, FolderIcon, TrashIcon } from "../ui/icons";
 import { FileThumb } from "../preview/Preview";
 import { ShareFilesButton } from "./ShareFiles";
-import { Badge, ConfirmIconButton, Spinner, buttonClass } from "../ui/ui";
+import { Badge, ConfirmIconButton, Notice, Spinner, buttonClass } from "../ui/ui";
 
 /** Stand-ins for a store that doesn't exist yet, for useSyncExternalStore. */
 export const subscribeNothing = () => () => {};
@@ -43,6 +43,25 @@ export function useRememberRecent(meta: TransferMeta, enabled = true) {
 export const pageTitle = (title: string) => `${title} · Flux`;
 
 export const percent = (part: number, whole: number) => (whole ? Math.floor((part / whole) * 100) : 100);
+
+const onPhone = () => window.matchMedia("(pointer: coarse)").matches;
+
+/** What a transfer needs from whoever started it; a phone pauses any page it isn't showing. */
+export const keepOpen = (until: string) =>
+  onPhone()
+    ? `Keep Flux on screen until ${until}. Phones pause it in the background.`
+    : `Keep this page open until ${until}.`;
+
+/** Says why a running transfer stood still, when a phone has just brought Flux back from the background. */
+export function BackgroundNotice({ active }: { active: boolean }) {
+  const back = useBackFromBackground(active);
+  if (!back || !onPhone()) return null;
+  return (
+    <Notice tone="warn" role="status" icon={<Spinner />} className="mt-4">
+      Paused while Flux was in the background. Picking up where it left off.
+    </Notice>
+  );
+}
 
 /** How long deleting a transfer can be taken back. */
 const UNDO_MS = 7000;

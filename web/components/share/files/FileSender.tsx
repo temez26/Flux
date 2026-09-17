@@ -19,6 +19,7 @@ import { usePaste, useWindowDrop } from "../incoming";
 import { offerTo } from "../offer";
 import { DropOverlay, DropZone } from "./DropZone";
 import { StagedFiles } from "./StagedFiles";
+import { keepOpen } from "../../transfer/common";
 
 // Files sent to a device end with the page, so the code behind them only needs to outlast any
 // plausible sitting; the row holds a file list and nothing else.
@@ -126,7 +127,7 @@ export function FileSender({ mode }: { mode: "public" | "device" }) {
             {files}
             <p className="mt-2 flex items-start gap-1.5 text-sm text-muted">
               <DeviceIcon className="mt-0.5 size-4 shrink-0" />
-              Sent straight from this device. Keep this page open until they have arrived.
+              Sent straight from this device. {keepOpen("they have arrived")}
             </p>
           </Step>
         </div>

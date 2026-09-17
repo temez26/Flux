@@ -40,12 +40,14 @@ import {
   type StatusProps,
 } from "../ui/ui";
 import {
+  BackgroundNotice,
   MetaRow,
   MetaTile,
   Pinned,
   SelectionDownload,
   TransferHeading,
   inFlight,
+  keepOpen,
   pageTitle,
   percent,
   subscribeNothing,
@@ -342,7 +344,7 @@ function receivingStatus(receiver: Receiver): StatusProps {
     tone: "accent",
     icon: <Spinner className="size-5" />,
     title: "Downloading",
-    subtitle: "Keep this page open until it finishes.",
+    subtitle: keepOpen("it finishes"),
   };
 }
 
@@ -401,6 +403,7 @@ function ReceivingPanel({ receiver, meta, onBack }: { receiver: Receiver; meta: 
         }
         danger={!finished && <ConfirmButton onConfirm={() => receiver.cancel()}>Cancel</ConfirmButton>}
       >
+        <BackgroundNotice active={running} />
         {receiver.items.some((item) => item.source === "direct") && (
           <div className="mt-4">
             <Badge tone="ok" icon={<ZapIcon />}>
