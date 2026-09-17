@@ -277,7 +277,7 @@ export function SelectionDownload({
 }) {
   return (
     <span className="flex flex-wrap justify-end gap-2">
-      <ShareFilesButton code={code} files={files} counted={counted} className="min-h-9" />
+      <ShareFilesButton code={code} files={files} counted={counted} className="min-h-9 pointer-coarse:min-h-11" />
       <DownloadButton code={code} files={files} counted={counted} />
     </span>
   );
@@ -285,7 +285,7 @@ export function SelectionDownload({
 
 function DownloadButton({ code, files, counted }: { code: string; files: FileMeta[]; counted: boolean }) {
   const count = counted ? () => countDownload(code) : undefined;
-  const primary = buttonClass("primary", "min-h-9");
+  const primary = buttonClass("primary", "min-h-9 pointer-coarse:min-h-11");
   if (files.some((f) => !f.hash)) {
     return (
       <button type="button" disabled className={primary}>

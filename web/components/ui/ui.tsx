@@ -27,7 +27,7 @@ export function buttonClass(variant: Variant = "secondary", extra = "") {
 }
 
 export const iconButtonClass =
-  "inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-hover hover:text-fg active:scale-95";
+  "inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted pointer-coarse:size-11 transition hover:bg-hover hover:text-fg active:scale-95";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant };
 

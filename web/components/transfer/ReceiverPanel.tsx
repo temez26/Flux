@@ -306,7 +306,7 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
             select={(indices) => (
               <Button
                 variant="primary"
-                className="min-h-9"
+                className="min-h-9 pointer-coarse:min-h-11"
                 disabled={!viaDirect}
                 onClick={() => startDirect(indices.map((i) => meta.files[i]))}
               >

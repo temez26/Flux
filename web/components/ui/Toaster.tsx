@@ -16,7 +16,7 @@ function ToastItem({ toast }: { toast: Toast }) {
             toasts.dismiss(toast.id);
             toast.action?.run();
           }}
-          className="-my-1 min-h-9 rounded-lg px-2 font-semibold text-accent transition hover:bg-hover"
+          className="-my-1 min-h-9 pointer-coarse:min-h-11 rounded-lg px-2 font-semibold text-accent transition hover:bg-hover"
         >
           {toast.action.label}
         </button>

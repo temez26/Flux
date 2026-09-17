@@ -128,7 +128,7 @@ export function NearbyDevices({ target, onChoose }: { target: Peer | null; onCho
           </div>
         </div>
       )}
-      <div className="mt-2 flex min-h-9 flex-wrap items-center gap-x-1 text-sm text-muted">
+      <div className="mt-2 flex min-h-9 pointer-coarse:min-h-11 flex-wrap items-center gap-x-1 text-sm text-muted">
         {draft === null ? (
           <>
             Others see this device as <span className="font-medium text-fg">{nearby.device.name}</span>
@@ -136,7 +136,7 @@ export function NearbyDevices({ target, onChoose }: { target: Peer | null; onCho
             <button
               type="button"
               onClick={() => setDraft(nearby.device.name)}
-              className="min-h-9 font-medium text-accent hover:underline"
+              className="min-h-9 pointer-coarse:min-h-11 font-medium text-accent hover:underline"
               aria-label={`Rename this device, now ${nearby.device.name}`}
             >
               Rename
@@ -153,7 +153,7 @@ export function NearbyDevices({ target, onChoose }: { target: Peer | null; onCho
               onBlur={rename}
               maxLength={40}
               enterKeyHint="done"
-              className="min-h-9 w-44 rounded-lg border border-line bg-bg px-2 text-base text-fg outline-none focus:border-accent"
+              className="min-h-9 pointer-coarse:min-h-11 w-44 rounded-lg border border-line bg-bg px-2 text-base text-fg outline-none focus:border-accent"
             />
           </form>
         )}

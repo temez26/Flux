@@ -287,7 +287,7 @@ export function FileBrowser({
             <button
               type="button"
               onClick={() => setChosen(chosen ? null : new Set())}
-              className={`ml-auto min-h-9 rounded-lg px-3 text-sm font-medium transition ${
+              className={`ml-auto min-h-9 pointer-coarse:min-h-11 rounded-lg px-3 text-sm font-medium transition ${
                 chosen ? "bg-accent/10 text-accent" : "text-muted hover:bg-hover hover:text-fg"
               }`}
             >
