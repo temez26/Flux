@@ -206,12 +206,21 @@ export function useWakeLock(enabled: boolean) {
   }, [enabled]);
 }
 
+/** Pages holding the guard at once; the page's overscroll is only given back when none do. */
+let guards = 0;
+
 export function useLeaveGuard(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     const guard = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener("beforeunload", guard);
-    return () => window.removeEventListener("beforeunload", guard);
+    // A pull past the top of the page reloads it on phones, and asks nobody first.
+    const root = document.documentElement;
+    if (guards++ === 0) root.style.overscrollBehaviorY = "none";
+    return () => {
+      window.removeEventListener("beforeunload", guard);
+      if (--guards === 0) root.style.overscrollBehaviorY = "";
+    };
   }, [enabled]);
 }
 
