@@ -32,14 +32,18 @@ pub struct Config {
 
 /// What a page needs to know before it can set up a direct transfer.
 pub async fn config(State(state): State<Shared>) -> Json<Config> {
-    Json(Config { stun_port: state.stun_port })
+    Json(Config {
+        stun_port: state.stun_port,
+    })
 }
 
 pub fn spawn(socket: UdpSocket) {
     tokio::spawn(async move {
         let mut buf = [0u8; MAX_REQUEST];
         loop {
-            let Ok((len, from)) = socket.recv_from(&mut buf).await else { continue };
+            let Ok((len, from)) = socket.recv_from(&mut buf).await else {
+                continue;
+            };
             if let Some(reply) = respond(&buf[..len], from) {
                 let _ = socket.send_to(&reply, from).await;
             }
@@ -112,7 +116,10 @@ mod tests {
         let port = u16::from_be_bytes([reply[26], reply[27]]) ^ (MAGIC_COOKIE >> 16) as u16;
         let ip = u32::from_be_bytes([reply[28], reply[29], reply[30], reply[31]]) ^ MAGIC_COOKIE;
         assert_eq!(port, 54321);
-        assert_eq!(std::net::Ipv4Addr::from(ip), "192.168.1.20".parse::<std::net::Ipv4Addr>().unwrap());
+        assert_eq!(
+            std::net::Ipv4Addr::from(ip),
+            "192.168.1.20".parse::<std::net::Ipv4Addr>().unwrap()
+        );
     }
 
     #[test]

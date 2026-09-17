@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useOwned, useTitle, useTransferMeta } from "@/lib/hooks";
-import { removeOwned } from "@/lib/owned";
-import { live } from "@/lib/session";
-import { AlertIcon, ClockIcon } from "../icons";
-import { Message, Notice, Spinner } from "../ui";
+import { removeOwned } from "@/lib/storage/owned";
+import { live } from "@/lib/transfer/session";
+import { AlertIcon, ClockIcon } from "../ui/icons";
+import { Message, Notice, Spinner } from "../ui/ui";
 import { CollectPanel } from "./CollectPanel";
 import { ContributePanel } from "./ContributePanel";
 import { HostedPanel } from "./HostedPanel";

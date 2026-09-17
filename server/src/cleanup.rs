@@ -19,10 +19,9 @@ pub fn spawn(state: Shared) {
 }
 
 async fn remove_expired(state: &Shared) -> Result<(), sqlx::Error> {
-    let expired: Vec<Uuid> =
-        sqlx::query_scalar("DELETE FROM transfers WHERE expires_at <= now() RETURNING id")
-            .fetch_all(&state.db)
-            .await?;
+    let expired: Vec<Uuid> = sqlx::query_scalar("DELETE FROM transfers WHERE expires_at <= now() RETURNING id")
+        .fetch_all(&state.db)
+        .await?;
     for id in &expired {
         remove_transfer_data(state, *id).await;
     }

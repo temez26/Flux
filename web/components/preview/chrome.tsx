@@ -2,10 +2,10 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { fileUrl, type FileMeta } from "@/lib/api";
-import { copyText } from "@/lib/clipboard";
-import { toast } from "@/lib/toast";
-import { CopyIcon, DownloadIcon, ExpandIcon, FileTypeIcon } from "../icons";
-import { Spinner, buttonClass } from "../ui";
+import { copyText } from "@/lib/platform/clipboard";
+import { toast } from "@/lib/alerts/toast";
+import { CopyIcon, DownloadIcon, ExpandIcon, FileTypeIcon } from "../ui/icons";
+import { Spinner, buttonClass } from "../ui/ui";
 
 // The viewer is always dark, like a photo viewer, so its controls don't follow the theme.
 export const overlayButton =
@@ -41,7 +41,13 @@ export function useLoad<T>(url: string, load: (url: string, signal: AbortSignal)
 }
 
 /** In the viewer, explains why a file can't be shown. Inline, the page's own download button is enough. */
-export function Unavailable({ code, file, inline, message, children }: ViewProps & { message: string; children?: ReactNode }) {
+export function Unavailable({
+  code,
+  file,
+  inline,
+  message,
+  children,
+}: ViewProps & { message: string; children?: ReactNode }) {
   if (inline) return null;
   return (
     <div className="absolute inset-0 flex touch-pan-y items-center justify-center p-6">
@@ -96,18 +102,22 @@ export function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function InlineFrame({ onExpand, aside, children }: { onExpand?: () => void; aside?: ReactNode; children: ReactNode }) {
+export function InlineFrame({
+  onExpand,
+  aside,
+  children,
+}: {
+  onExpand?: () => void;
+  aside?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-bg">
       <div className="flex items-center justify-between gap-2 border-b border-line py-1 pr-1 pl-3">
         <span className="mr-auto text-xs font-medium text-muted">Preview</span>
         {aside}
         {onExpand && (
-          <button
-            type="button"
-            onClick={onExpand}
-            className={frameButton}
-          >
+          <button type="button" onClick={onExpand} className={frameButton}>
             <ExpandIcon className="size-3.5" />
             Full screen
           </button>
@@ -142,7 +152,9 @@ export function Panel({
   }
   return (
     <div className="absolute inset-0 flex justify-center sm:px-16 sm:pb-6">
-      <div className={`flex min-h-0 w-full flex-col overflow-hidden bg-surface text-fg [color-scheme:light_dark] sm:rounded-2xl ${wide ? "max-w-6xl" : "max-w-4xl"}`}>
+      <div
+        className={`flex min-h-0 w-full flex-col overflow-hidden bg-surface text-fg [color-scheme:light_dark] sm:rounded-2xl ${wide ? "max-w-6xl" : "max-w-4xl"}`}
+      >
         {aside && <div className="flex shrink-0 justify-end border-b border-line px-2 py-1">{aside}</div>}
         {children}
       </div>
@@ -150,6 +162,8 @@ export function Panel({
   );
 }
 
-export const Note = ({ children }: { children: ReactNode }) => <p className="shrink-0 border-b border-line bg-hover px-4 py-2 text-xs text-muted">{children}</p>;
+export const Note = ({ children }: { children: ReactNode }) => (
+  <p className="shrink-0 border-b border-line bg-hover px-4 py-2 text-xs text-muted">{children}</p>
+);
 
 export const scrollArea = "min-h-0 flex-1 overflow-auto overscroll-contain";

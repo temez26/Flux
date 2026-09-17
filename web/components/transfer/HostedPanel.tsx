@@ -1,17 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { formatBytes, formatCode, plural } from "@/lib/format";
+import { formatBytes, formatCode, plural } from "@/lib/util/format";
 import { useLeaveGuard, useNotifyWhen, useNow, useTitle, useTransferMeta, useWakeLock } from "@/lib/hooks";
-import type { Session } from "@/lib/session";
-import { FileBrowser, FileRow } from "../FileList";
-import { AlertIcon, DeviceIcon, ZapIcon } from "../icons";
-import { ShareCard } from "../ShareCard";
-import { Badge, ConfirmButton, StatusCard, type StatusProps } from "../ui";
+import type { Session } from "@/lib/transfer/session";
+import { FileBrowser, FileRow } from "../files/FileList";
+import { AlertIcon, DeviceIcon, ZapIcon } from "../ui/icons";
+import { ShareCard } from "./ShareCard";
+import { Badge, ConfirmButton, StatusCard, type StatusProps } from "../ui/ui";
 import { pageTitle, removeTransfer } from "./common";
 
 function hostedStatus(serving: number, sent: number, expired: boolean): StatusProps {
-  if (expired) return { tone: "err", icon: <AlertIcon />, title: "Link expired", subtitle: "The code no longer works. Send the files again to share them." };
+  if (expired)
+    return {
+      tone: "err",
+      icon: <AlertIcon />,
+      title: "Link expired",
+      subtitle: "The code no longer works. Send the files again to share them.",
+    };
   if (serving > 0) {
     return {
       tone: "accent",
@@ -74,7 +80,13 @@ export function HostedPanel({ session, expiresAt }: { session: Session; expiresA
       </StatusCard>
       <FileBrowser
         paths={paths}
-        renderRow={(i) => <FileRow path={entries[i].path} size={entries[i].size} badge={<Badge icon={<DeviceIcon />}>On this device</Badge>} />}
+        renderRow={(i) => (
+          <FileRow
+            path={entries[i].path}
+            size={entries[i].size}
+            badge={<Badge icon={<DeviceIcon />}>On this device</Badge>}
+          />
+        )}
       />
     </div>
   );

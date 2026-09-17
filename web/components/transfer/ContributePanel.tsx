@@ -2,17 +2,26 @@
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { errorMessage, type TransferMeta } from "@/lib/api";
-import { getDevice } from "@/lib/device";
-import { formatBytes, plural } from "@/lib/format";
+import { getDevice } from "@/lib/nearby/device";
+import { formatBytes, plural } from "@/lib/util/format";
 import { reloadTransfer, useLeaveGuard, useNotifyWhen, useTitle, useWakeLock } from "@/lib/hooks";
-import { contribute, contributions } from "@/lib/session";
-import { toast } from "@/lib/toast";
-import { FileBrowser } from "../FileList";
-import { AlertIcon, CheckIcon, FolderIcon, PauseIcon, PlayIcon, PlusIcon, RetryIcon, UploadIcon } from "../icons";
-import { canPickFolder, useFilePickers } from "../picker";
+import { contribute, contributions } from "@/lib/transfer/session";
+import { toast } from "@/lib/alerts/toast";
+import { FileBrowser } from "../files/FileList";
+import { AlertIcon, CheckIcon, FolderIcon, PauseIcon, PlayIcon, PlusIcon, RetryIcon, UploadIcon } from "../ui/icons";
+import { canPickFolder, useFilePickers } from "../files/picker";
 import { PreviewDialog } from "../preview/Preview";
-import { Button, Card, SectionTitle, Spinner, StatusCard, type StatusProps } from "../ui";
-import { MetaRow, MetaTile, SelectionDownload, pageTitle, percent, subscribeNothing, useRememberRecent, versionZero } from "./common";
+import { Button, Card, SectionTitle, Spinner, StatusCard, type StatusProps } from "../ui/ui";
+import {
+  MetaRow,
+  MetaTile,
+  SelectionDownload,
+  pageTitle,
+  percent,
+  subscribeNothing,
+  useRememberRecent,
+  versionZero,
+} from "./common";
 
 /**
  * Someone else's collection: add files to it, follow those uploads, and see what is already
@@ -52,14 +61,29 @@ export function ContributePanel({ meta }: { meta: TransferMeta }) {
   let status: StatusProps | undefined;
   if (uploader && snapshot) {
     status = uploader.gone
-      ? { tone: "err", icon: <AlertIcon />, title: "This collection has closed", subtitle: "It expired or was deleted before everything arrived." }
+      ? {
+          tone: "err",
+          icon: <AlertIcon />,
+          title: "This collection has closed",
+          subtitle: "It expired or was deleted before everything arrived.",
+        }
       : snapshot.finished && failed
-        ? { tone: "err", icon: <AlertIcon />, title: `${plural(failed, "file")} didn't make it`, subtitle: "Retry them, or leave the rest as they are." }
+        ? {
+            tone: "err",
+            icon: <AlertIcon />,
+            title: `${plural(failed, "file")} didn't make it`,
+            subtitle: "Retry them, or leave the rest as they are.",
+          }
         : snapshot.finished
           ? { tone: "ok", icon: <CheckIcon />, title: "Your files are in", subtitle: "Uploaded and verified." }
           : uploader.paused
             ? { tone: "warn", icon: <PauseIcon />, title: "Paused", subtitle: "Resume to finish adding your files." }
-            : { tone: "accent", icon: <Spinner className="size-5" />, title: "Adding your files", subtitle: "Keep this page open until it finishes." };
+            : {
+                tone: "accent",
+                icon: <Spinner className="size-5" />,
+                title: "Adding your files",
+                subtitle: "Keep this page open until it finishes.",
+              };
   }
 
   return (
@@ -68,13 +92,15 @@ export function ContributePanel({ meta }: { meta: TransferMeta }) {
         <SectionTitle icon={<FolderIcon className="size-4.5" />}>{meta.title}</SectionTitle>
         {meta.closed ? (
           <p className="text-sm text-muted">
-            This collection is closed, so nothing more can be added. Anyone with the code can still download what&apos;s here.
+            This collection is closed, so nothing more can be added. Anyone with the code can still download what&apos;s
+            here.
           </p>
         ) : (
           <>
             <p className="text-sm text-muted">
-              Someone is collecting files here. Yours go into a folder named <span className="font-medium text-fg">{getDevice().name}</span>, and
-              anyone with the code can download what&apos;s here.
+              Someone is collecting files here. Yours go into a folder named{" "}
+              <span className="font-medium text-fg">{getDevice().name}</span>, and anyone with the code can download
+              what&apos;s here.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button variant="primary" onClick={() => picker.open("files")} disabled={adding}>
@@ -99,7 +125,10 @@ export function ContributePanel({ meta }: { meta: TransferMeta }) {
           percent={percent(snapshot.sent, snapshot.total)}
           progress={snapshot.total ? snapshot.sent / snapshot.total : 1}
           stats={[
-            ["Files", `${snapshot.counts.done.toLocaleString()} / ${(uploader.items.length - snapshot.counts.canceled).toLocaleString()}`],
+            [
+              "Files",
+              `${snapshot.counts.done.toLocaleString()} / ${(uploader.items.length - snapshot.counts.canceled).toLocaleString()}`,
+            ],
             ["Uploaded", `${formatBytes(snapshot.sent)} / ${formatBytes(snapshot.total)}`],
           ]}
           actions={
@@ -126,12 +155,16 @@ export function ContributePanel({ meta }: { meta: TransferMeta }) {
       {meta.files.length ? (
         <FileBrowser
           paths={paths}
-          renderRow={(i) => <MetaRow file={meta.files[i]} code={meta.code} downloadable counted onPreview={setPreviewing} />}
+          renderRow={(i) => (
+            <MetaRow file={meta.files[i]} code={meta.code} downloadable counted onPreview={setPreviewing} />
+          )}
           renderTile={(i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />}
           select={(indices) => <SelectionDownload code={meta.code} files={indices.map((i) => meta.files[i])} counted />}
         />
       ) : (
-        <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">Nothing here yet — yours can be the first.</p>
+        <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">
+          Nothing here yet — yours can be the first.
+        </p>
       )}
       <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />
     </div>

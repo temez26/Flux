@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { errorMessage, saveNote, updateTransfer, type NoteState, type TransferMeta } from "@/lib/api";
-import { copyText } from "@/lib/clipboard";
-import { formatCode, formatRemaining } from "@/lib/format";
+import { copyText } from "@/lib/platform/clipboard";
+import { formatCode, formatRemaining } from "@/lib/util/format";
 import { reloadTransfer, useNow, useTitle } from "@/lib/hooks";
-import { linkify } from "@/lib/links";
-import { toast } from "@/lib/toast";
-import { AlertIcon, ClockIcon, CopyIcon, LockIcon, TextIcon } from "../icons";
-import { ShareCard } from "../ShareCard";
-import { Badge, Button, Card, ConfirmButton, Field, Notice, Segmented, Spinner } from "../ui";
+import { linkify } from "@/lib/util/links";
+import { toast } from "@/lib/alerts/toast";
+import { AlertIcon, ClockIcon, CopyIcon, LockIcon, TextIcon } from "../ui/icons";
+import { ShareCard } from "./ShareCard";
+import { Badge, Button, Card, ConfirmButton, Field, Notice, Segmented, Spinner } from "../ui/ui";
 import { pageTitle, removeTransfer, useRememberRecent } from "./common";
 
 const EDITORS = [
@@ -26,7 +26,13 @@ function Reading({ text }: { text: string }) {
         typeof piece === "string" ? (
           piece
         ) : (
-          <a key={i} href={piece.url} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-2">
+          <a
+            key={i}
+            href={piece.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent underline underline-offset-2"
+          >
             {piece.url}
           </a>
         ),
@@ -149,7 +155,8 @@ export function NotePanel({ meta, token }: { meta: TransferMeta; token?: string 
 
         {draft !== null && !canEdit && (
           <Notice tone="warn" icon={<AlertIcon />} className="mt-3">
-            Its owner has made this text read-only, so your changes can&apos;t be saved. Copy them first if you need them.
+            Its owner has made this text read-only, so your changes can&apos;t be saved. Copy them first if you need
+            them.
           </Notice>
         )}
         {changedMeanwhile && (
@@ -220,8 +227,16 @@ export function NotePanel({ meta, token }: { meta: TransferMeta; token?: string 
 
         {owner && (
           <div className="mt-5">
-            <Field label="Who can edit" hint="Anyone with the code can always read it. You can change this whenever you like.">
-              <Segmented label="Who can edit" value={meta.editable ? "anyone" : "owner"} options={EDITORS} onChange={chooseEditors} />
+            <Field
+              label="Who can edit"
+              hint="Anyone with the code can always read it. You can change this whenever you like."
+            >
+              <Segmented
+                label="Who can edit"
+                value={meta.editable ? "anyone" : "owner"}
+                options={EDITORS}
+                onChange={chooseEditors}
+              />
             </Field>
           </div>
         )}

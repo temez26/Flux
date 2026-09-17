@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getTransfer, type TransferMeta } from "./api";
-import { notify } from "./notify";
-import { getOwned, ownedVersion, subscribeOwned } from "./owned";
+import { notify } from "./alerts/notify";
+import { getOwned, ownedVersion, subscribeOwned } from "./storage/owned";
 
 const noSubscribe = () => () => {};
 
@@ -135,7 +135,11 @@ export function reloadTransfer(code: string) {
 }
 
 export function useMounted(): boolean {
-  return useSyncExternalStore(noSubscribe, () => true, () => false);
+  return useSyncExternalStore(
+    noSubscribe,
+    () => true,
+    () => false,
+  );
 }
 
 function subscribeOnline(listener: () => void) {
@@ -148,7 +152,11 @@ function subscribeOnline(listener: () => void) {
 }
 
 export function useOnline(): boolean {
-  return useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
+  return useSyncExternalStore(
+    subscribeOnline,
+    () => navigator.onLine,
+    () => true,
+  );
 }
 
 /** Keeps the screen on while a transfer runs; mobile browsers suspend network work when it sleeps. */
@@ -280,7 +288,8 @@ export function useTransferMeta(code: string, enabled: boolean) {
         // A collection can gain files at any moment, however finished it looks. A transfer
         // served from a device never gets hashes, which would otherwise read as always uploading.
         // Text can change under the reader at any moment too — its owner can always edit it.
-        const changing = next.collect || next.note !== undefined || (!next.hosted && next.files.some((f) => f.hash === null));
+        const changing =
+          next.collect || next.note !== undefined || (!next.hosted && next.files.some((f) => f.hash === null));
         const interval = changing ? UPLOADING_POLL_MS : READY_POLL_MS;
         const untilExpiry = Date.parse(next.expiresAt) - Date.now() + 1000;
         timer = window.setTimeout(load, Math.max(0, Math.min(interval, untilExpiry)));

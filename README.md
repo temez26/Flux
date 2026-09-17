@@ -84,10 +84,15 @@ cd web && npm install && npm run dev    # UI on :3000, proxies /api to :8080
 
 `npm test` in `web/` and `cargo test` in `server/` cover the two zip writers, where a mistake
 yields an archive that looks fine until someone opens it somewhere else.
+Before a PR, `npm run lint` and `npm run format` in `web/`, `cargo clippy --all-targets` and
+`cargo fmt` in `server/`.
 
 `server/` — Rust API (axum, sqlx, PostgreSQL), also serves the web app. A module per concern:
 `upload`, `download`, `zip`, `thumbs`, `signal`, `nearby`, `stun`, `cleanup`.
 
-`web/` — Next.js, static export. `lib/` is the transfer engine and never imports a component.
-`components/` renders it: `transfer/` a file per panel, `preview/` a file per viewer family,
-`ui.tsx` the shared primitives.
+`web/` — Next.js, static export. `lib/` is the transfer engine and never imports a component:
+`transfer/` uploads, downloads and direct sends, `nearby/` device discovery, `save/` writing to
+disk, `storage/` what the browser remembers, `preview/`, `platform/` browser integrations,
+`alerts/` toasts and notifications, `util/`. `components/` renders it: `home/` the start page, `transfer/` a file per
+panel, `preview/` a file per viewer family, `files/` the file browser and pickers, `ui/` the
+shared primitives.

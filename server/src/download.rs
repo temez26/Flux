@@ -80,7 +80,11 @@ fn parse_range(value: &str, total: u64) -> Option<Result<(u64, u64), ()>> {
         (total.saturating_sub(suffix), total)
     } else {
         let start: u64 = first.parse().ok()?;
-        let end = if last.is_empty() { total } else { last.parse::<u64>().ok()?.saturating_add(1).min(total) };
+        let end = if last.is_empty() {
+            total
+        } else {
+            last.parse::<u64>().ok()?.saturating_add(1).min(total)
+        };
         (start, end)
     };
     Some(if range.0 < range.1 { Ok(range) } else { Err(()) })
@@ -89,7 +93,13 @@ fn parse_range(value: &str, total: u64) -> Option<Result<(u64, u64), ()>> {
 fn content_disposition(name: &str, inline: bool) -> HeaderValue {
     let fallback: String = name
         .chars()
-        .map(|c| if c.is_ascii_graphic() && c != '"' && c != '\\' || c == ' ' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_graphic() && c != '"' && c != '\\' || c == ' ' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let encoded: String = name
         .bytes()
@@ -99,16 +109,24 @@ fn content_disposition(name: &str, inline: bool) -> HeaderValue {
         })
         .collect();
     let disposition = if inline { "inline" } else { "attachment" };
-    HeaderValue::from_str(&format!("{disposition}; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"))
-        .unwrap_or_else(|_| HeaderValue::from_static(disposition))
+    HeaderValue::from_str(&format!(
+        "{disposition}; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
+    ))
+    .unwrap_or_else(|_| HeaderValue::from_static(disposition))
 }
 
 pub fn respond(request: &HeaderMap, parts: Vec<Part>, etag: String, mime: &str, name: &str, inline: bool) -> Response {
     // Previews revisit the same files, and their content never changes under one ETag.
-    if request.get(header::IF_NONE_MATCH).is_some_and(|v| v.as_bytes() == etag.as_bytes()) {
+    if request
+        .get(header::IF_NONE_MATCH)
+        .is_some_and(|v| v.as_bytes() == etag.as_bytes())
+    {
         return (
             StatusCode::NOT_MODIFIED,
-            [(header::ETAG, etag), (header::CACHE_CONTROL, "private, no-cache".to_owned())],
+            [
+                (header::ETAG, etag),
+                (header::CACHE_CONTROL, "private, no-cache".to_owned()),
+            ],
         )
             .into_response();
     }
@@ -181,8 +199,18 @@ pub async fn file(
     // (HTML, SVG) could run scripts; forcing the type keeps a renamed file from being sniffed as one.
     let inline = query.inline.is_some() && name.to_ascii_lowercase().ends_with(".pdf");
     let mime = if inline { "application/pdf" } else { &mime };
-    let parts = vec![Part::File { path: transfers::file_path(&state, transfer.id, idx), len: size as u64 }];
-    Ok(respond(&headers, parts, format!("\"{}\"", hex(&hash)), mime, name, inline))
+    let parts = vec![Part::File {
+        path: transfers::file_path(&state, transfer.id, idx),
+        len: size as u64,
+    }];
+    Ok(respond(
+        &headers,
+        parts,
+        format!("\"{}\"", hex(&hash)),
+        mime,
+        name,
+        inline,
+    ))
 }
 
 /// Most ranges a selection may name; a folder, being contiguous, needs one.
@@ -220,10 +248,17 @@ fn selected(ranges: &[(i32, i32)], idx: i32) -> bool {
 fn common_folder<'a>(paths: impl IntoIterator<Item = &'a str>) -> Option<&'a str> {
     let mut shared: Option<Vec<&str>> = None;
     for path in paths {
-        let folders: Vec<&str> = path.rsplit_once('/').map_or(vec![], |(dir, _)| dir.split('/').collect());
+        let folders: Vec<&str> = path
+            .rsplit_once('/')
+            .map_or(vec![], |(dir, _)| dir.split('/').collect());
         shared = Some(match shared {
             None => folders,
-            Some(prev) => prev.into_iter().zip(folders).take_while(|(a, b)| a == b).map(|(a, _)| a).collect(),
+            Some(prev) => prev
+                .into_iter()
+                .zip(folders)
+                .take_while(|(a, b)| a == b)
+                .map(|(a, _)| a)
+                .collect(),
         });
     }
     shared?.pop()
@@ -234,6 +269,9 @@ pub struct ZipQuery {
     /// Only these files, as index ranges. The whole transfer when absent.
     files: Option<String>,
 }
+
+/// idx, path, size, modified, hash, crc32
+type ZipRow = (i32, String, i64, Option<i64>, Option<Vec<u8>>, Option<i32>);
 
 pub async fn zip(
     State(state): State<Shared>,
@@ -246,12 +284,11 @@ pub async fn zip(
         None => None,
     };
     let transfer = transfers::find(&state.db, &code).await?;
-    let mut rows: Vec<(i32, String, i64, Option<i64>, Option<Vec<u8>>, Option<i32>)> = sqlx::query_as(
-        "SELECT idx, path, size, modified, hash, crc32 FROM files WHERE transfer_id = $1 ORDER BY idx",
-    )
-    .bind(transfer.id)
-    .fetch_all(&state.db)
-    .await?;
+    let mut rows: Vec<ZipRow> =
+        sqlx::query_as("SELECT idx, path, size, modified, hash, crc32 FROM files WHERE transfer_id = $1 ORDER BY idx")
+            .bind(transfer.id)
+            .fetch_all(&state.db)
+            .await?;
     if let Some(ranges) = &selection {
         rows.retain(|row| selected(ranges, row.0));
     }
@@ -287,7 +324,14 @@ pub async fn zip(
     }
 
     let etag = format!("\"{}\"", etag.finalize().to_hex());
-    Ok(respond(&headers, zip::build(entries), etag, "application/zip", &name, false))
+    Ok(respond(
+        &headers,
+        zip::build(entries),
+        etag,
+        "application/zip",
+        &name,
+        false,
+    ))
 }
 
 #[cfg(test)]
@@ -296,7 +340,10 @@ mod tests {
 
     #[test]
     fn reads_a_selection_as_merged_ranges() {
-        assert_eq!(parse_selection("0-12,15,40-44"), Some(vec![(0, 12), (15, 15), (40, 44)]));
+        assert_eq!(
+            parse_selection("0-12,15,40-44"),
+            Some(vec![(0, 12), (15, 15), (40, 44)])
+        );
         assert_eq!(parse_selection("7"), Some(vec![(7, 7)]));
         // Overlapping, adjacent and out-of-order ranges fold together.
         assert_eq!(parse_selection("5-9,0-4,8-12,20"), Some(vec![(0, 12), (20, 20)]));
@@ -307,8 +354,15 @@ mod tests {
         for spec in ["", "a", "3-1", "-1", "1-", ",", "1,,2", "0-2147483648"] {
             assert_eq!(parse_selection(spec), None, "{spec:?}");
         }
-        let too_many = (0..=MAX_RANGES).map(|i| (i * 2).to_string()).collect::<Vec<_>>().join(",");
-        assert_eq!(parse_selection(&too_many), None, "more ranges than a request should carry");
+        let too_many = (0..=MAX_RANGES)
+            .map(|i| (i * 2).to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        assert_eq!(
+            parse_selection(&too_many),
+            None,
+            "more ranges than a request should carry"
+        );
     }
 
     #[test]
@@ -322,7 +376,11 @@ mod tests {
     fn names_an_archive_after_the_folder_its_files_share() {
         assert_eq!(common_folder(["trip/2024/a.jpg", "trip/2024/b.jpg"]), Some("2024"));
         assert_eq!(common_folder(["trip/2024/a.jpg", "trip/2025/b.jpg"]), Some("trip"));
-        assert_eq!(common_folder(["a.jpg", "trip/b.jpg"]), None, "a loose file shares no folder");
+        assert_eq!(
+            common_folder(["a.jpg", "trip/b.jpg"]),
+            None,
+            "a loose file shares no folder"
+        );
         assert_eq!(common_folder(["trip/a.jpg"]), Some("trip"));
         assert_eq!(common_folder(Vec::<&str>::new()), None);
     }

@@ -2,10 +2,10 @@
 
 import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { inlineUrl, renderUrl } from "@/lib/api";
-import { basename } from "@/lib/files";
-import { thumbnailSource } from "@/lib/preview";
-import { ExpandIcon, ExternalIcon, FileTypeIcon } from "../icons";
-import { Spinner } from "../ui";
+import { basename } from "@/lib/platform/files";
+import { thumbnailSource } from "@/lib/preview/preview";
+import { ExpandIcon, ExternalIcon, FileTypeIcon } from "../ui/icons";
+import { Spinner } from "../ui/ui";
 import { InlineFrame, Loading, Unavailable, overlayTextButton, type Status, type ViewProps } from "./chrome";
 
 export function ImageView({ code, file, url, inline, onExpand }: ViewProps) {
@@ -25,7 +25,16 @@ export function ImageView({ code, file, url, inline, onExpand }: ViewProps) {
     el.scrollTop = zoom.y * el.scrollHeight - el.clientHeight / 2;
   }, [zoom]);
 
-  if (status === "failed") return <Unavailable code={code} file={file} url={url} inline={inline} message="This image format can't be shown in the browser" />;
+  if (status === "failed")
+    return (
+      <Unavailable
+        code={code}
+        file={file}
+        url={url}
+        inline={inline}
+        message="This image format can't be shown in the browser"
+      />
+    );
 
   // A format this browser can't decode (a HEIC outside Safari, say) is worth one more try
   // against the server's rendering of it before giving up on showing anything at all.
@@ -79,10 +88,15 @@ export function ImageView({ code, file, url, inline, onExpand }: ViewProps) {
   }
 
   return (
-    <div ref={scroller} className={`absolute inset-0 ${zoom ? "overflow-auto overscroll-contain" : "flex touch-pan-y items-center justify-center p-2 sm:px-16 sm:pb-6"}`}>
+    <div
+      ref={scroller}
+      className={`absolute inset-0 ${zoom ? "overflow-auto overscroll-contain" : "flex touch-pan-y items-center justify-center p-2 sm:px-16 sm:pb-6"}`}
+    >
       {status === "loading" && <Loading inline={false} />}
       {zoom ? (
-        <div className="grid size-max min-h-full min-w-full place-items-center">{image("max-w-none cursor-zoom-out", toggleZoom)}</div>
+        <div className="grid size-max min-h-full min-w-full place-items-center">
+          {image("max-w-none cursor-zoom-out", toggleZoom)}
+        </div>
       ) : (
         image(`max-h-full max-w-full object-contain ${zoomable ? "cursor-zoom-in" : ""}`, toggleZoom)
       )}
@@ -92,21 +106,64 @@ export function ImageView({ code, file, url, inline, onExpand }: ViewProps) {
 
 export function VideoView({ code, file, url, inline }: ViewProps) {
   const [failed, setFailed] = useState(false);
-  if (failed) return <Unavailable code={code} file={file} url={url} inline={inline} message="This video format can't be played in the browser" />;
+  if (failed)
+    return (
+      <Unavailable
+        code={code}
+        file={file}
+        url={url}
+        inline={inline}
+        message="This video format can't be played in the browser"
+      />
+    );
   if (inline) {
-    return <video src={url} controls playsInline preload="metadata" onError={() => setFailed(true)} className="max-h-[60vh] w-full rounded-xl bg-black" />;
+    return (
+      <video
+        src={url}
+        controls
+        playsInline
+        preload="metadata"
+        onError={() => setFailed(true)}
+        className="max-h-[60vh] w-full rounded-xl bg-black"
+      />
+    );
   }
   return (
     <div className="absolute inset-0 flex items-center justify-center sm:px-16 sm:pb-6">
-      <video src={url} controls autoPlay playsInline onError={() => setFailed(true)} className="max-h-full max-w-full" />
+      <video
+        src={url}
+        controls
+        autoPlay
+        playsInline
+        onError={() => setFailed(true)}
+        className="max-h-full max-w-full"
+      />
     </div>
   );
 }
 
 export function AudioView({ code, file, url, inline }: ViewProps) {
   const [failed, setFailed] = useState(false);
-  if (failed) return <Unavailable code={code} file={file} url={url} inline={inline} message="This audio format can't be played in the browser" />;
-  const player = <audio src={url} controls autoPlay={!inline} preload="metadata" onError={() => setFailed(true)} className="w-full" />;
+  if (failed)
+    return (
+      <Unavailable
+        code={code}
+        file={file}
+        url={url}
+        inline={inline}
+        message="This audio format can't be played in the browser"
+      />
+    );
+  const player = (
+    <audio
+      src={url}
+      controls
+      autoPlay={!inline}
+      preload="metadata"
+      onError={() => setFailed(true)}
+      className="w-full"
+    />
+  );
   if (inline) return player;
   return (
     <div className="absolute inset-0 flex touch-pan-y items-center justify-center p-6">
@@ -136,7 +193,9 @@ export function PdfView(view: ViewProps) {
     );
   }
   // Without the thumbnail sidebar and fitted to width, the page gets all of a narrow frame.
-  const frame = <iframe src={`${src}#navpanes=0&view=FitH`} title={basename(file.path)} className="size-full border-0 bg-white" />;
+  const frame = (
+    <iframe src={`${src}#navpanes=0&view=FitH`} title={basename(file.path)} className="size-full border-0 bg-white" />
+  );
   if (inline) {
     return (
       <InlineFrame onExpand={onExpand}>

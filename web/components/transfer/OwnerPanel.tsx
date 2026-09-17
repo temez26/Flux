@@ -2,18 +2,18 @@
 
 import { useMemo, useState } from "react";
 import type { TransferMeta } from "@/lib/api";
-import { basename } from "@/lib/files";
-import { formatBytes, plural } from "@/lib/format";
+import { basename } from "@/lib/platform/files";
+import { formatBytes, plural } from "@/lib/util/format";
 import { useTitle } from "@/lib/hooks";
 import { errorMessage } from "@/lib/api";
-import { addFiles, matchPicked, resume, type Match, type Session } from "@/lib/session";
-import { toast } from "@/lib/toast";
-import { FileBrowser, FileRow } from "../FileList";
-import { AlertIcon, CheckIcon, DeviceIcon, FolderIcon, PlusIcon, UploadIcon } from "../icons";
-import { canPickFolder, useFilePickers } from "../picker";
+import { addFiles, matchPicked, resume, type Match, type Session } from "@/lib/transfer/session";
+import { toast } from "@/lib/alerts/toast";
+import { FileBrowser, FileRow } from "../files/FileList";
+import { AlertIcon, CheckIcon, DeviceIcon, FolderIcon, PlusIcon, UploadIcon } from "../ui/icons";
+import { canPickFolder, useFilePickers } from "../files/picker";
 import { PreviewDialog } from "../preview/Preview";
-import { ShareCard } from "../ShareCard";
-import { Badge, Button, ConfirmButton, Notice, Spinner, StatusCard, type StatusProps } from "../ui";
+import { ShareCard } from "./ShareCard";
+import { Badge, Button, ConfirmButton, Notice, Spinner, StatusCard, type StatusProps } from "../ui/ui";
 import { MetaRow, MetaTile, pageTitle, percent, removeOwnedFile, removeTransfer, summarize } from "./common";
 
 /**
@@ -21,7 +21,15 @@ import { MetaRow, MetaTile, pageTitle, percent, removeOwnedFile, removeTransfer,
  * from another visit. The files themselves are gone with the old page, so continuing means
  * picking them again.
  */
-export function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; token: string; onResume: (s: Session) => void }) {
+export function OwnerPanel({
+  meta,
+  token,
+  onResume,
+}: {
+  meta: TransferMeta;
+  token: string;
+  onResume: (s: Session) => void;
+}) {
   const { complete, ready, size, received } = summarize(meta.files);
   const [previewing, setPreviewing] = useState<number | null>(null);
   const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
@@ -46,17 +54,30 @@ export function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; toke
     // Starting an upload where nothing lined up would just hand back a screen of failures.
     if (!match.matched) return;
     if (match.missing.length) {
-      toast(`${match.matched.toLocaleString()} of ${(match.matched + match.missing.length).toLocaleString()} files matched`, "err");
+      toast(
+        `${match.matched.toLocaleString()} of ${(match.matched + match.missing.length).toLocaleString()} files matched`,
+        "err",
+      );
     }
     onResume(resume(meta, token, match));
   });
   useTitle(pageTitle(meta.code));
 
   const status: StatusProps = meta.hosted
-    ? { tone: "warn", icon: <DeviceIcon />, title: "Not being shared", subtitle: "Nothing was uploaded, so add the files again to serve them from this device." }
+    ? {
+        tone: "warn",
+        icon: <DeviceIcon />,
+        title: "Not being shared",
+        subtitle: "Nothing was uploaded, so add the files again to serve them from this device.",
+      }
     : ready
       ? { tone: "ok", icon: <CheckIcon />, title: "Ready to receive", subtitle: "Every file is uploaded and verified." }
-      : { tone: "warn", icon: <AlertIcon />, title: "Upload interrupted", subtitle: "Add the same files again to continue where it stopped." };
+      : {
+          tone: "warn",
+          icon: <AlertIcon />,
+          title: "Upload interrupted",
+          subtitle: "Add the same files again to continue where it stopped.",
+        };
 
   return (
     <div className="space-y-4">
@@ -98,7 +119,13 @@ export function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; toke
           ) : (
             <>
               <Button variant="primary" onClick={() => picker.open("files")}>
-                {picker.waiting ? <Spinner className="size-4" /> : meta.hosted ? <DeviceIcon className="size-4" /> : <UploadIcon className="size-4" />}
+                {picker.waiting ? (
+                  <Spinner className="size-4" />
+                ) : meta.hosted ? (
+                  <DeviceIcon className="size-4" />
+                ) : (
+                  <UploadIcon className="size-4" />
+                )}
                 {picker.waiting ? "Getting your files…" : meta.hosted ? "Share these files again" : "Add files"}
               </Button>
               {folders && (
@@ -115,8 +142,8 @@ export function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; toke
         {picker.inputs}
         {shortfall && !shortfall.matched && (
           <Notice tone="warn" icon={<AlertIcon />} className="mt-4">
-            None of the {plural(shortfall.missing.length, "file")} still needed were in what you picked. Choose the same files or
-            folder you sent — still missing {shortfall.missing.slice(0, 3).map(basename).join(", ")}
+            None of the {plural(shortfall.missing.length, "file")} still needed were in what you picked. Choose the same
+            files or folder you sent — still missing {shortfall.missing.slice(0, 3).map(basename).join(", ")}
             {shortfall.missing.length > 3 ? ` and ${(shortfall.missing.length - 3).toLocaleString()} more` : ""}.
           </Notice>
         )}
@@ -125,7 +152,11 @@ export function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; toke
         paths={paths}
         renderRow={(i) =>
           meta.hosted ? (
-            <FileRow path={meta.files[i].path} size={meta.files[i].size} badge={<Badge icon={<DeviceIcon />}>Not shared</Badge>} />
+            <FileRow
+              path={meta.files[i].path}
+              size={meta.files[i].size}
+              badge={<Badge icon={<DeviceIcon />}>Not shared</Badge>}
+            />
           ) : (
             <MetaRow
               file={meta.files[i]}
@@ -136,7 +167,9 @@ export function OwnerPanel({ meta, token, onResume }: { meta: TransferMeta; toke
             />
           )
         }
-        renderTile={meta.hosted ? undefined : (i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />}
+        renderTile={
+          meta.hosted ? undefined : (i) => <MetaTile file={meta.files[i]} code={meta.code} onPreview={setPreviewing} />
+        }
       />
       <PreviewDialog code={meta.code} files={meta.files} idx={previewing} onChange={setPreviewing} />
     </div>

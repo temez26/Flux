@@ -1,20 +1,28 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { countDownload, deleteTransfer, errorMessage, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
-import { basename } from "@/lib/files";
-import { formatBytes, formatCode, formatRemaining, plural } from "@/lib/format";
+import {
+  countDownload,
+  deleteTransfer,
+  errorMessage,
+  fileUrl,
+  zipUrl,
+  type FileMeta,
+  type TransferMeta,
+} from "@/lib/api";
+import { basename } from "@/lib/platform/files";
+import { formatBytes, formatCode, formatRemaining, plural } from "@/lib/util/format";
 import { reloadTransfer, useNow } from "@/lib/hooks";
-import { removeOwned } from "@/lib/owned";
-import { canPreview } from "@/lib/preview";
-import { rememberRecent } from "@/lib/recent";
-import { navigate } from "@/lib/router";
-import { end, removeFile } from "@/lib/session";
-import { toast } from "@/lib/toast";
-import { FileRow, FileTile } from "../FileList";
-import { CheckIcon, ClockIcon, DownloadIcon, FileTypeIcon, FolderIcon, TrashIcon } from "../icons";
+import { removeOwned } from "@/lib/storage/owned";
+import { canPreview } from "@/lib/preview/preview";
+import { rememberRecent } from "@/lib/storage/recent";
+import { navigate } from "@/lib/platform/router";
+import { end, removeFile } from "@/lib/transfer/session";
+import { toast } from "@/lib/alerts/toast";
+import { FileRow, FileTile } from "../files/FileList";
+import { CheckIcon, ClockIcon, DownloadIcon, FileTypeIcon, FolderIcon, TrashIcon } from "../ui/icons";
 import { FileThumb } from "../preview/Preview";
-import { Badge, ConfirmIconButton, Spinner, buttonClass } from "../ui";
+import { Badge, ConfirmIconButton, Spinner, buttonClass } from "../ui/ui";
 
 /** Stand-ins for a store that doesn't exist yet, for useSyncExternalStore. */
 export const subscribeNothing = () => () => {};
@@ -126,7 +134,9 @@ export function TransferHeading({ meta, badges }: { meta: TransferMeta; badges?:
           {single ? <FileTypeIcon path={single.path} className="size-6" /> : <FolderIcon className="size-6" />}
         </span>
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold">{single ? basename(single.path) : plural(meta.files.length, "file")}</h1>
+          <h1 className="truncate text-lg font-semibold">
+            {single ? basename(single.path) : plural(meta.files.length, "file")}
+          </h1>
           <p className="text-sm text-muted">{formatBytes(size)}</p>
         </div>
       </div>
@@ -210,7 +220,15 @@ export function MetaRow({
   );
 }
 
-export function MetaTile({ file, code, onPreview }: { file: FileMeta; code: string; onPreview: (idx: number) => void }) {
+export function MetaTile({
+  file,
+  code,
+  onPreview,
+}: {
+  file: FileMeta;
+  code: string;
+  onPreview: (idx: number) => void;
+}) {
   return (
     <FileTile
       path={file.path}
@@ -232,7 +250,15 @@ export function MetaTile({ file, code, onPreview }: { file: FileMeta; code: stri
 const MAX_URL = 4000;
 
 /** Downloads chosen files that the server holds: one directly, several as a zip. */
-export function SelectionDownload({ code, files, counted = false }: { code: string; files: FileMeta[]; counted?: boolean }) {
+export function SelectionDownload({
+  code,
+  files,
+  counted = false,
+}: {
+  code: string;
+  files: FileMeta[];
+  counted?: boolean;
+}) {
   const count = counted ? () => countDownload(code) : undefined;
   const primary = buttonClass("primary", "min-h-9");
   if (files.some((f) => !f.hash)) {
@@ -250,7 +276,10 @@ export function SelectionDownload({ code, files, counted = false }: { code: stri
       </a>
     );
   }
-  const url = zipUrl(code, files.map((f) => f.idx));
+  const url = zipUrl(
+    code,
+    files.map((f) => f.idx),
+  );
   // Scattered picks can't be written as a handful of ranges; a folder always can.
   if (url.length > MAX_URL) {
     return (
