@@ -53,7 +53,7 @@ export function PublicShares() {
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          className="min-h-11 w-full rounded-xl border border-line bg-bg pr-3 pl-9 text-base outline-none placeholder:text-muted/60 focus:border-accent"
+          className="min-h-11 w-full rounded-xl border border-line bg-bg pr-3 pl-9 text-base outline-none placeholder:text-muted focus:border-accent"
         />
       </div>
 

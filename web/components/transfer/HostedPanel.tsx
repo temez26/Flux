@@ -9,7 +9,7 @@ import { FileBrowser, FileRow } from "../files/FileList";
 import { AlertIcon, DeviceIcon, ZapIcon } from "../ui/icons";
 import { ShareCard } from "./ShareCard";
 import { Badge, ConfirmButton, StatusCard, type StatusProps } from "../ui/ui";
-import { pageTitle, removeTransfer } from "./common";
+import { BackgroundNotice, keepOpen, pageTitle, removeTransfer } from "./common";
 
 function hostedStatus(serving: number, sent: number, expired: boolean): StatusProps {
   if (expired)
@@ -31,7 +31,7 @@ function hostedStatus(serving: number, sent: number, expired: boolean): StatusPr
     tone: "ok",
     icon: <DeviceIcon />,
     title: "Ready to send from this device",
-    subtitle: "Nothing was uploaded. Keep this page open until the files have been received.",
+    subtitle: `Nothing was uploaded. ${keepOpen("the files have been received")}`,
   };
 }
 
@@ -71,6 +71,7 @@ export function HostedPanel({ session, expiresAt }: { session: Session; expiresA
         ]}
         danger={<ConfirmButton onConfirm={() => removeTransfer(code, token)}>Delete transfer</ConfirmButton>}
       >
+        <BackgroundNotice active={!expired} />
         {serving > 0 && (
           <div className="mt-4">
             <Badge tone="ok" icon={<ZapIcon />}>

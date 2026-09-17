@@ -10,7 +10,7 @@ import { toast } from "@/lib/alerts/toast";
 import { AlertIcon, CheckIcon, PauseIcon, PlayIcon, PlusIcon, RetryIcon, UploadIcon } from "../ui/icons";
 import { canPickFolder, useFilePickers } from "../files/picker";
 import { Button, Card, SectionTitle, Spinner, StatusCard, type StatusProps } from "../ui/ui";
-import { percent, subscribeNothing, versionZero } from "./common";
+import { BackgroundNotice, keepOpen, percent, subscribeNothing, versionZero } from "./common";
 
 /**
  * Adding files to someone else's public share, which its owner opened to that: choosing them,
@@ -67,7 +67,7 @@ export function AddFilesCard({ meta }: { meta: TransferMeta }) {
                 tone: "accent",
                 icon: <Spinner className="size-5" />,
                 title: "Adding your files",
-                subtitle: "Keep this page open until it finishes.",
+                subtitle: keepOpen("it finishes"),
               };
   }
 
@@ -124,7 +124,9 @@ export function AddFilesCard({ meta }: { meta: TransferMeta }) {
               </>
             )
           }
-        />
+        >
+          <BackgroundNotice active={running} />
+        </StatusCard>
       )}
     </>
   );

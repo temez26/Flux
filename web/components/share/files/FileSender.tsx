@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { errorMessage } from "@/lib/api";
 import { nextPaint } from "@/lib/hooks";
 import { offerTitle, type Peer } from "@/lib/nearby/nearby";
-import type { Picked } from "@/lib/platform/files";
+import { addPicked, type Picked } from "@/lib/platform/files";
 import { navigate } from "@/lib/platform/router";
 import { send } from "@/lib/transfer/session";
 import { formatCode, plural } from "@/lib/util/format";
@@ -19,6 +19,7 @@ import { usePaste, useWindowDrop } from "../incoming";
 import { offerTo } from "../offer";
 import { DropOverlay, DropZone } from "./DropZone";
 import { StagedFiles } from "./StagedFiles";
+import { keepOpen } from "../../transfer/common";
 
 // Files sent to a device end with the page, so the code behind them only needs to outlast any
 // plausible sitting; the row holds a file list and nothing else.
@@ -57,13 +58,13 @@ export function FileSender({ mode }: { mode: "public" | "device" }) {
     }
   }
 
-  /** Files are shown before they go, so nothing is shared until Send says so. */
+  /** Files are shown before they go, so nothing is shared until Send says so. More picked are added to them. */
   async function stage(picked: Picked[] | Promise<Picked[]>) {
     setError(null);
     setBusy("Reading files…");
     try {
       const files = await picked;
-      if (files.length) setStaged(files);
+      if (files.length) setStaged((chosen) => (chosen ? addPicked(chosen, files) : files));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -89,6 +90,8 @@ export function FileSender({ mode }: { mode: "public" | "device" }) {
           setStaged(null);
           void start(staged);
         }}
+        onAdd={() => picker.open("files")}
+        onRemove={(index) => setStaged(staged.length > 1 ? staged.filter((_, i) => i !== index) : null)}
         onCancel={() => setStaged(null)}
       />
     ) : (
@@ -124,7 +127,7 @@ export function FileSender({ mode }: { mode: "public" | "device" }) {
             {files}
             <p className="mt-2 flex items-start gap-1.5 text-sm text-muted">
               <DeviceIcon className="mt-0.5 size-4 shrink-0" />
-              Sent straight from this device. Keep this page open until they have arrived.
+              Sent straight from this device. {keepOpen("they have arrived")}
             </p>
           </Step>
         </div>

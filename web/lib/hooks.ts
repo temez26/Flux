@@ -206,12 +206,57 @@ export function useWakeLock(enabled: boolean) {
   }, [enabled]);
 }
 
+// Long enough to have been suspended, rather than a glance at a notification.
+const BACKGROUND_PAUSE_MS = 3000;
+const BACK_NOTICE_MS = 8000;
+
+/**
+ * Whether the page has just come back from the background while `active` was set. Phones
+ * suspend a page they aren't showing, transfers and all, and without a word about it the
+ * transfer looks to have stalled by itself.
+ */
+export function useBackFromBackground(active: boolean): boolean {
+  const [back, setBack] = useState(false);
+  useEffect(() => {
+    if (!active) return;
+    let hiddenAt = document.hidden ? Date.now() : 0;
+    let timer = 0;
+    const changed = () => {
+      if (document.hidden) {
+        hiddenAt = Date.now();
+        return;
+      }
+      const away = hiddenAt ? Date.now() - hiddenAt : 0;
+      hiddenAt = 0;
+      if (away < BACKGROUND_PAUSE_MS) return;
+      setBack(true);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setBack(false), BACK_NOTICE_MS);
+    };
+    document.addEventListener("visibilitychange", changed);
+    return () => {
+      document.removeEventListener("visibilitychange", changed);
+      window.clearTimeout(timer);
+    };
+  }, [active]);
+  return back && active;
+}
+
+/** Pages holding the guard at once; the page's overscroll is only given back when none do. */
+let guards = 0;
+
 export function useLeaveGuard(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     const guard = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener("beforeunload", guard);
-    return () => window.removeEventListener("beforeunload", guard);
+    // A pull past the top of the page reloads it on phones, and asks nobody first.
+    const root = document.documentElement;
+    if (guards++ === 0) root.style.overscrollBehaviorY = "none";
+    return () => {
+      window.removeEventListener("beforeunload", guard);
+      if (--guards === 0) root.style.overscrollBehaviorY = "";
+    };
   }, [enabled]);
 }
 

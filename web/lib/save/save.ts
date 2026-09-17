@@ -1,3 +1,5 @@
+import { isAppleTouch } from "../platform/install";
+
 /** Destination for a download produced in the page. */
 export interface ByteSink {
   write(chunk: Uint8Array): Promise<void>;
@@ -9,6 +11,9 @@ export type SaveMethod = "stream" | "memory";
 
 // Without a service worker the whole download is assembled in memory before saving.
 const MEMORY_LIMIT = 1024 ** 3;
+// An iPhone or iPad closes a tab holding much less than that, and all anyone sees is the page
+// reloading, so a phone is told up front instead.
+const TOUCH_MEMORY_LIMIT = 512 * 1024 ** 2;
 // Fewer, larger messages to the service worker.
 const BATCH = 512 * 1024;
 /** A wedged worker must not hold up the page that is waiting to offer a download. */
@@ -64,7 +69,7 @@ export async function saveMethod(size: number): Promise<SaveMethod | null> {
   // since they all carry "Safari" in theirs.
   const webkit = navigator.vendor === "Apple Computer, Inc.";
   if (!webkit && (await streamsWork())) return "stream";
-  return size <= MEMORY_LIMIT ? "memory" : null;
+  return size <= (isAppleTouch() ? TOUCH_MEMORY_LIMIT : MEMORY_LIMIT) ? "memory" : null;
 }
 
 /**

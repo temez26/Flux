@@ -32,3 +32,21 @@ export async function takeShared(): Promise<Shared | null> {
   for (const key of await cache.keys()) await cache.delete(key);
   return { files: fromFileList(files), text };
 }
+
+/** What a share gathers is held in memory first, so stay well inside what a phone's tab survives. */
+export const SHARE_LIMIT = 256 * 1024 ** 2;
+
+/**
+ * Whether this device's Share sheet takes files with these names. It is how a phone puts a
+ * photo in its library, which a download never reaches: iOS files every download under Files.
+ * Chrome takes only some kinds of file, and tells them apart by name, so empty stand-ins
+ * answer before anything is fetched.
+ */
+export function canShareFiles(names: string[]): boolean {
+  if (typeof navigator.canShare !== "function" || !window.matchMedia("(pointer: coarse)").matches) return false;
+  try {
+    return navigator.canShare({ files: names.map((name) => new File([], name)) });
+  } catch {
+    return false;
+  }
+}

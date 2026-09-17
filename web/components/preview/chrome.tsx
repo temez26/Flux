@@ -82,7 +82,7 @@ export function Loading({ inline }: { inline: boolean }) {
 }
 
 const frameButton =
-  "inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted transition hover:bg-hover hover:text-fg";
+  "inline-flex min-h-9 pointer-coarse:min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted transition hover:bg-hover hover:text-fg";
 
 /** Copies what a text preview shows — on a phone, usually the reason for opening it at all. */
 export function CopyButton({ text }: { text: string }) {

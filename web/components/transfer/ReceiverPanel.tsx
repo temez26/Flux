@@ -25,6 +25,8 @@ import {
   ZapIcon,
 } from "../ui/icons";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
+import { ShareFilesButton } from "./ShareFiles";
+import { StickyAction } from "./StickyAction";
 import {
   Badge,
   Button,
@@ -39,12 +41,14 @@ import {
   type StatusProps,
 } from "../ui/ui";
 import {
+  BackgroundNotice,
   MetaRow,
   MetaTile,
   Pinned,
   SelectionDownload,
   TransferHeading,
   inFlight,
+  keepOpen,
   pageTitle,
   percent,
   subscribeNothing,
@@ -101,7 +105,8 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
   const viaDirect = directOpen && (meta.hosted || !ready);
   // The sender's page is the only source, so its absence is the whole story.
   const senderMissing = meta.hosted && !directOpen;
-  const tooLargeHere = whole === null;
+  // Only a download taken from the sender's device is saved from the page; the server's copy downloads as usual.
+  const tooLargeHere = whole === null && (meta.hosted || !ready);
   const unreachable = direct?.state === "unavailable";
   const remaining = meta.files.filter((f) => !saved.has(f.idx));
 
@@ -205,7 +210,7 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
               <span className="flex-1">Waiting for the sender to finish uploading</span>
               <span className="font-medium tabular-nums">{percent(received, size)}%</span>
             </div>
-            <ProgressBar value={size ? received / size : 0} />
+            <ProgressBar value={size ? received / size : 0} label="Uploaded by the sender" />
             <p className="mt-2 text-xs text-muted">
               {complete.toLocaleString()} of {plural(meta.files.length, "file")} ready. Uploaded files can already be
               downloaded below.
@@ -214,29 +219,34 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
         )}
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
-          {meta.hosted ? (
-            <Button
-              variant="primary"
-              className={primary}
-              onClick={() => startDirect(meta.files)}
-              disabled={!viaDirect || tooLargeHere}
-            >
-              {label}
-            </Button>
-          ) : viaDirect ? (
-            <Button variant="primary" className={primary} onClick={() => startDirect(meta.files)}>
-              {label}
-            </Button>
-          ) : (
-            <a
-              href={single ? fileUrl(meta.code, single.idx) : zipUrl(meta.code)}
-              download
-              aria-disabled={!ready}
-              onClick={() => countDownload(meta.code)}
-              className={buttonClass("primary", primary)}
-            >
-              {label}
-            </a>
+          <StickyAction enabled={!single}>
+            {meta.hosted ? (
+              <Button
+                variant="primary"
+                className={primary}
+                onClick={() => startDirect(meta.files)}
+                disabled={!viaDirect || tooLargeHere}
+              >
+                {label}
+              </Button>
+            ) : viaDirect ? (
+              <Button variant="primary" className={primary} onClick={() => startDirect(meta.files)}>
+                {label}
+              </Button>
+            ) : (
+              <a
+                href={single ? fileUrl(meta.code, single.idx) : zipUrl(meta.code)}
+                download
+                aria-disabled={!ready}
+                onClick={() => countDownload(meta.code)}
+                className={buttonClass("primary", primary)}
+              >
+                {label}
+              </a>
+            )}
+          </StickyAction>
+          {!meta.hosted && !viaDirect && ready && (
+            <ShareFilesButton code={meta.code} files={meta.files} counted className="min-h-12 max-sm:flex-1" />
           )}
           {complete > 0 && (
             <a
@@ -296,7 +306,7 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
             select={(indices) => (
               <Button
                 variant="primary"
-                className="min-h-9"
+                className="min-h-9 pointer-coarse:min-h-11"
                 disabled={!viaDirect}
                 onClick={() => startDirect(indices.map((i) => meta.files[i]))}
               >
@@ -338,7 +348,7 @@ function receivingStatus(receiver: Receiver): StatusProps {
     tone: "accent",
     icon: <Spinner className="size-5" />,
     title: "Downloading",
-    subtitle: "Keep this page open until it finishes.",
+    subtitle: keepOpen("it finishes"),
   };
 }
 
@@ -397,6 +407,7 @@ function ReceivingPanel({ receiver, meta, onBack }: { receiver: Receiver; meta: 
         }
         danger={!finished && <ConfirmButton onConfirm={() => receiver.cancel()}>Cancel</ConfirmButton>}
       >
+        <BackgroundNotice active={running} />
         {receiver.items.some((item) => item.source === "direct") && (
           <div className="mt-4">
             <Badge tone="ok" icon={<ZapIcon />}>

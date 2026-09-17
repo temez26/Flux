@@ -27,7 +27,7 @@ export function buttonClass(variant: Variant = "secondary", extra = "") {
 }
 
 export const iconButtonClass =
-  "inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-hover hover:text-fg active:scale-95";
+  "inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted pointer-coarse:size-11 transition hover:bg-hover hover:text-fg active:scale-95";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant };
 
@@ -41,16 +41,27 @@ export function IconButton({ label, className = "", ...props }: ComponentProps<"
   );
 }
 
-/** A destructive control's wait for its second tap, which lapses if that tap doesn't come. */
+// Long enough to find the button again with a screen reader or a switch, short enough that a
+// stray tap much later doesn't delete anything.
+const ARMED_MS = 8000;
+
+/** A destructive control's wait for its second press, which lapses if that press doesn't come. */
 function useArmed(): [boolean, (armed: boolean) => void] {
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return;
-    const id = window.setTimeout(() => setArmed(false), 3000);
+    const id = window.setTimeout(() => setArmed(false), ARMED_MS);
     return () => window.clearTimeout(id);
   }, [armed]);
   return [armed, setArmed];
 }
+
+/** Says a control is waiting for its second press; the change of label alone goes unannounced. */
+const ArmedStatus = ({ armed }: { armed: boolean }) => (
+  <span role="status" className="sr-only">
+    {armed ? "Press again to confirm" : ""}
+  </span>
+);
 
 /** ConfirmButton for a row with no room for words: an icon that turns red while it waits. */
 export function ConfirmIconButton({
@@ -64,31 +75,40 @@ export function ConfirmIconButton({
 }) {
   const [armed, setArmed] = useArmed();
   return (
-    <IconButton
-      label={armed ? `Tap again: ${label}` : label}
-      onClick={() => {
-        if (!armed) return setArmed(true);
-        setArmed(false);
-        onConfirm();
-      }}
-      className={armed ? "bg-err/10 !text-err" : "hover:!text-err"}
-    >
-      {children}
-    </IconButton>
+    <>
+      <IconButton
+        label={armed ? `Press again: ${label}` : label}
+        onClick={() => {
+          if (!armed) return setArmed(true);
+          setArmed(false);
+          onConfirm();
+        }}
+        // Moving on is a clear enough no.
+        onBlur={() => setArmed(false)}
+        className={armed ? "bg-err/10 !text-err" : "hover:!text-err"}
+      >
+        {children}
+      </IconButton>
+      <ArmedStatus armed={armed} />
+    </>
   );
 }
 
-/** Destructive action that needs a second tap, instead of a blocking dialog. */
+/** Destructive action that needs a second press, instead of a blocking dialog. */
 export function ConfirmButton({ onConfirm, children }: { onConfirm: () => void; children: ReactNode }) {
   const [armed, setArmed] = useArmed();
   return (
-    <Button
-      variant={armed ? "primary" : "danger"}
-      className={armed ? "!bg-err-solid" : ""}
-      onClick={() => (armed ? onConfirm() : setArmed(true))}
-    >
-      {armed ? "Tap again to confirm" : children}
-    </Button>
+    <>
+      <Button
+        variant={armed ? "primary" : "danger"}
+        className={armed ? "!bg-err-solid" : ""}
+        onClick={() => (armed ? onConfirm() : setArmed(true))}
+        onBlur={() => setArmed(false)}
+      >
+        {armed ? "Press again to confirm" : children}
+      </Button>
+      <ArmedStatus armed={armed} />
+    </>
   );
 }
 
@@ -287,11 +307,23 @@ export function Segmented<T extends string | number>({
   );
 }
 
-export function ProgressBar({ value, tone = "accent", thin = false }: { value: number; tone?: Tone; thin?: boolean }) {
+/** How far a transfer has got; `label` says what is progressing, since a bar alone is only a number to a screen reader. */
+export function ProgressBar({
+  value,
+  label,
+  tone = "accent",
+  thin = false,
+}: {
+  value: number;
+  label: string;
+  tone?: Tone;
+  thin?: boolean;
+}) {
   const pct = Math.max(0, Math.min(1, value || 0)) * 100;
   return (
     <div
       role="progressbar"
+      aria-label={label}
       aria-valuenow={Math.round(pct)}
       aria-valuemin={0}
       aria-valuemax={100}
@@ -344,8 +376,14 @@ export function StatusCard({
       </div>
       {progress !== undefined && (
         <div className="mt-4">
-          <ProgressBar value={progress} tone={tone} />
+          <ProgressBar value={progress} tone={tone} label={title} />
         </div>
+      )}
+      {percent !== undefined && (
+        // A bar changing says nothing unless it's looked at, so reaching each quarter is announced.
+        <p role="status" className="sr-only">
+          {title}, {Math.floor(percent / 25) * 25}%
+        </p>
       )}
       {stats && (
         <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">

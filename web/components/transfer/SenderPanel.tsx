@@ -25,7 +25,18 @@ import { useFilePickers } from "../files/picker";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
 import { ShareCard } from "./ShareCard";
 import { Badge, Button, ConfirmButton, IconButton, Spinner, StatusCard, type StatusProps } from "../ui/ui";
-import { MetaRow, MetaTile, Pinned, inFlight, pageTitle, percent, removeOwnedFile, removeTransfer } from "./common";
+import {
+  BackgroundNotice,
+  MetaRow,
+  MetaTile,
+  Pinned,
+  inFlight,
+  keepOpen,
+  pageTitle,
+  percent,
+  removeOwnedFile,
+  removeTransfer,
+} from "./common";
 
 function senderStatus(session: Session, uploader: Uploader): StatusProps {
   const { counts, finished, reconnecting } = uploader.snapshot;
@@ -80,7 +91,7 @@ function senderStatus(session: Session, uploader: Uploader): StatusProps {
     tone: "accent",
     icon: <Spinner className="size-5" />,
     title: "Uploading",
-    subtitle: "Keep this page open until it finishes.",
+    subtitle: keepOpen("it finishes"),
   };
 }
 
@@ -202,6 +213,7 @@ export function SenderPanel({
           </ConfirmButton>
         }
       >
+        <BackgroundNotice active={running || serving} />
         {adder.inputs}
         {serving && (
           <div className="mt-4">

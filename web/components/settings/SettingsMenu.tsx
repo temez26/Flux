@@ -5,6 +5,7 @@ import { EXPIRY_OPTIONS } from "@/lib/api";
 import { SettingsIcon } from "../ui/icons";
 import { IconButton } from "../ui/ui";
 import { expiryLabel, useExpiry } from "./expiry";
+import { InstallApp } from "./InstallApp";
 import { NotificationSwitch } from "./NotificationSwitch";
 
 // Open from the header, or from any form's "Change" next to how long its share will last.
@@ -116,6 +117,7 @@ export function SettingsMenu() {
           <div className="mt-4 border-t border-line pt-4">
             <NotificationSwitch />
           </div>
+          <InstallApp />
         </div>
       )}
     </div>

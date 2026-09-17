@@ -29,6 +29,7 @@ export function getNearby(): Nearby {
         `${offer.from.name} wants to send you ${offer.files ? "files" : "text"}`,
         `${offer.title} · ${offerDetail(offer)}`,
         `offer-${offer.code}`,
+        `/${formatCode(offer.code)}`,
       ),
   ));
 }
@@ -42,43 +43,47 @@ export function useNearby(): Nearby {
 /** Offers from other devices, shown over whichever page is open when they arrive. */
 export function IncomingOffers() {
   const nearby = useNearby();
-  if (!nearby.offers.length) return null;
   return (
+    // Always there, empty or not: a live region that arrives along with its message goes unread.
     <div
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 top-0 z-50 mx-auto flex max-w-2xl flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]"
+      className="pointer-events-none fixed inset-x-0 top-0 z-50 mx-auto max-w-2xl p-3 pt-[max(0.75rem,env(safe-area-inset-top))] empty:hidden"
     >
-      {nearby.offers.map((offer) => (
-        <div
-          key={offer.code}
-          className="pointer-events-auto flex animate-[toast-in_.2s_ease-out] items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-lg"
-        >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
-            <DownloadIcon className="size-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">
-              {offer.from.name} wants to send you {offer.title}
-            </p>
-            <p className="truncate text-xs text-muted">{offerDetail(offer)}</p>
-          </div>
-          <Button
-            variant="primary"
-            onClick={() => {
-              nearby.answer(offer, true);
-              navigate(`/${formatCode(offer.code)}`);
-            }}
-          >
-            Open
-          </Button>
-          <IconButton
-            label={`Decline ${offer.title} from ${offer.from.name}`}
-            onClick={() => nearby.answer(offer, false)}
-          >
-            <CloseIcon className="size-4" />
-          </IconButton>
-        </div>
-      ))}
+      {nearby.offers.length > 0 && (
+        <section aria-label="Offers from nearby devices" className="flex flex-col gap-2">
+          {nearby.offers.map((offer) => (
+            <div
+              key={offer.code}
+              className="pointer-events-auto flex animate-[toast-in_.2s_ease-out] items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-lg"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+                <DownloadIcon className="size-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">
+                  {offer.from.name} wants to send you {offer.title}
+                </p>
+                <p className="truncate text-xs text-muted">{offerDetail(offer)}</p>
+              </div>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  nearby.answer(offer, true);
+                  navigate(`/${formatCode(offer.code)}`);
+                }}
+              >
+                Open
+              </Button>
+              <IconButton
+                label={`Decline ${offer.title} from ${offer.from.name}`}
+                onClick={() => nearby.answer(offer, false)}
+              >
+                <CloseIcon className="size-4" />
+              </IconButton>
+            </div>
+          ))}
+        </section>
+      )}
     </div>
   );
 }
@@ -127,7 +132,7 @@ export function NearbyDevices({ target, onChoose }: { target: Peer | null; onCho
           </div>
         </div>
       )}
-      <div className="mt-2 flex min-h-9 flex-wrap items-center gap-x-1 text-sm text-muted">
+      <div className="mt-2 flex min-h-9 pointer-coarse:min-h-11 flex-wrap items-center gap-x-1 text-sm text-muted">
         {draft === null ? (
           <>
             Others see this device as <span className="font-medium text-fg">{nearby.device.name}</span>
@@ -135,7 +140,7 @@ export function NearbyDevices({ target, onChoose }: { target: Peer | null; onCho
             <button
               type="button"
               onClick={() => setDraft(nearby.device.name)}
-              className="min-h-9 font-medium text-accent hover:underline"
+              className="min-h-9 pointer-coarse:min-h-11 font-medium text-accent hover:underline"
               aria-label={`Rename this device, now ${nearby.device.name}`}
             >
               Rename
@@ -152,7 +157,7 @@ export function NearbyDevices({ target, onChoose }: { target: Peer | null; onCho
               onBlur={rename}
               maxLength={40}
               enterKeyHint="done"
-              className="min-h-9 w-44 rounded-lg border border-line bg-bg px-2 text-base text-fg outline-none focus:border-accent"
+              className="min-h-9 pointer-coarse:min-h-11 w-44 rounded-lg border border-line bg-bg px-2 text-base text-fg outline-none focus:border-accent"
             />
           </form>
         )}

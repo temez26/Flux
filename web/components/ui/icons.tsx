@@ -26,6 +26,7 @@ export const UploadIcon = (p: IconProps) => (
 export const DownloadIcon = (p: IconProps) => (
   <Icon d="M12 3v12m0 0-5-5m5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" {...p} />
 );
+export const ShareIcon = (p: IconProps) => <Icon d="M12 15V3m0 0L8 7m4-4 4 4M6 11H5v10h14V11h-1" {...p} />;
 export const CloseIcon = (p: IconProps) => <Icon d="M6 6l12 12M18 6 6 18" {...p} />;
 export const RetryIcon = (p: IconProps) => <Icon d="M20 12a8 8 0 1 1-2.34-5.66L20 8.7M20 4v4.7h-4.7" {...p} />;
 export const CheckIcon = (p: IconProps) => <Icon d="m5 12.5 4.5 4.5L19 7" {...p} />;
@@ -85,7 +86,7 @@ export const QrIcon = (p: IconProps) => (
 const FileIcon = (p: IconProps) => (
   <Icon d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5" {...p} />
 );
-const ImageIcon = (p: IconProps) => <Icon d="M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15.5 9.5h.01" {...p} />;
+export const ImageIcon = (p: IconProps) => <Icon d="M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15.5 9.5h.01" {...p} />;
 const VideoIcon = (p: IconProps) => <Icon d="M3 6h12v12H3zM15 10l6-3.5v11L15 14" {...p} />;
 const AudioIcon = (p: IconProps) => (
   <Icon d="M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" {...p} />

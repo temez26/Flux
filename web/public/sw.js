@@ -161,13 +161,15 @@ async function networkFirst(request) {
   }
 }
 
-// Tapping a notification brings back the page it came from, or opens Flux if that has closed.
+// Tapping a notification brings back the page it came from, or opens what it was about if that
+// has closed. An open page is only brought forward, never sent elsewhere: it may be mid-transfer.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  const url = event.notification.data?.url ?? "/";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
       const open = windows.find((w) => "focus" in w);
-      return open ? open.focus() : self.clients.openWindow("/");
+      return open ? open.focus() : self.clients.openWindow(url);
     }),
   );
 });

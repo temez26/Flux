@@ -1,8 +1,8 @@
 "use client";
 
 import type { Picked } from "@/lib/platform/files";
-import { canPickFolder } from "../../files/picker";
-import { FolderIcon, UploadIcon } from "../../ui/icons";
+import { canPickFolder, canPickMedia, type PickerKind } from "../../files/picker";
+import { FolderIcon, ImageIcon, UploadIcon } from "../../ui/icons";
 import { Button, Spinner } from "../../ui/ui";
 import { dropTarget } from "../incoming";
 
@@ -23,13 +23,14 @@ export function DropZone({
   disabled: boolean;
   title: string;
   hint: string;
-  onPick: (kind: "files" | "folder") => void;
+  onPick: (kind: PickerKind) => void;
   onDrop: (picked: Promise<Picked[]>) => void;
 }) {
   const folders = canPickFolder();
+  const photos = canPickMedia();
   const idle = !status && !disabled;
   // The zone around these buttons opens the file picker too.
-  const pick = (kind: "files" | "folder") => (e: { stopPropagation(): void }) => {
+  const pick = (kind: PickerKind) => (e: { stopPropagation(): void }) => {
     e.stopPropagation();
     onPick(kind);
   };
@@ -61,7 +62,13 @@ export function DropZone({
             <p className="mt-1 text-sm text-muted">{hint}</p>
           </div>
           <div className="flex flex-wrap justify-center gap-2">
-            <Button variant="primary" onClick={pick("files")} disabled={disabled}>
+            {photos && (
+              <Button variant="primary" onClick={pick("media")} disabled={disabled}>
+                <ImageIcon className="size-4" />
+                Photos & videos
+              </Button>
+            )}
+            <Button variant={photos ? "secondary" : "primary"} onClick={pick("files")} disabled={disabled}>
               <UploadIcon className="size-4" />
               Choose files
             </Button>

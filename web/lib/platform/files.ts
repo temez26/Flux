@@ -87,3 +87,11 @@ export function uniquePaths(picked: Picked[]): Picked[] {
     return path === p.path ? p : { ...p, path };
   });
 }
+
+const sameFile = (a: Picked, b: Picked) =>
+  a.path === b.path && a.file.size === b.file.size && a.file.lastModified === b.file.lastModified;
+
+/** Adds a further pick to files already chosen, leaving out any picked a second time. */
+export function addPicked(chosen: Picked[], added: Picked[]): Picked[] {
+  return [...chosen, ...added.filter((p) => !chosen.some((c) => sameFile(c, p)))];
+}

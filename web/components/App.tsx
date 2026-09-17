@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { normalizeCode } from "@/lib/util/format";
 import { useMounted, useOnline } from "@/lib/hooks";
+import { watchInstall } from "@/lib/platform/install";
 import { navigate, usePath } from "@/lib/platform/router";
 import Home from "./home/Home";
 import { tabAt } from "./share/tabs";
@@ -20,19 +21,22 @@ export default function App() {
   const code = path === "/" ? null : normalizeCode(path);
   const tab = tabAt(path);
   const main = useRef<HTMLElement>(null);
-  const previous = useRef(path);
+  const previous = useRef<string | null>(null);
 
   // A new view replaces the page without a load, which a screen reader wouldn't otherwise
   // notice, so focus moves to the start of it. The view the app opens on keeps the browser's
-  // focus, and so does switching tabs, which happens on the tab itself.
+  // focus, and so does switching tabs, which happens on the tab itself. The path only becomes
+  // the real one once mounted (the static page renders as "/"), so that is where following starts.
   useEffect(() => {
+    if (!mounted) return;
     const from = previous.current;
     previous.current = path;
-    if (from === path || (tabAt(from) && tabAt(path))) return;
+    if (from === null || from === path || (tabAt(from) && tabAt(path))) return;
     main.current?.focus({ preventScroll: true });
-  }, [path]);
+  }, [mounted, path]);
 
   useEffect(() => {
+    watchInstall();
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
@@ -82,6 +86,9 @@ export default function App() {
       >
         Skip to content
       </a>
+      {/* Offers can arrive on any page, and there is nothing to connect for before hydration. They
+          come first after the skip link, so a keyboard reaches one without crossing the page. */}
+      {mounted && <IncomingOffers />}
       <header className="flex h-12 items-center gap-1">
         {!tab && (
           <IconButton label="Back to home" className="-ml-2" onClick={() => navigate("/")}>
@@ -103,11 +110,9 @@ export default function App() {
           {mounted && <SettingsMenu />}
         </div>
       </header>
-      <main id="main" ref={main} tabIndex={-1} className="flex-1 pt-4 outline-none">
+      <main id="main" ref={main} tabIndex={-1} className="flex-1 pt-4 outline-none!">
         {view}
       </main>
-      {/* Offers can arrive on any page, and there is nothing to connect for before hydration. */}
-      {mounted && <IncomingOffers />}
       <Toaster />
     </div>
   );
