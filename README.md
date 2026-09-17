@@ -3,14 +3,23 @@
 Self-hosted file transfer for your home network. Drop files or folders, share a code, link or QR
 code. Receivers take single files or the lot as one zip.
 
+Sharing is split into rooms, each on its own page. On a phone the home page links to them; on a
+wide screen it shows them side by side.
+
+- **Private share** — files for whoever has the code, link or QR code
+- **Public share** — files listed for everyone who opens Flux, and a searchable listing of them
+- **Text** — a note, link or password, listed publicly or reachable by link only, read only or
+  edited together; edits save as you type and reach everyone who has it open
+- **Collect files** — hand out a code people add files to
+
+And throughout:
+
 - Very large files and thousands of them, resumable (pause, retry, cancel)
 - BLAKE3 integrity check end to end
 - Upload to the server, or send straight from your device
 - Send to another device on your network without a code
-- Collect files from others: hand out a code people add files to
-- Optional public listing on the home page
 - Expires after 1 hour, 1 day or 7 days
-- Installable, mobile-first web app
+- Installable, mobile-first, keyboard and screen reader friendly web app
 
 ## Run
 
@@ -88,11 +97,11 @@ Before a PR, `npm run lint` and `npm run format` in `web/`, `cargo clippy --all-
 `cargo fmt` in `server/`.
 
 `server/` — Rust API (axum, sqlx, PostgreSQL), also serves the web app. A module per concern:
-`upload`, `download`, `zip`, `thumbs`, `signal`, `nearby`, `stun`, `cleanup`.
+`upload`, `download`, `zip`, `thumbs`, `signal`, `nearby`, `notes` (live text), `stun`, `cleanup`.
 
 `web/` — Next.js, static export. `lib/` is the transfer engine and never imports a component:
 `transfer/` uploads, downloads and direct sends, `nearby/` device discovery, `save/` writing to
 disk, `storage/` what the browser remembers, `preview/`, `platform/` browser integrations,
-`alerts/` toasts and notifications, `util/`. `components/` renders it: `home/` the start page, `transfer/` a file per
-panel, `preview/` a file per viewer family, `files/` the file browser and pickers, `ui/` the
+`alerts/` toasts and notifications, `util/`. `components/` renders it: `home/` the start page, `rooms/` a folder per room and what they
+share, `lists/` the transfer listings, `transfer/` a file per panel, `preview/` a file per viewer family, `files/` the file browser and pickers, `ui/` the
 shared primitives.

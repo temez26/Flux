@@ -6,6 +6,7 @@ import {
   type AnchorHTMLAttributes,
   type ButtonHTMLAttributes,
   type HTMLAttributes,
+  type KeyboardEvent,
   type ReactNode,
 } from "react";
 import { navigate } from "@/lib/platform/router";
@@ -212,13 +213,27 @@ export function Segmented<T extends string | number>({
   options: { value: T; label: string; icon?: ReactNode }[];
   onChange: (value: T) => void;
 }) {
+  // Arrow keys move the choice within the group, and Tab moves past it, as for native radio buttons.
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    const at = options.findIndex((o) => o.value === value);
+    let next = step === undefined ? -1 : (at + step + options.length) % options.length;
+    if (e.key === "Home") next = 0;
+    if (e.key === "End") next = options.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    onChange(options[next].value);
+    e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]')[next]?.focus();
+  }
+
   return (
     <div
       role="radiogroup"
       aria-label={label}
+      onKeyDown={onKeyDown}
       className="grid auto-cols-fr grid-flow-col gap-1 rounded-xl border border-line bg-bg p-1"
     >
-      {options.map((option) => {
+      {options.map((option, i) => {
         const active = option.value === value;
         return (
           <button
@@ -226,6 +241,7 @@ export function Segmented<T extends string | number>({
             type="button"
             role="radio"
             aria-checked={active}
+            tabIndex={active || (i === 0 && !options.some((o) => o.value === value)) ? 0 : -1}
             onClick={() => onChange(option.value)}
             className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition ${
               active ? "bg-surface text-fg shadow-sm ring-1 ring-line" : "text-muted hover:text-fg"
