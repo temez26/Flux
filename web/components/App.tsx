@@ -21,17 +21,19 @@ export default function App() {
   const code = path === "/" ? null : normalizeCode(path);
   const tab = tabAt(path);
   const main = useRef<HTMLElement>(null);
-  const previous = useRef(path);
+  const previous = useRef<string | null>(null);
 
   // A new view replaces the page without a load, which a screen reader wouldn't otherwise
   // notice, so focus moves to the start of it. The view the app opens on keeps the browser's
-  // focus, and so does switching tabs, which happens on the tab itself.
+  // focus, and so does switching tabs, which happens on the tab itself. The path only becomes
+  // the real one once mounted (the static page renders as "/"), so that is where following starts.
   useEffect(() => {
+    if (!mounted) return;
     const from = previous.current;
     previous.current = path;
-    if (from === path || (tabAt(from) && tabAt(path))) return;
+    if (from === null || from === path || (tabAt(from) && tabAt(path))) return;
     main.current?.focus({ preventScroll: true });
-  }, [path]);
+  }, [mounted, path]);
 
   useEffect(() => {
     watchInstall();
@@ -108,7 +110,7 @@ export default function App() {
           {mounted && <SettingsMenu />}
         </div>
       </header>
-      <main id="main" ref={main} tabIndex={-1} className="flex-1 pt-4 outline-none">
+      <main id="main" ref={main} tabIndex={-1} className="flex-1 pt-4 outline-none!">
         {view}
       </main>
       <Toaster />
