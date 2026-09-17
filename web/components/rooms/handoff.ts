@@ -1,17 +1,16 @@
 import { useEffect, useRef } from "react";
 import type { Picked } from "@/lib/platform/files";
 
-/** What the home page hands to a room: files for the file rooms, text for the text room. */
+/** What the home page hands to a tab: files for the file tabs, text for the text tab. */
 export interface Handoffs {
-  private?: Picked[];
+  device?: Picked[];
   public?: Picked[];
   text?: string;
 }
 
 export type Target = keyof Handoffs;
 
-// Files can't travel in an address, so they wait here for the room to open — on its own page
-// or beside the home page — and are taken once.
+// Files can't travel in an address, so they wait here for their tab to open, and are taken once.
 const waiting: Handoffs = {};
 const listeners = new Set<() => void>();
 

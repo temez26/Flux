@@ -6,8 +6,8 @@ import { Nearby, type Offer, type Peer, type SocketLike } from "@/lib/nearby/nea
 import { notify } from "@/lib/alerts/notify";
 import { navigate } from "@/lib/platform/router";
 import { toast } from "@/lib/alerts/toast";
-import { CloseIcon, DeviceIcon, DownloadIcon } from "./ui/icons";
-import { Button, IconButton } from "./ui/ui";
+import { CheckIcon, CloseIcon, DeviceIcon, DownloadIcon } from "./ui/icons";
+import { Button, IconButton, Spinner } from "./ui/ui";
 
 let instance: Nearby | undefined;
 
@@ -83,7 +83,7 @@ export function IncomingOffers() {
   );
 }
 
-/** Devices to send to directly, and the name this one goes by. */
+/** Devices to send to directly, and the name this one goes by to them. */
 export function NearbyDevices({ target, onChoose }: { target: Peer | null; onChoose: (peer: Peer) => void }) {
   const nearby = useNearby();
   const [draft, setDraft] = useState<string | null>(null);
@@ -95,36 +95,9 @@ export function NearbyDevices({ target, onChoose }: { target: Peer | null; onCho
   }
 
   return (
-    <div className="mt-5">
-      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <p className="text-xs font-medium tracking-wide text-muted uppercase">Send to a nearby device</p>
-        {draft === null ? (
-          <button
-            type="button"
-            onClick={() => setDraft(nearby.device.name)}
-            className="text-xs text-muted transition hover:text-fg"
-          >
-            You appear as <span className="font-medium text-fg">{nearby.device.name}</span> · Rename
-          </button>
-        ) : (
-          <form onSubmit={rename} className="flex items-center gap-1">
-            <input
-              autoFocus
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={rename}
-              maxLength={40}
-              aria-label="This device's name"
-              enterKeyHint="done"
-              className="min-h-9 w-44 rounded-lg border border-line bg-bg px-2 text-sm outline-none focus:border-accent"
-            />
-          </form>
-        )}
-      </div>
-      {!nearby.connected ? (
-        <p className="text-sm text-muted">Looking for devices…</p>
-      ) : nearby.peers.length ? (
-        <div role="radiogroup" aria-label="Nearby devices" className="flex flex-wrap gap-2">
+    <div>
+      {nearby.connected && nearby.peers.length ? (
+        <div role="radiogroup" aria-label="Nearby devices" className="grid gap-2 sm:grid-cols-2">
           {nearby.peers.map((peer) => {
             const chosen = target?.device === peer.device;
             return (
@@ -134,21 +107,56 @@ export function NearbyDevices({ target, onChoose }: { target: Peer | null; onCho
                 role="radio"
                 aria-checked={chosen}
                 onClick={() => onChoose(peer)}
-                className={`flex min-h-11 items-center gap-2 rounded-xl border px-3 text-sm font-medium transition ${
+                className={`flex min-h-14 items-center gap-3 rounded-xl border-2 px-3 text-left font-medium transition ${
                   chosen ? "border-accent bg-accent/10 text-accent" : "border-line bg-bg hover:border-accent/60"
                 }`}
               >
-                <DeviceIcon className="size-4" />
-                {peer.name}
+                <DeviceIcon className="size-5 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{peer.name}</span>
+                {chosen && <CheckIcon className="size-5 shrink-0" />}
               </button>
             );
           })}
         </div>
       ) : (
-        <p className="rounded-xl border border-dashed border-line p-3 text-center text-sm text-muted">
-          No other devices right now. Open Flux on another device on this network.
-        </p>
+        <div role="status" className="flex items-start gap-3 rounded-xl border border-dashed border-line p-4 text-sm">
+          <Spinner className="mt-0.5 size-4 shrink-0 text-muted" />
+          <div>
+            <p className="font-medium">Looking for devices…</p>
+            <p className="mt-0.5 text-muted">Open Flux on the other device. It needs to be on the same network.</p>
+          </div>
+        </div>
       )}
+      <div className="mt-2 flex min-h-9 flex-wrap items-center gap-x-1 text-sm text-muted">
+        {draft === null ? (
+          <>
+            Others see this device as <span className="font-medium text-fg">{nearby.device.name}</span>
+            <span aria-hidden="true">·</span>
+            <button
+              type="button"
+              onClick={() => setDraft(nearby.device.name)}
+              className="min-h-9 font-medium text-accent hover:underline"
+              aria-label={`Rename this device, now ${nearby.device.name}`}
+            >
+              Rename
+            </button>
+          </>
+        ) : (
+          <form onSubmit={rename} className="flex items-center gap-2">
+            <label htmlFor="device-name">This device&apos;s name</label>
+            <input
+              id="device-name"
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={rename}
+              maxLength={40}
+              enterKeyHint="done"
+              className="min-h-9 w-44 rounded-lg border border-line bg-bg px-2 text-base text-fg outline-none focus:border-accent"
+            />
+          </form>
+        )}
+      </div>
     </div>
   );
 }

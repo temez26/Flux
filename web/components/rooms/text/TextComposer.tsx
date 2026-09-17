@@ -2,18 +2,15 @@
 
 import { useId, useState, type FormEvent } from "react";
 import { errorMessage } from "@/lib/api";
-import type { Peer } from "@/lib/nearby/nearby";
 import { navigate } from "@/lib/platform/router";
 import { sendNote } from "@/lib/transfer/session";
 import { formatCode } from "@/lib/util/format";
-import { NearbyDevices } from "../../nearby";
-import { AlertIcon, DeviceIcon, GlobeIcon, LinkIcon, LockIcon, TextIcon, UsersIcon } from "../../ui/icons";
+import { AlertIcon, GlobeIcon, LinkIcon, LockIcon, TextIcon, UsersIcon } from "../../ui/icons";
 import { Button, Field, Notice, Segmented, Spinner } from "../../ui/ui";
 import { ExpiryNote } from "../../settings/ExpiryNote";
 import { useExpiry } from "../../settings/expiry";
 import { useHandoff } from "../handoff";
 import { usePaste } from "../incoming";
-import { offerTo } from "../offer";
 
 const VISIBILITY = [
   { label: "Link only", value: "link", icon: <LinkIcon className="size-4" /> },
@@ -26,23 +23,22 @@ const EDITORS = [
 
 /**
  * Writes text to share. It always lives on the server, where it can be listed, opened by link or
- * QR code, and edited by its owner or by everyone with the link. `global` makes it take text
- * pasted anywhere on the page, which only one composer on a page may do.
+ * QR code, and edited by its owner or by everyone with the link. Text pasted anywhere on the page
+ * lands in it.
  */
-export function TextComposer({ global }: { global: boolean }) {
+export function TextComposer() {
   const [text, setText] = useState("");
   // Neither is remembered: publishing and handing out editing should always be conscious choices.
   const [isPublic, setIsPublic] = useState(false);
   const [editable, setEditable] = useState(false);
   const [expiresIn] = useExpiry();
-  const [target, setTarget] = useState<Peer | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const id = useId();
 
   const append = (more: string) => setText((current) => current + more);
   useHandoff("text", append);
-  usePaste({ text: global ? append : undefined });
+  usePaste({ text: append });
 
   async function submit(e?: FormEvent) {
     e?.preventDefault();
@@ -51,8 +47,6 @@ export function TextComposer({ global }: { global: boolean }) {
     setBusy(true);
     try {
       const code = await sendNote(text, editable, expiresIn, isPublic);
-      const title = text.trim().split(/\r?\n/)[0].slice(0, 80);
-      offerTo(target, code, { title, files: 0, size: new TextEncoder().encode(text).length });
       navigate(`/${formatCode(code)}`);
     } catch (err) {
       setError(errorMessage(err));
@@ -111,22 +105,14 @@ export function TextComposer({ global }: { global: boolean }) {
       </div>
       <ExpiryNote className="mt-2" />
 
-      <NearbyDevices target={target} onChoose={(peer) => setTarget(target?.device === peer.device ? null : peer)} />
-
       {error && (
         <Notice tone="err" role="alert" icon={<AlertIcon />} className="mt-4">
           {error}
         </Notice>
       )}
       <Button type="submit" variant="primary" className="mt-5 w-full @md:w-auto" disabled={!text.trim() || busy}>
-        {busy ? (
-          <Spinner className="size-4" />
-        ) : target ? (
-          <DeviceIcon className="size-4" />
-        ) : (
-          <TextIcon className="size-4" />
-        )}
-        {target ? `Share text with ${target.name}` : "Share text"}
+        {busy ? <Spinner className="size-4" /> : <TextIcon className="size-4" />}
+        Share text
       </Button>
     </form>
   );

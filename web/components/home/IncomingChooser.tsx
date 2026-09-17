@@ -2,18 +2,18 @@
 
 import { useEffect, useRef } from "react";
 import type { Picked } from "@/lib/platform/files";
-import { GlobeIcon, LockIcon } from "../ui/icons";
+import { DeviceIcon, GlobeIcon } from "../ui/icons";
 import { Button, Card } from "../ui/ui";
 import { describeFiles } from "../rooms/files/SharedFiles";
 
-/** Files that reached the home page, which has no one room to send them from, asking where to go. */
+/** Files that arrived with nowhere chosen to send them, asking where to go. */
 export function IncomingChooser({
   files,
   onChoose,
   onCancel,
 }: {
   files: Picked[];
-  onChoose: (isPublic: boolean) => void;
+  onChoose: (target: "public" | "device") => void;
   onCancel: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -27,13 +27,13 @@ export function IncomingChooser({
       </h2>
       <p className="mt-1 truncate text-sm text-muted">{describeFiles(files)}</p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button variant="primary" onClick={() => onChoose(false)}>
-          <LockIcon className="size-4" />
-          Privately
+        <Button variant="primary" onClick={() => onChoose("device")}>
+          <DeviceIcon className="size-4" />
+          Send to a device
         </Button>
-        <Button onClick={() => onChoose(true)}>
+        <Button onClick={() => onChoose("public")}>
           <GlobeIcon className="size-4" />
-          Publicly
+          Share publicly
         </Button>
         <Button variant="ghost" onClick={onCancel}>
           Cancel

@@ -3,23 +3,18 @@
 Self-hosted file transfer for your home network. Drop files or folders, share a code, link or QR
 code. Receivers take single files or the lot as one zip.
 
-Sharing is split into rooms, each on its own page. On a phone the home page links to them; on a
-wide screen it shows them side by side.
+The home page has a tab for each way to share, with everything shared publicly listed below:
 
-- **Private share** — files for whoever has the code, link or QR code
-- **Public share** — files listed for everyone who opens Flux
+- **Public** — upload files anyone who opens Flux can see and download
+- **Device** — pick a nearby device and send files straight to it; nothing is uploaded
 - **Text** — a note, link or password, listed publicly or reachable by link only, read only or
   edited together; edits save as you type and reach everyone who has it open
-- **Collect files** — hand out a code people add files to
-
-Public files and texts are browsed and searched together from the home page, each in its own group.
+- **Collect** — hand out a link people add files to
 
 And throughout:
 
 - Very large files and thousands of them, resumable (pause, retry, cancel)
 - BLAKE3 integrity check end to end
-- Upload to the server, or send straight from your device
-- Send to another device on your network without a code
 - Expires after 5 minutes to 7 days, set once in Settings; uploads count from when they finish
 - Installable, mobile-first, keyboard and screen reader friendly web app
 
@@ -104,6 +99,6 @@ Before a PR, `npm run lint` and `npm run format` in `web/`, `cargo clippy --all-
 `web/` — Next.js, static export. `lib/` is the transfer engine and never imports a component:
 `transfer/` uploads, downloads and direct sends, `nearby/` device discovery, `save/` writing to
 disk, `storage/` what the browser remembers, `preview/`, `platform/` browser integrations,
-`alerts/` toasts and notifications, `util/`. `components/` renders it: `home/` the start page, `rooms/` a folder per room and what they
-share, `lists/` the transfer listings, `transfer/` a file per panel, `preview/` a file per viewer family, `files/` the file browser and pickers, `ui/` the
+`alerts/` toasts and notifications, `util/`. `components/` renders it: `home/` the start page and its tabs, `rooms/` what each tab
+shares, `lists/` the transfer listings, `transfer/` a file per panel, `preview/` a file per viewer family, `files/` the file browser and pickers, `ui/` the
 shared primitives.

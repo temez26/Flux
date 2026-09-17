@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { errorMessage } from "@/lib/api";
 import { nextPaint } from "@/lib/hooks";
 import { offerTitle, type Peer } from "@/lib/nearby/nearby";
@@ -10,46 +10,42 @@ import { send } from "@/lib/transfer/session";
 import { formatCode, plural } from "@/lib/util/format";
 import { useFilePickers } from "../../files/picker";
 import { NearbyDevices } from "../../nearby";
-import { AlertIcon, DeviceIcon } from "../../ui/icons";
-import { Notice } from "../../ui/ui";
+import { ExpiryNote } from "../../settings/ExpiryNote";
 import { useExpiry } from "../../settings/expiry";
+import { AlertIcon, DeviceIcon, GlobeIcon } from "../../ui/icons";
+import { Notice } from "../../ui/ui";
 import { useHandoff } from "../handoff";
 import { usePaste, useWindowDrop } from "../incoming";
 import { offerTo } from "../offer";
 import { DropOverlay, DropZone } from "./DropZone";
-import { SendOptions } from "./SendOptions";
 import { SharedFiles } from "./SharedFiles";
 
-// A share from this device ends with the page, so its code only needs to outlast any
+// Files sent to a device end with the page, so the code behind them only needs to outlast any
 // plausible sitting; the row holds a file list and nothing else.
 const HOSTED_EXPIRY = 604_800;
 
 /**
- * Sends files privately or publicly. `global` makes it take files dropped or pasted anywhere on
- * the page, which only the one sender on a page may do.
+ * Sends files one of two ways: `public` uploads them for anyone who opens Flux, `device` sends
+ * them straight from this device to a nearby one, without uploading anything.
  */
-export function FileSender({ isPublic, global }: { isPublic: boolean; global: boolean }) {
+export function FileSender({ mode }: { mode: "public" | "device" }) {
+  const toDevice = mode === "device";
   const [expiresIn] = useExpiry();
-  // Deliberately not remembered: sharing from this device only lasts as long as the page stays open.
-  const [hosted, setHosted] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  /** A nearby device the next files are offered to, instead of only handing out a code. */
   const [target, setTarget] = useState<Peer | null>(null);
-  /** Files handed over from elsewhere, waiting to be told to go. */
-  const [shared, setShared] = useState<Picked[] | null>(null);
+  /** Files dropped, pasted or handed over, waiting for the go-ahead. */
+  const [staged, setStaged] = useState<Picked[] | null>(null);
 
-  async function start(picked: Picked[] | Promise<Picked[]>, to = target) {
+  async function start(files: Picked[]) {
+    if (!files.length || (toDevice && !target)) return;
     setError(null);
-    setBusy("Reading files…");
+    setBusy(`Preparing ${plural(files.length, "file")}…`);
     try {
-      const files = await picked;
-      if (!files.length) return setBusy(null);
-      setBusy(`Preparing ${plural(files.length, "file")}…`);
       // Reading every file's metadata blocks the main thread, so let the spinner land first.
       await nextPaint();
-      const code = await send(files, hosted ? HOSTED_EXPIRY : expiresIn, isPublic, hosted);
-      offerTo(to, code, {
+      const code = await send(files, toDevice ? HOSTED_EXPIRY : expiresIn, !toDevice, toDevice);
+      offerTo(target, code, {
         title: offerTitle(files.map((f) => f.path)),
         files: files.length,
         size: files.reduce((sum, f) => sum + f.file.size, 0),
@@ -61,64 +57,87 @@ export function FileSender({ isPublic, global }: { isPublic: boolean; global: bo
     }
   }
 
+  /** What arrives without the picker is shown first, so nothing is shared by a stray drop or paste. */
+  async function stage(picked: Picked[] | Promise<Picked[]>) {
+    setError(null);
+    setBusy("Reading files…");
+    try {
+      const files = await picked;
+      if (files.length) setStaged(files);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const picker = useFilePickers((picked) => void start(picked));
   const status = busy ?? (picker.waiting ? "Getting your files…" : null);
-  const dragging = useWindowDrop(global ? (picked) => void start(picked) : undefined);
-  usePaste({ files: global ? (picked) => void start(picked) : undefined });
-  useHandoff(isPublic ? "public" : "private", setShared);
+  const dragging = useWindowDrop((picked) => void stage(picked));
+  usePaste({ files: (picked) => void stage(picked) });
+  useHandoff(mode, (files) => void stage(files));
 
-  // Choosing a device goes straight on to choosing files; choosing it again lets it go.
-  function chooseDevice(peer: Peer) {
-    if (target?.device === peer.device) return setTarget(null);
-    setTarget(peer);
-    if (shared) sendShared(peer);
-    else picker.open("files");
-  }
-
-  function sendShared(to = target) {
-    if (!shared) return;
-    setShared(null);
-    void start(shared, to);
-  }
+  const blocked = toDevice && !target;
+  const files =
+    staged && !status ? (
+      <SharedFiles
+        files={staged}
+        action={toDevice ? (target ? `Send to ${target.name}` : "Send") : "Share publicly"}
+        disabled={blocked}
+        hint={blocked ? "Choose a device above first." : undefined}
+        onSend={() => {
+          setStaged(null);
+          void start(staged);
+        }}
+        onCancel={() => setStaged(null)}
+      />
+    ) : (
+      <DropZone
+        status={status}
+        stalled={picker.stalled}
+        disabled={blocked}
+        title={
+          blocked
+            ? "Choose a device first"
+            : target
+              ? `Choose files to send to ${target.name}`
+              : "Choose files to share publicly"
+        }
+        hint="Photos, videos or any files, of any size"
+        onPick={picker.open}
+        onDrop={(picked) => void stage(picked)}
+      />
+    );
 
   return (
     <>
-      {global && dragging && <DropOverlay label={isPublic ? "Drop to share publicly" : "Drop to share privately"} />}
-      {shared && !status ? (
-        <SharedFiles
-          files={shared}
-          target={target}
-          nearby={!isPublic}
-          onSend={() => sendShared()}
-          onCancel={() => setShared(null)}
-        />
+      {dragging && <DropOverlay label={toDevice ? "Drop to send to a device" : "Drop to share publicly"} />}
+      {toDevice ? (
+        <div className="space-y-5">
+          <Step number={1} title="Choose a device">
+            <NearbyDevices
+              target={target}
+              onChoose={(peer) => setTarget(target?.device === peer.device ? null : peer)}
+            />
+          </Step>
+          <Step number={2} title="Choose files">
+            {files}
+            <p className="mt-2 flex items-start gap-1.5 text-sm text-muted">
+              <DeviceIcon className="mt-0.5 size-4 shrink-0" />
+              Sent straight from this device. Keep this page open until they have arrived.
+            </p>
+          </Step>
+        </div>
       ) : (
-        <DropZone
-          status={status}
-          stalled={picker.stalled}
-          busy={!!busy}
-          target={target}
-          isPublic={isPublic}
-          highlight={!global && dragging}
-          onPick={picker.open}
-          onDrop={(picked) => void start(picked)}
-        />
+        <>
+          {files}
+          <p className="mt-2 flex items-center gap-1.5 text-sm text-muted">
+            <GlobeIcon className="size-4 shrink-0" />
+            Listed in Public shares below.
+          </p>
+          <ExpiryNote />
+        </>
       )}
-
-      {target && (
-        <p className="mt-3 flex items-center gap-2 text-sm">
-          <DeviceIcon className="size-4 text-accent" />
-          <span className="min-w-0 flex-1 truncate">
-            Sending to <span className="font-medium">{target.name}</span>
-          </span>
-          <button type="button" onClick={() => setTarget(null)} className="text-muted transition hover:text-fg">
-            Cancel
-          </button>
-        </p>
-      )}
-      {!isPublic && <NearbyDevices target={target} onChoose={chooseDevice} />}
-
-      <SendOptions hosted={hosted} onHosted={setHosted} />
 
       {error && (
         <Notice tone="err" role="alert" icon={<AlertIcon />} className="mt-4">
@@ -127,5 +146,22 @@ export function FileSender({ isPublic, global }: { isPublic: boolean; global: bo
       )}
       {picker.inputs}
     </>
+  );
+}
+
+function Step({ number, title, children }: { number: number; title: string; children: ReactNode }) {
+  return (
+    <section aria-label={`Step ${number}: ${title}`}>
+      <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+        <span
+          aria-hidden="true"
+          className="flex size-6 items-center justify-center rounded-full bg-accent/10 text-xs text-accent"
+        >
+          {number}
+        </span>
+        {title}
+      </h2>
+      {children}
+    </section>
   );
 }

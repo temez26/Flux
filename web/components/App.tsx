@@ -2,12 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { normalizeCode } from "@/lib/util/format";
-import { useMediaQuery, useMounted, useOnline } from "@/lib/hooks";
+import { useMounted, useOnline } from "@/lib/hooks";
 import { navigate, usePath } from "@/lib/platform/router";
 import Home from "./home/Home";
-import { BrowsePage } from "./lists/BrowsePage";
-import { RoomPage } from "./rooms/RoomViews";
-import { roomAt, WIDE_QUERY } from "./rooms/rooms";
+import { tabAt } from "./rooms/tabs";
 import { AlertIcon, BackIcon, LogoIcon } from "./ui/icons";
 import { IncomingOffers } from "./nearby";
 import { SettingsMenu } from "./settings/SettingsMenu";
@@ -20,16 +18,17 @@ export default function App() {
   const online = useOnline();
   const path = usePath();
   const code = path === "/" ? null : normalizeCode(path);
-  const room = roomAt(path);
-  const wide = useMediaQuery(WIDE_QUERY);
+  const tab = tabAt(path);
   const main = useRef<HTMLElement>(null);
-  const firstPath = useRef(path);
+  const previous = useRef(path);
 
   // A new view replaces the page without a load, which a screen reader wouldn't otherwise
-  // notice, so focus moves to the start of it. The view the app opens on keeps the browser's focus.
+  // notice, so focus moves to the start of it. The view the app opens on keeps the browser's
+  // focus, and so does switching tabs, which happens on the tab itself.
   useEffect(() => {
-    if (path === firstPath.current) return;
-    firstPath.current = "";
+    const from = previous.current;
+    previous.current = path;
+    if (from === path || (tabAt(from) && tabAt(path))) return;
     main.current?.focus({ preventScroll: true });
   }, [path]);
 
@@ -66,9 +65,7 @@ export default function App() {
   let view = null;
   if (mounted) {
     if (code) view = <TransferView key={code} code={code} />;
-    else if (path === "/") view = <Home />;
-    else if (room) view = <RoomPage key={room.id} room={room} />;
-    else if (path === "/browse") view = <BrowsePage />;
+    else if (tab) view = <Home tab={tab} />;
     else
       view = (
         <Message icon={<AlertIcon />} title="Nothing here">
@@ -78,9 +75,7 @@ export default function App() {
   }
 
   return (
-    <div
-      className={`safe-area mx-auto flex min-h-dvh w-full flex-col ${path === "/" && wide ? "max-w-6xl" : "max-w-2xl"}`}
-    >
+    <div className={`safe-area mx-auto flex min-h-dvh w-full flex-col ${tab ? "max-w-3xl" : "max-w-2xl"}`}>
       <a
         href="#main"
         className="sr-only rounded-lg bg-accent-solid px-3 py-2 text-sm font-medium text-accent-fg focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50"
@@ -88,7 +83,7 @@ export default function App() {
         Skip to content
       </a>
       <header className="flex h-12 items-center gap-1">
-        {path !== "/" && (
+        {!tab && (
           <IconButton label="Back to home" className="-ml-2" onClick={() => navigate("/")}>
             <BackIcon />
           </IconButton>

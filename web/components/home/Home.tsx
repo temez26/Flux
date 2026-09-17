@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMediaQuery } from "@/lib/hooks";
+import { useTitle } from "@/lib/hooks";
 import type { Picked } from "@/lib/platform/files";
 import { navigate } from "@/lib/platform/router";
 import { OwnedList } from "../lists/OwnedList";
@@ -10,96 +10,54 @@ import { RecentList } from "../lists/RecentList";
 import { DropOverlay } from "../rooms/files/DropZone";
 import { handOff, type Handoffs, type Target } from "../rooms/handoff";
 import { usePaste, useSharedFromApps, useWindowDrop } from "../rooms/incoming";
-import { RoomPanel } from "../rooms/RoomViews";
-import { room, WIDE_QUERY, type RoomId } from "../rooms/rooms";
+import { tabById, type ShareTab } from "../rooms/tabs";
 import { Card } from "../ui/ui";
 import { IncomingChooser } from "./IncomingChooser";
-import { ReceiveForm } from "./ReceiveForm";
-import { RoomLinks } from "./RoomLinks";
+import { ShareTabs } from "./ShareTabs";
 
-/**
- * The start page. Where it fits, every room is shown on it side by side; otherwise it links to
- * each room's own page.
- */
-export default function Home() {
-  const wide = useMediaQuery(WIDE_QUERY);
-  /** Files dropped, pasted or shared here, waiting to be told which room they are for. */
+/** The start page: the ways to share on top, what is shared publicly below, then this device's own. */
+export default function Home({ tab }: { tab: ShareTab }) {
+  useTitle(tab.id === "public" ? "Flux" : `${tab.name} · Flux`);
+  /** Files from another app's Share sheet, or dropped on a tab that doesn't send files, asking where to go. */
   const [incoming, setIncoming] = useState<Picked[] | null>(null);
+  // The file tabs take what is dropped or pasted on them themselves.
+  const sendsFiles = tab.id === "public" || tab.id === "device";
 
   function goTo<T extends Target>(id: T, payload: NonNullable<Handoffs[T]>) {
     handOff(id, payload);
-    if (wide) reveal(id);
-    else navigate(room(id).path);
+    if (tab.id !== id) navigate(tabById(id).path);
   }
 
   const receive = (files: Picked[]) => {
     if (files.length) setIncoming(files);
   };
-  const dragging = useWindowDrop((picked) => void picked.then(receive));
-  usePaste({ files: receive, text: (text) => goTo("text", text) });
+  const dragging = useWindowDrop(sendsFiles ? undefined : (picked) => void picked.then(receive));
+  usePaste({
+    files: sendsFiles ? undefined : receive,
+    text: tab.id === "text" ? undefined : (text) => goTo("text", text),
+  });
   useSharedFromApps(receive, (text) => goTo("text", text));
-
-  const chooser = incoming && (
-    <IncomingChooser
-      files={incoming}
-      onChoose={(isPublic) => {
-        setIncoming(null);
-        goTo(isPublic ? "public" : "private", incoming);
-      }}
-      onCancel={() => setIncoming(null)}
-    />
-  );
-
-  if (wide) {
-    return (
-      <div className="space-y-4">
-        <h1 className="sr-only">Flux</h1>
-        {chooser}
-        <div className="grid grid-cols-2 items-start gap-4">
-          <RoomPanel id="private" />
-          <RoomPanel id="public" />
-        </div>
-        <div className="grid grid-cols-2 items-start gap-4">
-          <RoomPanel id="text" />
-          <div className="space-y-4">
-            <Card aria-label="Open a share">
-              <ReceiveForm />
-            </Card>
-            <RoomPanel id="collect" />
-          </div>
-        </div>
-        <Card>
-          <PublicShares heading="h2" variant="full" />
-        </Card>
-        <div className="grid grid-cols-2 items-start gap-4">
-          <OwnedList />
-          <RecentList />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">
-      {dragging && <DropOverlay label="Drop to choose how to share" />}
       <h1 className="sr-only">Flux</h1>
-      {chooser}
-      <RoomLinks />
-      <Card aria-label="Open a share">
-        <ReceiveForm />
-      </Card>
+      {dragging && !sendsFiles && <DropOverlay label="Drop to choose how to share" />}
+      {incoming && (
+        <IncomingChooser
+          files={incoming}
+          onChoose={(target) => {
+            setIncoming(null);
+            goTo(target, incoming);
+          }}
+          onCancel={() => setIncoming(null)}
+        />
+      )}
+      <ShareTabs tab={tab} />
       <Card>
-        <PublicShares heading="h2" variant="preview" />
+        <PublicShares />
       </Card>
       <OwnedList />
       <RecentList />
     </div>
   );
-}
-
-/** Brings a room shown beside the others into view, with focus, once it has what was handed to it. */
-function reveal(id: RoomId) {
-  const panel = document.getElementById(`room-${id}`);
-  panel?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-  panel?.focus({ preventScroll: true });
 }
