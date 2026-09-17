@@ -125,7 +125,8 @@ export function NotePanel({ meta, token }: { meta: TransferMeta; token?: string 
         </div>
 
         {editor.editing ? (
-          <div className="mt-4 rounded-xl border-2 border-accent/60 bg-bg p-3 sm:p-4">
+          // The box shows focus rather than the field inside it, whose ring would sit right against the text.
+          <div className="mt-4 rounded-xl border-2 border-accent/60 bg-bg p-3 transition-colors focus-within:border-accent sm:p-4">
             <textarea
               ref={textarea}
               autoFocus
@@ -137,7 +138,7 @@ export function NotePanel({ meta, token }: { meta: TransferMeta; token?: string 
               aria-label="Text"
               aria-describedby="note-save-status"
               spellCheck={false}
-              className="block min-h-48 w-full resize-none bg-transparent text-[15px] leading-7 outline-none"
+              className="block min-h-48 w-full resize-none bg-transparent text-[15px] leading-7 outline-none!"
             />
           </div>
         ) : (
