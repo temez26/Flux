@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { normalizeCode } from "@/lib/util/format";
 import { useMounted, useOnline } from "@/lib/hooks";
 import { navigate, usePath } from "@/lib/platform/router";
-import Home from "./Home";
+import Home from "./home/Home";
 import { AlertIcon, BackIcon, LogoIcon } from "./ui/icons";
 import { IncomingOffers } from "./nearby";
 import { NotificationToggle } from "./notifications";

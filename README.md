@@ -93,6 +93,6 @@ Before a PR, `npm run lint` and `npm run format` in `web/`, `cargo clippy --all-
 `web/` — Next.js, static export. `lib/` is the transfer engine and never imports a component:
 `transfer/` uploads, downloads and direct sends, `nearby/` device discovery, `save/` writing to
 disk, `storage/` what the browser remembers, `preview/`, `platform/` browser integrations,
-`alerts/` toasts and notifications, `util/`. `components/` renders it: `transfer/` a file per
+`alerts/` toasts and notifications, `util/`. `components/` renders it: `home/` the start page, `transfer/` a file per
 panel, `preview/` a file per viewer family, `files/` the file browser and pickers, `ui/` the
 shared primitives.
