@@ -232,6 +232,35 @@ body {
     }
   }
 
+  /* A list's header, pinned while its rows scroll beneath. */
+  .list-header {
+    top: 0;
+    margin-inline: -0.25rem;
+    padding: 0.5rem 0.25rem 0.75rem;
+    background: var(--bg);
+  }
+
+  /* A flat band of translucent fill would show rows through it and square off the rounded
+     glass around it, so here it floats as its own frosted bar. */
+  :root[data-theme="glass"] .list-header {
+    top: 0.5rem;
+    margin: 0 0 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-2xl);
+    background: var(--surface);
+    box-shadow: var(--surface-edge), var(--surface-shadow);
+    -webkit-backdrop-filter: blur(24px) saturate(170%);
+    backdrop-filter: blur(24px) saturate(170%);
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    :root[data-theme="glass"] .list-header {
+      background: linear-gradient(var(--surface), var(--surface)), var(--page);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
   /* The chosen option of a tab list or segmented control, sliding between its equal columns.
      Its parent sets --count and --index and is padded and spaced by 0.25rem. */
   .thumb {

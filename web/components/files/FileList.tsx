@@ -275,7 +275,7 @@ export function FileBrowser({
   return (
     <section>
       {/* Stays reachable while scrolling a long list, which is exactly when it is needed. */}
-      <div className="sticky top-0 z-10 -mx-1 bg-bg px-1 pt-2 pb-3">
+      <div className="list-header sticky z-10">
         <div className="flex items-center gap-2">
           <h2 className="flex items-center gap-2 text-sm font-medium">
             Files
