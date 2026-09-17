@@ -110,8 +110,6 @@ export class Uploader extends Observable {
   private readonly meter = new SpeedMeter();
   private cursor = 0;
   private active = 0;
-  private heldUntil = 0;
-  private holdTimer = 0;
 
   constructor(
     readonly code: string,
@@ -123,26 +121,6 @@ export class Uploader extends Observable {
     this.items = this.tasks.map((t) => t.item);
     this.refresh();
     window.addEventListener("online", this.onOnline);
-  }
-
-  /** Yielding bandwidth to a direct transfer. */
-  get held() {
-    return performance.now() < this.heldUntil;
-  }
-
-  /** Pauses the server upload while a direct transfer runs; it continues once that is idle for `ms`. */
-  hold(ms: number) {
-    const wasHeld = this.held;
-    this.heldUntil = performance.now() + ms;
-    window.clearTimeout(this.holdTimer);
-    this.holdTimer = window.setTimeout(() => {
-      this.heldUntil = 0;
-      this.pump();
-    }, ms);
-    if (!wasHeld) {
-      for (const t of this.tasks) if (t.item.status === "active") this.interrupt(t);
-      this.changed();
-    }
   }
 
   start() {
@@ -225,7 +203,6 @@ export class Uploader extends Observable {
       this.discardHasher(t);
     }
     window.removeEventListener("online", this.onOnline);
-    window.clearTimeout(this.holdTimer);
     this.stopTicking();
   }
 
@@ -276,7 +253,7 @@ export class Uploader extends Observable {
   }
 
   private pump() {
-    while (!this.paused && !this.held && !this.gone && this.active < CONCURRENCY) {
+    while (!this.paused && !this.gone && this.active < CONCURRENCY) {
       const task = this.nextPending();
       if (!task) break;
       this.active++;
@@ -290,7 +267,7 @@ export class Uploader extends Observable {
   }
 
   private stopped(t: Task) {
-    return this.paused || this.held || this.gone || t.item.status !== "active";
+    return this.paused || this.gone || t.item.status !== "active";
   }
 
   private async run(t: Task) {

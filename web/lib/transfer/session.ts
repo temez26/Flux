@@ -5,22 +5,21 @@ import { basename, uniquePaths, type Picked } from "../platform/files";
 import { getOwned, saveOwned } from "../storage/owned";
 import { Uploader, type Entry } from "./upload";
 
-// How long the server upload keeps yielding after a direct receiver's last request.
-const DIRECT_IDLE_MS = 5000;
-
-export interface Session {
+interface Common {
   code: string;
   token: string;
-  /** Absent when the transfer is served from this device and nothing is being uploaded. */
-  uploader?: Uploader;
-  host: DirectHost;
   /** The files this tab is serving, in listing order. */
   entries: Entry[];
   /** What this tab holds of them, by index, to upload or to hand a direct receiver. */
   files: Map<number, File>;
-  /** A receiver got everything directly, so the server upload was paused as unnecessary. */
-  delivered: boolean;
 }
+
+/**
+ * A transfer this tab is sending. A public share goes to the server alone, and receivers take it
+ * from there; only a transfer sent to a device, which is never uploaded, is served from this one.
+ */
+export type Session =
+  (Common & { uploader: Uploader; host?: never }) | (Common & { uploader?: never; host: DirectHost });
 
 /** Transfers started in this tab. They keep running while the user moves between views. */
 export const live = new Map<string, Session>();
@@ -33,24 +32,13 @@ const describe = ({ path, file }: Picked): NewFile => ({
 });
 
 function start(code: string, token: string, entries: Entry[], hosted: boolean): Session {
-  const uploader = hosted ? undefined : new Uploader(code, token, entries);
-  const session: Session = {
-    code,
-    token,
-    uploader,
-    entries,
-    files: new Map(entries.flatMap((e) => (e.file ? [[e.idx, e.file] as const] : []))),
-    delivered: false,
-    host: new DirectHost(code, token, (idx) => session.files.get(idx), {
-      activity: () => uploader?.hold(DIRECT_IDLE_MS),
-      delivered: () => {
-        session.delivered = true;
-        if (uploader && !uploader.snapshot.finished) uploader.pause();
-      },
-    }),
-  };
+  const files = new Map(entries.flatMap((e) => (e.file ? [[e.idx, e.file] as const] : [])));
+  const common = { code, token, entries, files };
+  const session: Session = hosted
+    ? { ...common, host: new DirectHost(code, token, (idx) => files.get(idx)) }
+    : { ...common, uploader: new Uploader(code, token, entries) };
   live.set(code, session);
-  uploader?.start();
+  session.uploader?.start();
   return session;
 }
 
@@ -217,6 +205,6 @@ export function resume(meta: TransferMeta, token: string, match: Match): Session
 export function end(code: string) {
   const session = live.get(code);
   session?.uploader?.dispose();
-  session?.host.close();
+  session?.host?.close();
   live.delete(code);
 }

@@ -8,9 +8,8 @@ import { formatBytes, formatDuration, plural } from "@/lib/util/format";
 import { useLeaveGuard, useNotifyWhen, useTitle, useWakeLock } from "@/lib/hooks";
 import { canPreview } from "@/lib/preview/preview";
 import { Receiver, type ReceiveItem } from "@/lib/transfer/receive";
-import { getReceived, markReceived } from "@/lib/storage/received";
-import { memorySink, saveMethod, streamSink, type SaveMethod } from "@/lib/save/save";
-import { singleTarget, zipTarget } from "@/lib/save/zip";
+import { getReceived } from "@/lib/storage/received";
+import { saveMethod, type SaveMethod } from "@/lib/save/save";
 import { FileBrowser, FileRow } from "../files/FileList";
 import {
   AlertIcon,
@@ -27,6 +26,7 @@ import {
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
 import { ShareFilesButton } from "./ShareFiles";
 import { StickyAction } from "./StickyAction";
+import { receiveDirect, useFileDownloads } from "./directDownloads";
 import {
   Badge,
   Button,
@@ -67,19 +67,20 @@ function checksumsUrl(meta: TransferMeta): string {
 /** `children` go right below the heading card: what else can be done with the transfer. */
 export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children?: ReactNode }) {
   const { size, received, complete, ready } = summarize(meta.files);
-  const [initial] = useState({ ready: ready && !meta.hosted, size });
+  const [initialSize] = useState(size);
   /** How the whole transfer could be saved at once; null when it is too big to be. */
   const [whole, setWhole] = useState<SaveMethod | null>();
-  // A hosted transfer has no other source, and otherwise a peer is only worth trying while
-  // the server doesn't have everything yet. Worth it whatever the transfer weighs: one too
-  // big to save in a single go can still be taken a file at a time.
-  const [direct] = useState(() => (initial.ready ? undefined : new DirectClient(meta.code)));
+  // Only a transfer sent to a device comes from the sender; a public share comes from the server
+  // alone, even while it uploads. Worth it whatever the transfer weighs: one too big to save in a
+  // single go can still be taken a file at a time.
+  const [direct] = useState(() => (meta.hosted ? new DirectClient(meta.code) : undefined));
   const [receiver, setReceiver] = useState<Receiver>();
   /** Files already downloaded from this transfer on this device, from an earlier visit or a lost tab. */
   const [saved, setSaved] = useState(() => getReceived(meta.code));
   const [error, setError] = useState<string>();
   const [previewing, setPreviewing] = useState<number | null>(null);
   const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
+  const downloads = useFileDownloads(meta, direct, () => setSaved(getReceived(meta.code)));
   useSyncExternalStore(direct?.subscribe ?? subscribeNothing, direct?.getVersion ?? versionZero, versionZero);
   useTitle(pageTitle(meta.title));
   useRememberRecent(meta);
@@ -88,11 +89,11 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
 
   useEffect(() => {
     let alive = true;
-    void saveMethod(initial.size).then((m) => alive && setWhole(m));
+    void saveMethod(initialSize).then((m) => alive && setWhole(m));
     return () => {
       alive = false;
     };
-  }, [initial.size]);
+  }, [initialSize]);
 
   useEffect(() => {
     receiver?.update(meta);
@@ -102,42 +103,20 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
 
   const single = meta.files.length === 1 ? meta.files[0] : null;
   const directOpen = direct?.state === "open";
-  const viaDirect = directOpen && (meta.hosted || !ready);
+  const viaDirect = directOpen;
   // The sender's page is the only source, so its absence is the whole story.
   const senderMissing = meta.hosted && !directOpen;
   // Only a download taken from the sender's device is saved from the page; the server's copy downloads as usual.
-  const tooLargeHere = whole === null && (meta.hosted || !ready);
+  const tooLargeHere = whole === null && meta.hosted;
   const unreachable = direct?.state === "unavailable";
   const remaining = meta.files.filter((f) => !saved.has(f.idx));
 
-  /** Receives `files` from the sender's device, as one file or as a zip of several. */
+  /** Receives `files` from the sender's device, as one file or as a zip of several, in full view. */
   async function startDirect(files: FileMeta[]) {
     if (!direct || !files.length) return;
     setError(undefined);
     try {
-      const one = files.length === 1 ? files[0] : null;
-      const method = await saveMethod(files.reduce((size, f) => size + f.size, 0));
-      if (!method) throw new Error("This browser can't save a download that large.");
-      const name = one ? basename(one.path) : `flux-${meta.code}.zip`;
-      const sink = method === "stream" ? await streamSink(name, one?.size) : memorySink(name);
-      const target = one ? singleTarget(sink) : zipTarget(sink);
-      const next = new Receiver(meta, direct, target, new Set(files.map((f) => f.idx)));
-      countDownload(meta.code);
-      // Only a finished receive has actually put anything on disk: a zip lands as one file
-      // at the very end, so a run that failed part way through saved none of it.
-      const stop = next.subscribe(() => {
-        if (!next.finished) return;
-        stop();
-        if (next.error) return;
-        markReceived(
-          meta.code,
-          meta.expiresAt,
-          files.map((f) => f.idx),
-        );
-        setSaved(getReceived(meta.code));
-      });
-      next.start();
-      setReceiver(next);
+      setReceiver(await receiveDirect(meta, direct, files, () => setSaved(getReceived(meta.code))));
     } catch (err) {
       setError(errorMessage(err));
     }
@@ -278,37 +257,56 @@ export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children
         (meta.hosted ? (
           <FileBrowser
             paths={paths}
-            renderRow={(i) => (
-              <FileRow
-                path={meta.files[i].path}
-                size={meta.files[i].size}
-                badge={
-                  saved.has(meta.files[i].idx) ? (
-                    <Badge tone="ok" icon={<CheckIcon />}>
-                      Saved
-                    </Badge>
-                  ) : (
-                    <Badge icon={<DeviceIcon />}>On the sender</Badge>
-                  )
-                }
-                actions={
-                  <IconButton
-                    label={`Download ${basename(meta.files[i].path)}`}
-                    disabled={!viaDirect}
-                    className="text-accent disabled:opacity-40"
-                    onClick={() => startDirect([meta.files[i]])}
-                  >
-                    <DownloadIcon className="size-4" />
-                  </IconButton>
-                }
-              />
-            )}
+            renderRow={(i) => {
+              const file = meta.files[i];
+              const progress = downloads.progress(file.idx);
+              return (
+                <FileRow
+                  path={file.path}
+                  size={file.size}
+                  progress={progress}
+                  badge={
+                    progress !== undefined ? (
+                      <Badge tone="accent" icon={<ZapIcon />}>
+                        {Math.floor(progress * 100)}%
+                      </Badge>
+                    ) : saved.has(file.idx) ? (
+                      <Badge tone="ok" icon={<CheckIcon />}>
+                        Saved
+                      </Badge>
+                    ) : (
+                      <Badge icon={<DeviceIcon />}>On the sender</Badge>
+                    )
+                  }
+                  actions={
+                    progress !== undefined ? (
+                      <IconButton label={`Cancel ${basename(file.path)}`} onClick={() => downloads.cancel(file.idx)}>
+                        <CloseIcon className="size-4" />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        label={`Download ${basename(file.path)}`}
+                        disabled={!viaDirect}
+                        className="text-accent disabled:opacity-40"
+                        onClick={() => void downloads.download(file)}
+                      >
+                        <DownloadIcon className="size-4" />
+                      </IconButton>
+                    )
+                  }
+                />
+              );
+            }}
             select={(indices) => (
               <Button
                 variant="primary"
                 className="min-h-9 pointer-coarse:min-h-11"
                 disabled={!viaDirect}
-                onClick={() => startDirect(indices.map((i) => meta.files[i]))}
+                onClick={() =>
+                  indices.length === 1
+                    ? void downloads.download(meta.files[indices[0]])
+                    : startDirect(indices.map((i) => meta.files[i]))
+                }
               >
                 <DownloadIcon className="size-4" />
                 {indices.length === 1 ? "Download" : `Download ${indices.length.toLocaleString()} as .zip`}
