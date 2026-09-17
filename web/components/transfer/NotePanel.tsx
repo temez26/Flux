@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { errorMessage, saveNote, updateTransfer, type NoteState, type TransferMeta } from "@/lib/api";
-import { copyText } from "@/lib/clipboard";
-import { formatCode, formatRemaining } from "@/lib/format";
+import { copyText } from "@/lib/platform/clipboard";
+import { formatCode, formatRemaining } from "@/lib/util/format";
 import { reloadTransfer, useNow, useTitle } from "@/lib/hooks";
-import { linkify } from "@/lib/links";
-import { toast } from "@/lib/toast";
-import { AlertIcon, ClockIcon, CopyIcon, LockIcon, TextIcon } from "../icons";
-import { ShareCard } from "../ShareCard";
-import { Badge, Button, Card, ConfirmButton, Field, Notice, Segmented, Spinner } from "../ui";
+import { linkify } from "@/lib/util/links";
+import { toast } from "@/lib/alerts/toast";
+import { AlertIcon, ClockIcon, CopyIcon, LockIcon, TextIcon } from "../ui/icons";
+import { ShareCard } from "./ShareCard";
+import { Badge, Button, Card, ConfirmButton, Field, Notice, Segmented, Spinner } from "../ui/ui";
 import { pageTitle, removeTransfer, useRememberRecent } from "./common";
 
 const EDITORS = [

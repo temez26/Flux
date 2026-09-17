@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { toasts } from "@/lib/toast";
+import { toasts } from "@/lib/alerts/toast";
 import { AlertIcon, CheckIcon } from "./icons";
 
 export default function Toaster() {

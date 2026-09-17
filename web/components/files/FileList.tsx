@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { basename } from "@/lib/files";
-import { formatBytes, plural } from "@/lib/format";
-import { CheckIcon, FileTypeIcon, GridIcon, ListIcon, SearchIcon } from "./icons";
-import { Badge, ProgressBar, type Tone } from "./ui";
+import { basename } from "@/lib/platform/files";
+import { formatBytes, plural } from "@/lib/util/format";
+import { CheckIcon, FileTypeIcon, GridIcon, ListIcon, SearchIcon } from "../ui/icons";
+import { Badge, ProgressBar, type Tone } from "../ui/ui";
 
 const ROW_HEIGHT = 60;
 // Kept off screen above and below, in pixels rather than rows: a grid row is twice the

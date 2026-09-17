@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import type { TransferMeta } from "./api";
-import type { Picked } from "./files";
+import type { TransferMeta } from "../api";
+import type { Picked } from "../platform/files";
 import { matchPicked } from "./session";
 
 function transfer(files: { path: string; size: number; hash?: string }[]): TransferMeta {

@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useSyncExternalStore, type FormEvent } from "react";
-import { formatBytes, formatCode, plural } from "@/lib/format";
-import { Nearby, type Offer, type Peer, type SocketLike } from "@/lib/nearby";
-import { notify } from "@/lib/notify";
-import { navigate } from "@/lib/router";
-import { toast } from "@/lib/toast";
-import { CloseIcon, DeviceIcon, DownloadIcon } from "./icons";
-import { Button, IconButton } from "./ui";
+import { formatBytes, formatCode, plural } from "@/lib/util/format";
+import { Nearby, type Offer, type Peer, type SocketLike } from "@/lib/nearby/nearby";
+import { notify } from "@/lib/alerts/notify";
+import { navigate } from "@/lib/platform/router";
+import { toast } from "@/lib/alerts/toast";
+import { CloseIcon, DeviceIcon, DownloadIcon } from "./ui/icons";
+import { Button, IconButton } from "./ui/ui";
 
 let instance: Nearby | undefined;
 

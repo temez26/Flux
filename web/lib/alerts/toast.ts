@@ -1,4 +1,4 @@
-import { Emitter } from "./observable";
+import { Emitter } from "../util/observable";
 
 /** One thing the toast offers to do, e.g. take back what just happened. */
 export interface ToastAction {

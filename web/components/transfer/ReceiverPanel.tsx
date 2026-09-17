@@ -2,19 +2,19 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { countDownload, errorMessage, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
-import { DirectClient } from "@/lib/direct";
-import { basename } from "@/lib/files";
-import { formatBytes, formatCode, formatDuration, plural } from "@/lib/format";
+import { DirectClient } from "@/lib/transfer/direct";
+import { basename } from "@/lib/platform/files";
+import { formatBytes, formatCode, formatDuration, plural } from "@/lib/util/format";
 import { useLeaveGuard, useNotifyWhen, useTitle, useWakeLock } from "@/lib/hooks";
-import { canPreview } from "@/lib/preview";
-import { Receiver, type ReceiveItem } from "@/lib/receive";
-import { getReceived, markReceived } from "@/lib/received";
-import { memorySink, saveMethod, streamSink, type SaveMethod } from "@/lib/save";
-import { singleTarget, zipTarget } from "@/lib/zip";
-import { FileBrowser, FileRow } from "../FileList";
-import { AlertIcon, BackIcon, CheckIcon, ClockIcon, CloseIcon, DeviceIcon, DownloadIcon, PauseIcon, PlayIcon, ZapIcon } from "../icons";
+import { canPreview } from "@/lib/preview/preview";
+import { Receiver, type ReceiveItem } from "@/lib/transfer/receive";
+import { getReceived, markReceived } from "@/lib/storage/received";
+import { memorySink, saveMethod, streamSink, type SaveMethod } from "@/lib/save/save";
+import { singleTarget, zipTarget } from "@/lib/save/zip";
+import { FileBrowser, FileRow } from "../files/FileList";
+import { AlertIcon, BackIcon, CheckIcon, ClockIcon, CloseIcon, DeviceIcon, DownloadIcon, PauseIcon, PlayIcon, ZapIcon } from "../ui/icons";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
-import { Badge, Button, Card, ConfirmButton, IconButton, Notice, ProgressBar, Spinner, StatusCard, buttonClass, type StatusProps } from "../ui";
+import { Badge, Button, Card, ConfirmButton, IconButton, Notice, ProgressBar, Spinner, StatusCard, buttonClass, type StatusProps } from "../ui/ui";
 import { MetaRow, MetaTile, Pinned, SelectionDownload, TransferHeading, inFlight, pageTitle, percent, subscribeNothing, summarize, useRememberRecent, versionZero } from "./common";
 
 function checksumsUrl(meta: TransferMeta): string {

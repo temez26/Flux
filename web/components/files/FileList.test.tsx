@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { FileList } from "@/components/FileList";
+import { FileList } from "@/components/files/FileList";
 
 test("each rendered row states its place in the whole list", () => {
   const html = renderToStaticMarkup(

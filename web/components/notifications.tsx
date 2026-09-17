@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { notificationsOn, notificationsSupported, turnOffNotifications, turnOnNotifications } from "@/lib/notify";
-import { toast } from "@/lib/toast";
-import { BellIcon } from "./icons";
-import { IconButton } from "./ui";
+import { notificationsOn, notificationsSupported, turnOffNotifications, turnOnNotifications } from "@/lib/alerts/notify";
+import { toast } from "@/lib/alerts/toast";
+import { BellIcon } from "./ui/icons";
+import { IconButton } from "./ui/ui";
 
 /** Turns system notifications on or off; absent where the browser won't send any. */
 export function NotificationToggle() {

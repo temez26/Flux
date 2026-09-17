@@ -3,13 +3,13 @@
 import { useMemo, useState } from "react";
 import { EXPIRY_OPTIONS, errorMessage, updateTransfer } from "@/lib/api";
 import { encode } from "uqr";
-import { copyText } from "@/lib/clipboard";
-import { formatCode, formatRemaining } from "@/lib/format";
+import { copyText } from "@/lib/platform/clipboard";
+import { formatCode, formatRemaining } from "@/lib/util/format";
 import { reloadTransfer, useNow, useOwned } from "@/lib/hooks";
-import { saveOwned } from "@/lib/owned";
-import { toast } from "@/lib/toast";
-import { ClockIcon, CopyIcon, GlobeIcon, LinkIcon, LockIcon, QrIcon } from "./icons";
-import { Badge, Button, Card, IconButton } from "./ui";
+import { saveOwned } from "@/lib/storage/owned";
+import { toast } from "@/lib/alerts/toast";
+import { ClockIcon, CopyIcon, GlobeIcon, LinkIcon, LockIcon, QrIcon } from "../ui/icons";
+import { Badge, Button, Card, IconButton } from "../ui/ui";
 
 function QrCode({ text }: { text: string }) {
   const { path, size } = useMemo(() => {

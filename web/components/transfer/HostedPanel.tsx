@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { formatBytes, formatCode, plural } from "@/lib/format";
+import { formatBytes, formatCode, plural } from "@/lib/util/format";
 import { useLeaveGuard, useNotifyWhen, useNow, useTitle, useTransferMeta, useWakeLock } from "@/lib/hooks";
-import type { Session } from "@/lib/session";
-import { FileBrowser, FileRow } from "../FileList";
-import { AlertIcon, DeviceIcon, ZapIcon } from "../icons";
-import { ShareCard } from "../ShareCard";
-import { Badge, ConfirmButton, StatusCard, type StatusProps } from "../ui";
+import type { Session } from "@/lib/transfer/session";
+import { FileBrowser, FileRow } from "../files/FileList";
+import { AlertIcon, DeviceIcon, ZapIcon } from "../ui/icons";
+import { ShareCard } from "./ShareCard";
+import { Badge, ConfirmButton, StatusCard, type StatusProps } from "../ui/ui";
 import { pageTitle, removeTransfer } from "./common";
 
 function hostedStatus(serving: number, sent: number, expired: boolean): StatusProps {

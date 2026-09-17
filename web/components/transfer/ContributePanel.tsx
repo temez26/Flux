@@ -2,16 +2,16 @@
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { errorMessage, type TransferMeta } from "@/lib/api";
-import { getDevice } from "@/lib/device";
-import { formatBytes, plural } from "@/lib/format";
+import { getDevice } from "@/lib/nearby/device";
+import { formatBytes, plural } from "@/lib/util/format";
 import { reloadTransfer, useLeaveGuard, useNotifyWhen, useTitle, useWakeLock } from "@/lib/hooks";
-import { contribute, contributions } from "@/lib/session";
-import { toast } from "@/lib/toast";
-import { FileBrowser } from "../FileList";
-import { AlertIcon, CheckIcon, FolderIcon, PauseIcon, PlayIcon, PlusIcon, RetryIcon, UploadIcon } from "../icons";
-import { canPickFolder, useFilePickers } from "../picker";
+import { contribute, contributions } from "@/lib/transfer/session";
+import { toast } from "@/lib/alerts/toast";
+import { FileBrowser } from "../files/FileList";
+import { AlertIcon, CheckIcon, FolderIcon, PauseIcon, PlayIcon, PlusIcon, RetryIcon, UploadIcon } from "../ui/icons";
+import { canPickFolder, useFilePickers } from "../files/picker";
 import { PreviewDialog } from "../preview/Preview";
-import { Button, Card, SectionTitle, Spinner, StatusCard, type StatusProps } from "../ui";
+import { Button, Card, SectionTitle, Spinner, StatusCard, type StatusProps } from "../ui/ui";
 import { MetaRow, MetaTile, SelectionDownload, pageTitle, percent, subscribeNothing, useRememberRecent, versionZero } from "./common";
 
 /**

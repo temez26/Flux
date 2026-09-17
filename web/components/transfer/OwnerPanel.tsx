@@ -2,18 +2,18 @@
 
 import { useMemo, useState } from "react";
 import type { TransferMeta } from "@/lib/api";
-import { basename } from "@/lib/files";
-import { formatBytes, plural } from "@/lib/format";
+import { basename } from "@/lib/platform/files";
+import { formatBytes, plural } from "@/lib/util/format";
 import { useTitle } from "@/lib/hooks";
 import { errorMessage } from "@/lib/api";
-import { addFiles, matchPicked, resume, type Match, type Session } from "@/lib/session";
-import { toast } from "@/lib/toast";
-import { FileBrowser, FileRow } from "../FileList";
-import { AlertIcon, CheckIcon, DeviceIcon, FolderIcon, PlusIcon, UploadIcon } from "../icons";
-import { canPickFolder, useFilePickers } from "../picker";
+import { addFiles, matchPicked, resume, type Match, type Session } from "@/lib/transfer/session";
+import { toast } from "@/lib/alerts/toast";
+import { FileBrowser, FileRow } from "../files/FileList";
+import { AlertIcon, CheckIcon, DeviceIcon, FolderIcon, PlusIcon, UploadIcon } from "../ui/icons";
+import { canPickFolder, useFilePickers } from "../files/picker";
 import { PreviewDialog } from "../preview/Preview";
-import { ShareCard } from "../ShareCard";
-import { Badge, Button, ConfirmButton, Notice, Spinner, StatusCard, type StatusProps } from "../ui";
+import { ShareCard } from "./ShareCard";
+import { Badge, Button, ConfirmButton, Notice, Spinner, StatusCard, type StatusProps } from "../ui/ui";
 import { MetaRow, MetaTile, pageTitle, percent, removeOwnedFile, removeTransfer, summarize } from "./common";
 
 /**

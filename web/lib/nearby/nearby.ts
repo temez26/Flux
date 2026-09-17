@@ -1,5 +1,5 @@
 import { getDevice, renameDevice, type Device } from "./device";
-import { Emitter } from "./observable";
+import { Emitter } from "../util/observable";
 
 export interface Peer {
   device: string;

@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { formatBytes } from "@/lib/format";
-import { readSlides, readWorkbook, renderDocx } from "@/lib/office";
-import { loadText, TEXT_PREVIEW_BYTES } from "@/lib/preview";
+import { formatBytes } from "@/lib/util/format";
+import { readSlides, readWorkbook, renderDocx } from "@/lib/preview/office";
+import { loadText, TEXT_PREVIEW_BYTES } from "@/lib/preview/preview";
 import { CopyButton, InlineFrame, Loading, Note, Panel, Unavailable, scrollArea, useLoad, type Status, type ViewProps } from "./chrome";
 
 export function TextView(view: ViewProps) {

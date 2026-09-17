@@ -1,6 +1,6 @@
-import { getConfig } from "./api";
+import { getConfig } from "../api";
 import { createHasher, type Hasher } from "./hash";
-import { Emitter, Observable } from "./observable";
+import { Emitter, Observable } from "../util/observable";
 import { Signal, type SignalData, type SignalMessage } from "./signal";
 
 // Data channel frames: binary = [u32 request id][payload], text = JSON control messages.

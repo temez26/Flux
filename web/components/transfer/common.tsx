@@ -2,19 +2,19 @@
 
 import { useEffect, type ReactNode } from "react";
 import { countDownload, deleteTransfer, errorMessage, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
-import { basename } from "@/lib/files";
-import { formatBytes, formatCode, formatRemaining, plural } from "@/lib/format";
+import { basename } from "@/lib/platform/files";
+import { formatBytes, formatCode, formatRemaining, plural } from "@/lib/util/format";
 import { reloadTransfer, useNow } from "@/lib/hooks";
-import { removeOwned } from "@/lib/owned";
-import { canPreview } from "@/lib/preview";
-import { rememberRecent } from "@/lib/recent";
-import { navigate } from "@/lib/router";
-import { end, removeFile } from "@/lib/session";
-import { toast } from "@/lib/toast";
-import { FileRow, FileTile } from "../FileList";
-import { CheckIcon, ClockIcon, DownloadIcon, FileTypeIcon, FolderIcon, TrashIcon } from "../icons";
+import { removeOwned } from "@/lib/storage/owned";
+import { canPreview } from "@/lib/preview/preview";
+import { rememberRecent } from "@/lib/storage/recent";
+import { navigate } from "@/lib/platform/router";
+import { end, removeFile } from "@/lib/transfer/session";
+import { toast } from "@/lib/alerts/toast";
+import { FileRow, FileTile } from "../files/FileList";
+import { CheckIcon, ClockIcon, DownloadIcon, FileTypeIcon, FolderIcon, TrashIcon } from "../ui/icons";
 import { FileThumb } from "../preview/Preview";
-import { Badge, ConfirmIconButton, Spinner, buttonClass } from "../ui";
+import { Badge, ConfirmIconButton, Spinner, buttonClass } from "../ui/ui";
 
 /** Stand-ins for a store that doesn't exist yet, for useSyncExternalStore. */
 export const subscribeNothing = () => () => {};

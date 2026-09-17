@@ -1,8 +1,8 @@
-import { appendFiles, createCollection, createNote, createTransfer, deleteFile, type NewFile, type TransferMeta } from "./api";
-import { getDevice } from "./device";
+import { appendFiles, createCollection, createNote, createTransfer, deleteFile, type NewFile, type TransferMeta } from "../api";
+import { getDevice } from "../nearby/device";
 import { DirectHost } from "./direct";
-import { basename, uniquePaths, type Picked } from "./files";
-import { getOwned, saveOwned } from "./owned";
+import { basename, uniquePaths, type Picked } from "../platform/files";
+import { getOwned, saveOwned } from "../storage/owned";
 import { Uploader, type Entry } from "./upload";
 
 // How long the server upload keeps yielding after a direct receiver's last request.

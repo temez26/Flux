@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import { createBLAKE3 } from "hash-wasm";
-import type { TransferMeta } from "./api";
+import type { TransferMeta } from "../api";
 import type { DirectClient } from "./direct";
 import { Receiver } from "./receive";
-import type { Entry, FileWriter, Target } from "./zip";
+import type { Entry, FileWriter, Target } from "../save/zip";
 
 Object.defineProperty(globalThis, "window", { value: globalThis, configurable: true });
 

@@ -2,15 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { errorMessage, updateTransfer, zipUrl, type TransferMeta } from "@/lib/api";
-import { formatBytes, formatCode, plural } from "@/lib/format";
+import { formatBytes, formatCode, plural } from "@/lib/util/format";
 import { reloadTransfer, useTitle } from "@/lib/hooks";
-import { notify } from "@/lib/notify";
-import { toast } from "@/lib/toast";
-import { FileBrowser } from "../FileList";
-import { DownloadIcon, FolderIcon, LockIcon } from "../icons";
+import { notify } from "@/lib/alerts/notify";
+import { toast } from "@/lib/alerts/toast";
+import { FileBrowser } from "../files/FileList";
+import { DownloadIcon, FolderIcon, LockIcon } from "../ui/icons";
 import { PreviewDialog } from "../preview/Preview";
-import { ShareCard } from "../ShareCard";
-import { Button, ConfirmButton, StatusCard, buttonClass } from "../ui";
+import { ShareCard } from "./ShareCard";
+import { Button, ConfirmButton, StatusCard, buttonClass } from "../ui/ui";
 import { MetaRow, MetaTile, SelectionDownload, pageTitle, removeOwnedFile, removeTransfer, summarize } from "./common";
 
 /**

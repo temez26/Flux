@@ -2,17 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { EXPIRY_OPTIONS, errorMessage, getSummary, listPublic, type Summary } from "@/lib/api";
-import { fromClipboard, fromDataTransfer, type Picked } from "@/lib/files";
-import { formatBytes, formatCode, formatLifetime, formatRemaining, normalizeCode, plural } from "@/lib/format";
+import { fromClipboard, fromDataTransfer, type Picked } from "@/lib/platform/files";
+import { formatBytes, formatCode, formatLifetime, formatRemaining, normalizeCode, plural } from "@/lib/util/format";
 import { nextPaint, useNow, usePolling } from "@/lib/hooks";
-import { listOwned, ownedVersion, removeOwned, subscribeOwned } from "@/lib/owned";
-import { clearRecent, forgetRecent, listRecent, recentVersion, subscribeRecent } from "@/lib/recent";
-import { getReceived } from "@/lib/received";
-import { navigate } from "@/lib/router";
-import { offerTitle, type Peer } from "@/lib/nearby";
-import { collect, live, send, sendNote } from "@/lib/session";
-import { takeShared } from "@/lib/share";
-import { toast } from "@/lib/toast";
+import { listOwned, ownedVersion, removeOwned, subscribeOwned } from "@/lib/storage/owned";
+import { clearRecent, forgetRecent, listRecent, recentVersion, subscribeRecent } from "@/lib/storage/recent";
+import { getReceived } from "@/lib/storage/received";
+import { navigate } from "@/lib/platform/router";
+import { offerTitle, type Peer } from "@/lib/nearby/nearby";
+import { collect, live, send, sendNote } from "@/lib/transfer/session";
+import { takeShared } from "@/lib/platform/share";
+import { toast } from "@/lib/alerts/toast";
 import {
   AlertIcon,
   ArrowIcon,
@@ -28,10 +28,10 @@ import {
   SearchIcon,
   TextIcon,
   UploadIcon,
-} from "./icons";
+} from "./ui/icons";
 import { getNearby, NearbyDevices } from "./nearby";
-import { canPickFolder, useFilePickers } from "./picker";
-import { Badge, Button, Card, Field, Notice, SectionTitle, Segmented, Spinner } from "./ui";
+import { canPickFolder, useFilePickers } from "./files/picker";
+import { Badge, Button, Card, Field, Notice, SectionTitle, Segmented, Spinner } from "./ui/ui";
 
 const EXPIRY = EXPIRY_OPTIONS;
 const VISIBILITY = [

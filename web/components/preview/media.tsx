@@ -2,10 +2,10 @@
 
 import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { inlineUrl, renderUrl } from "@/lib/api";
-import { basename } from "@/lib/files";
-import { thumbnailSource } from "@/lib/preview";
-import { ExpandIcon, ExternalIcon, FileTypeIcon } from "../icons";
-import { Spinner } from "../ui";
+import { basename } from "@/lib/platform/files";
+import { thumbnailSource } from "@/lib/preview/preview";
+import { ExpandIcon, ExternalIcon, FileTypeIcon } from "../ui/icons";
+import { Spinner } from "../ui/ui";
 import { InlineFrame, Loading, Unavailable, overlayTextButton, type Status, type ViewProps } from "./chrome";
 
 export function ImageView({ code, file, url, inline, onExpand }: ViewProps) {

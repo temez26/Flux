@@ -1,4 +1,4 @@
-import type { FileMeta } from "./api";
+import type { FileMeta } from "../api";
 
 export type PreviewKind = "image" | "video" | "audio" | "pdf" | "text" | "docx" | "xlsx" | "pptx";
 

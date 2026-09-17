@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getTransfer, type TransferMeta } from "./api";
-import { notify } from "./notify";
-import { getOwned, ownedVersion, subscribeOwned } from "./owned";
+import { notify } from "./alerts/notify";
+import { getOwned, ownedVersion, subscribeOwned } from "./storage/owned";
 
 const noSubscribe = () => () => {};
 

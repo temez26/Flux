@@ -1,8 +1,8 @@
-import { errorMessage, fileUrl, type TransferMeta } from "./api";
+import { errorMessage, fileUrl, type TransferMeta } from "../api";
 import type { DirectClient } from "./direct";
 import { acquireHasher, releaseHasher } from "./hash";
-import { Observable, SpeedMeter } from "./observable";
-import type { FileWriter, Target } from "./zip";
+import { Observable, SpeedMeter } from "../util/observable";
+import type { FileWriter, Target } from "../save/zip";
 
 export type ReceiveStatus = "pending" | "active" | "done" | "failed";
 

@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect } from "react";
-import { normalizeCode } from "@/lib/format";
+import { normalizeCode } from "@/lib/util/format";
 import { useMounted, useOnline } from "@/lib/hooks";
-import { navigate, usePath } from "@/lib/router";
+import { navigate, usePath } from "@/lib/platform/router";
 import Home from "./Home";
-import { AlertIcon, BackIcon, LogoIcon } from "./icons";
+import { AlertIcon, BackIcon, LogoIcon } from "./ui/icons";
 import { IncomingOffers } from "./nearby";
 import { NotificationToggle } from "./notifications";
-import Toaster from "./Toaster";
+import Toaster from "./ui/Toaster";
 import TransferView from "./transfer/TransferView";
-import { Badge, IconButton, Message } from "./ui";
+import { Badge, IconButton, Message } from "./ui/ui";
 
 export default function App() {
   const mounted = useMounted();

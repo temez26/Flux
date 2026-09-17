@@ -2,18 +2,18 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { errorMessage } from "@/lib/api";
-import { formatBytes, formatCode, formatDuration, plural } from "@/lib/format";
+import { formatBytes, formatCode, formatDuration, plural } from "@/lib/util/format";
 import { useLeaveGuard, useNotifyWhen, useNow, useTitle, useTransferMeta, useWakeLock } from "@/lib/hooks";
-import { canPreview } from "@/lib/preview";
-import type { Item, Uploader } from "@/lib/upload";
-import { addFiles, type Session } from "@/lib/session";
-import { toast } from "@/lib/toast";
-import { FileBrowser, FileRow } from "../FileList";
-import { AlertIcon, CheckIcon, ClockIcon, CloseIcon, PauseIcon, PlayIcon, PlusIcon, RetryIcon, ZapIcon } from "../icons";
-import { useFilePickers } from "../picker";
+import { canPreview } from "@/lib/preview/preview";
+import type { Item, Uploader } from "@/lib/transfer/upload";
+import { addFiles, type Session } from "@/lib/transfer/session";
+import { toast } from "@/lib/alerts/toast";
+import { FileBrowser, FileRow } from "../files/FileList";
+import { AlertIcon, CheckIcon, ClockIcon, CloseIcon, PauseIcon, PlayIcon, PlusIcon, RetryIcon, ZapIcon } from "../ui/icons";
+import { useFilePickers } from "../files/picker";
 import { InlinePreview, PreviewDialog } from "../preview/Preview";
-import { ShareCard } from "../ShareCard";
-import { Badge, Button, ConfirmButton, IconButton, Spinner, StatusCard, type StatusProps } from "../ui";
+import { ShareCard } from "./ShareCard";
+import { Badge, Button, ConfirmButton, IconButton, Spinner, StatusCard, type StatusProps } from "../ui/ui";
 import { MetaRow, MetaTile, Pinned, inFlight, pageTitle, percent, removeOwnedFile, removeTransfer } from "./common";
 
 function senderStatus(session: Session, uploader: Uploader): StatusProps {

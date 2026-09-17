@@ -1,6 +1,6 @@
-import { deleteFile, fileUrl } from "./api";
+import { deleteFile, fileUrl } from "../api";
 import { createHasher, type Hasher } from "./hash";
-import { Observable, SpeedMeter } from "./observable";
+import { Observable, SpeedMeter } from "../util/observable";
 
 export type Status = "pending" | "active" | "done" | "failed" | "canceled";
 

@@ -2,10 +2,10 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { fileUrl, type FileMeta } from "@/lib/api";
-import { copyText } from "@/lib/clipboard";
-import { toast } from "@/lib/toast";
-import { CopyIcon, DownloadIcon, ExpandIcon, FileTypeIcon } from "../icons";
-import { Spinner, buttonClass } from "../ui";
+import { copyText } from "@/lib/platform/clipboard";
+import { toast } from "@/lib/alerts/toast";
+import { CopyIcon, DownloadIcon, ExpandIcon, FileTypeIcon } from "../ui/icons";
+import { Spinner, buttonClass } from "../ui/ui";
 
 // The viewer is always dark, like a photo viewer, so its controls don't follow the theme.
 export const overlayButton =

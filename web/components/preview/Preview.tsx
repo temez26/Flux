@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { fileUrl, inlineUrl, thumbUrl, type FileMeta } from "@/lib/api";
-import { basename } from "@/lib/files";
-import { formatBytes } from "@/lib/format";
-import { canPreview, OFFICE_PREVIEW_BYTES, previewKind, thumbnailSource } from "@/lib/preview";
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, DownloadIcon, ExternalIcon, FileTypeIcon } from "../icons";
+import { basename } from "@/lib/platform/files";
+import { formatBytes } from "@/lib/util/format";
+import { canPreview, OFFICE_PREVIEW_BYTES, previewKind, thumbnailSource } from "@/lib/preview/preview";
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, DownloadIcon, ExternalIcon, FileTypeIcon } from "../ui/icons";
 import { Unavailable, overlayButton, overlayTextButton, type Target, type ViewProps } from "./chrome";
 import { DocxView, SheetView, SlidesView, TextView } from "./documents";
 import { AudioView, ImageView, PdfView, VideoView } from "./media";

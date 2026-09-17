@@ -47,7 +47,7 @@ function worker() {
     clients: { claim: async () => {}, matchAll: async () => [], openWindow: async () => {} },
     skipWaiting: async () => {},
   };
-  const source = readFileSync(fileURLToPath(new URL("../public/sw.js", import.meta.url)), "utf8");
+  const source = readFileSync(fileURLToPath(new URL("../../public/sw.js", import.meta.url)), "utf8");
   vm.runInNewContext(source, { self, caches, Response, Request, URL, fetch, setTimeout, clearTimeout, console });
   return async (request: Request): Promise<Response | undefined> => {
     let answer: Promise<Response> | undefined;
@@ -128,7 +128,7 @@ test("a worker update keeps a share waiting to be picked up", async () => {
     clients: { claim: async () => {} },
     skipWaiting: async () => {},
   };
-  vm.runInNewContext(readFileSync(fileURLToPath(new URL("../public/sw.js", import.meta.url)), "utf8"), { self, caches, Response, URL, setTimeout, console });
+  vm.runInNewContext(readFileSync(fileURLToPath(new URL("../../public/sw.js", import.meta.url)), "utf8"), { self, caches, Response, URL, setTimeout, console });
   let done: Promise<unknown> | undefined;
   handlers.get("activate")!({ waitUntil: (p: Promise<unknown>) => (done = p) });
   await done;

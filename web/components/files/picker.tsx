@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, type InputHTMLAttributes } from "react";
-import { fromFileList, type Picked } from "@/lib/files";
+import { fromFileList, type Picked } from "@/lib/platform/files";
 import { useFilePicker } from "@/lib/hooks";
 
 const folderInputProps = { webkitdirectory: "" } as InputHTMLAttributes<HTMLInputElement>;
