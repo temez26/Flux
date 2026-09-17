@@ -117,9 +117,13 @@ export function ShareCard({
             type="button"
             onClick={() => setChoosing(!choosing)}
             aria-expanded={choosing}
-            className="rounded-full transition hover:brightness-95"
+            className="group cursor-pointer rounded-full transition hover:brightness-95"
           >
-            <Badge icon={<ClockIcon />}>{formatRemaining(expires, now, afterUpload)} · Change</Badge>
+            <Badge icon={<ClockIcon />}>
+              {formatRemaining(expires, now, afterUpload)} ·{" "}
+              {/* Styled as the link it is, like Change beside a new share's expiry. */}
+              <span className="font-medium text-accent group-hover:underline">Change</span>
+            </Badge>
           </button>
         ) : (
           expires && <Badge icon={<ClockIcon />}>{formatRemaining(expires, now, afterUpload)}</Badge>
