@@ -74,6 +74,37 @@ input {
   outline-offset: 2px;
 }
 
+/* High contrast modes replace every colour, and with them the fills that show state here: how
+   far a transfer has got, a switch being on, the chosen tab. So state is drawn again in the
+   system's own colours. */
+@media (forced-colors: active) {
+  [role="progressbar"] {
+    border: 1px solid CanvasText;
+  }
+  [role="progressbar"] > div {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+  [role="switch"] {
+    forced-color-adjust: none;
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+  }
+  [role="switch"] > span {
+    background: ButtonText;
+  }
+  [role="switch"][aria-checked="true"] {
+    background: Highlight;
+  }
+  [role="switch"][aria-checked="true"] > span {
+    background: HighlightText;
+  }
+  [role="tab"][aria-selected="true"],
+  [role="radio"][aria-checked="true"] {
+    border: 2px solid Highlight;
+  }
+}
+
 /* Spinners keep turning: they are how waiting is shown, not decoration. */
 @media (prefers-reduced-motion: reduce) {
   *:not(.animate-spin),
