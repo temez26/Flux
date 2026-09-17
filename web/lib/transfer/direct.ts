@@ -1,6 +1,7 @@
 import { getConfig } from "../api";
 import { createHasher, type Hasher } from "./hash";
 import { Emitter, Observable } from "../util/observable";
+import { withAddress } from "./candidates";
 import { Signal, type SignalData, type SignalMessage } from "./signal";
 
 // Data channel frames: binary = [u32 request id][payload], text = JSON control messages.
@@ -39,26 +40,39 @@ interface Peer {
   signal(data: SignalData): Promise<void>;
 }
 
-/**
- * This server's own STUN responder, asked for once. Browsers offer only an `<uuid>.local`
- * name for a machine's real address, and a network that won't resolve that between two
- * devices leaves a direct transfer with nothing to connect to. Asking a server on the same
- * network which address it sees produces one that works, without involving anyone else.
- */
-let servers: Promise<RTCIceServer[]> | undefined;
-
-function iceServers(): Promise<RTCIceServer[]> {
-  return (servers ??= getConfig()
-    .then(({ stunPort }) => (stunPort ? [{ urls: `stun:${window.location.hostname}:${stunPort}` }] : []))
-    // Without it there are still the mDNS candidates, which work on some networks.
-    .catch(() => []));
+interface Ice {
+  servers: RTCIceServer[];
+  /** The address this device reaches the server from, as the server saw it. */
+  address: string | null;
 }
 
-function createPeer(servers: RTCIceServer[], onCandidate: (candidate: RTCIceCandidateInit) => void): Peer {
+/**
+ * How this device can be reached, asked for once. Browsers offer only an `<uuid>.local` name
+ * for a machine's real address, and a network that won't resolve that between two devices
+ * leaves a direct transfer with nothing to connect to. The server on the same network knows the
+ * address that works: it says so itself, and its STUN responder does where UDP reaches it.
+ */
+let ice: Promise<Ice> | undefined;
+
+function iceConfig(): Promise<Ice> {
+  return (ice ??= getConfig()
+    .then(({ stunPort, address }) => ({
+      servers: stunPort ? [{ urls: `stun:${window.location.hostname}:${stunPort}` }] : [],
+      address: address ?? null,
+    }))
+    // Without it there are still the mDNS candidates, which work on some networks.
+    .catch(() => ({ servers: [], address: null })));
+}
+
+function createPeer({ servers, address }: Ice, onCandidate: (candidate: RTCIceCandidateInit) => void): Peer {
   const pc = new RTCPeerConnection({ iceServers: servers });
   const early: RTCIceCandidateInit[] = [];
   pc.onicecandidate = (e) => {
-    if (e.candidate) onCandidate(e.candidate.toJSON());
+    if (!e.candidate) return;
+    const candidate = e.candidate.toJSON();
+    onCandidate(candidate);
+    const reachable = address && withAddress(candidate, address);
+    if (reachable) onCandidate(reachable);
   };
   return {
     pc,
@@ -143,7 +157,7 @@ export class DirectHost extends Observable {
     try {
       if (msg.data.sdp?.type === "offer") {
         this.peers.get(from)?.pc.close();
-        const peer = createPeer(await iceServers(), (candidate) =>
+        const peer = createPeer(await iceConfig(), (candidate) =>
           this.signal.send({ t: "signal", to: from, data: { candidate } }),
         );
         this.peers.set(from, peer);
@@ -408,7 +422,7 @@ export class DirectClient extends Emitter {
     this.teardown();
     this.attempts++;
     this.setState("connecting");
-    const peer = createPeer(await iceServers(), (candidate) => this.signal.send({ t: "signal", data: { candidate } }));
+    const peer = createPeer(await iceConfig(), (candidate) => this.signal.send({ t: "signal", data: { candidate } }));
     const channel = peer.pc.createDataChannel("flux", { ordered: true });
     this.peer = peer;
     this.channel = channel;

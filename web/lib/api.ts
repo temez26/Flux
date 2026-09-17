@@ -187,9 +187,10 @@ export async function saveNote(
   throw new ApiError(res.status, body?.error ?? `Request failed (${res.status})`);
 }
 
-/** Where this deployment's STUN responder listens, so peers can find each other. */
+/** What peers need to find each other: this deployment's STUN port, and the address this device reaches it from. */
 export function getConfig() {
-  return request<{ stunPort: number | null }>("/api/config");
+  // An older server says nothing of the address.
+  return request<{ stunPort: number | null; address?: string }>("/api/config");
 }
 
 /**

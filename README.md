@@ -44,8 +44,12 @@ For files on a specific disk, bind-mount over `flux-data` and `chown -R 65532:65
 ## Reverse proxy
 
 - **HTTPS** — installing the app, offline start and direct downloads need it.
-- **UDP 3478** published straight to the host; a proxy won't carry it.
+- **Each device's address** passed on in `X-Forwarded-For`, which devices sending to each other
+  directly are told to use. Caddy and Nginx Proxy Manager already do.
 - Request bodies of **8 MiB**, request buffering **off**, **WebSocket** upgrades allowed.
+
+UDP 3478 then needs no publishing; a proxy couldn't carry it anyway. It still helps devices that
+reach Flux without the proxy.
 
 Caddy: `reverse_proxy flux:8080`. nginx:
 
@@ -59,11 +63,12 @@ location / {
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection $http_connection;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 }
 ```
 
-The container must see each device's real address, or they all look like one machine and can't
-connect. Check it from a phone on your network:
+Without a proxy, the container must see each device's real address, or they all look like one
+machine and can't connect. Check it from a phone on your network:
 
 ```bash
 python3 - <<'EOF'

@@ -9,7 +9,11 @@
 
 use std::net::{IpAddr, SocketAddr};
 
-use axum::{Json, extract::State};
+use axum::{
+    Json,
+    extract::{ConnectInfo, State},
+    http::HeaderMap,
+};
 use serde::Serialize;
 use tokio::net::UdpSocket;
 
@@ -28,13 +32,43 @@ const MAX_REQUEST: usize = 1024;
 pub struct Config {
     /// Port to reach this server's STUN responder on, or null when it isn't running.
     stun_port: Option<u16>,
+    /// The address the asking device reaches this server from.
+    address: IpAddr,
 }
 
 /// What a page needs to know before it can set up a direct transfer.
-pub async fn config(State(state): State<Shared>) -> Json<Config> {
+pub async fn config(
+    State(state): State<Shared>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+) -> Json<Config> {
     Json(Config {
         stun_port: state.stun_port,
+        address: client_address(&headers, peer),
     })
+}
+
+/// The address a device connects from. Behind a reverse proxy the connection is the proxy's own,
+/// and what it saw is in its headers. That is also the one way a device's address reaches a server
+/// that only the proxy is published for: a proxy carries no UDP, so the STUN responder never hears
+/// from it. The address is only ever handed back to the device that sent it, so a forged header
+/// misleads no one else.
+fn client_address(headers: &HeaderMap, peer: SocketAddr) -> IpAddr {
+    let header = |name: &str| headers.get(name).and_then(|value| value.to_str().ok());
+    let parse = |value: &str| value.trim().parse::<IpAddr>().ok();
+    let forwarded = header("x-forwarded-for")
+        .and_then(|value| value.split(',').next())
+        .and_then(parse)
+        .or_else(|| header("x-real-ip").and_then(parse));
+    unmap(forwarded.unwrap_or(peer.ip()))
+}
+
+/// A dual-stack socket reports IPv4 clients as IPv6-mapped addresses, which no device dials.
+fn unmap(ip: IpAddr) -> IpAddr {
+    match ip {
+        IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(IpAddr::V6(v6), IpAddr::V4),
+        ip => ip,
+    }
 }
 
 pub fn spawn(socket: UdpSocket) {
@@ -68,10 +102,7 @@ fn respond(msg: &[u8], from: SocketAddr) -> Option<Vec<u8>> {
     // The address is sent XOR'd with the cookie so that NATs rewriting a bare address in
     // the payload can't corrupt it.
     let port = from.port() ^ (MAGIC_COOKIE >> 16) as u16;
-    let ip = match from.ip() {
-        IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(IpAddr::V6(v6), IpAddr::V4),
-        ip => ip,
-    };
+    let ip = unmap(from.ip());
     let mut value = vec![0, if ip.is_ipv4() { 0x01 } else { 0x02 }];
     value.extend_from_slice(&port.to_be_bytes());
     match ip {
@@ -120,6 +151,33 @@ mod tests {
             std::net::Ipv4Addr::from(ip),
             "192.168.1.20".parse::<std::net::Ipv4Addr>().unwrap()
         );
+    }
+
+    #[test]
+    fn a_device_is_told_the_address_its_proxy_saw() {
+        let proxy: SocketAddr = "172.18.0.5:40000".parse().unwrap();
+        let mut headers = HeaderMap::new();
+        assert_eq!(
+            client_address(&headers, proxy),
+            proxy.ip(),
+            "no proxy: the connection's own"
+        );
+
+        headers.insert("x-real-ip", "192.168.1.20".parse().unwrap());
+        assert_eq!(client_address(&headers, proxy).to_string(), "192.168.1.20");
+
+        headers.insert("x-forwarded-for", "192.168.1.30, 10.0.0.1".parse().unwrap());
+        assert_eq!(
+            client_address(&headers, proxy).to_string(),
+            "192.168.1.30",
+            "the first hop is the device"
+        );
+
+        headers.insert("x-forwarded-for", "not an address".parse().unwrap());
+        assert_eq!(client_address(&headers, proxy).to_string(), "192.168.1.20");
+
+        let mapped: SocketAddr = "[::ffff:192.168.1.40]:1".parse().unwrap();
+        assert_eq!(client_address(&HeaderMap::new(), mapped).to_string(), "192.168.1.40");
     }
 
     #[test]

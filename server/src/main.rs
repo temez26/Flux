@@ -98,9 +98,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("listening on {addr}");
     health::watch(addr);
-    axum::serve(listener, app(state, &web_dir))
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    // Each connection's address, for telling a page which one it reaches this server from.
+    axum::serve(
+        listener,
+        app(state, &web_dir).into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     Ok(())
 }
 
