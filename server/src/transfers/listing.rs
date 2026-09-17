@@ -18,12 +18,14 @@ const PUBLIC_LIST_MAX: i64 = 500;
 const LIKE_ESCAPE: char = '!';
 
 const SUMMARY_SQL: &str =
-    "SELECT t.code, t.title, t.created_at, t.expires_at, t.hosted, t.collect, t.downloads, t.closed,
+    "SELECT t.code, t.title, t.created_at, t.expires_at, t.lifetime, t.hosted, t.open, t.downloads,
         t.note IS NOT NULL AS note,
         count(f.idx) AS files,
         CASE WHEN t.note IS NULL THEN coalesce(sum(f.size), 0) ELSE octet_length(t.note) END::bigint AS size,
-        -- Nothing is pending for a hosted transfer: its bytes were never coming here.
-        t.hosted OR count(f.idx) = count(f.hash) AS complete
+        -- Nothing is pending for a hosted transfer: its bytes were never coming here. What others
+        -- are still adding to an open share doesn't make the owner's share incomplete.
+        t.hosted OR count(f.idx) FILTER (WHERE f.upload_token_hash IS NULL)
+          = count(f.hash) FILTER (WHERE f.upload_token_hash IS NULL) AS complete
      FROM transfers t LEFT JOIN files f ON f.transfer_id = t.id";
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -33,10 +35,10 @@ pub struct Summary {
     title: String,
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
+    lifetime: Option<i32>,
     hosted: bool,
-    collect: bool,
+    open: bool,
     downloads: i32,
-    closed: bool,
     /// A text transfer rather than files.
     note: bool,
     files: i64,
@@ -58,14 +60,23 @@ fn like_pattern(text: &str) -> String {
     out
 }
 
+#[derive(Deserialize, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum Kind {
+    Files,
+    Text,
+}
+
 #[derive(Deserialize)]
 pub struct PublicQuery {
     /// Matches the transfer's title, which is the dropped folder or the first file's name.
     q: Option<String>,
     limit: Option<i64>,
+    /// Only files or only text; both when absent.
+    kind: Option<Kind>,
 }
 
-/// Public transfers, newest first, narrowed by `q` and capped at `limit`.
+/// Public transfers, newest first, narrowed by `q` and `kind` and capped at `limit`.
 pub async fn list_public(State(state): State<Shared>, Query(query): Query<PublicQuery>) -> Result<Json<Vec<Summary>>> {
     let limit = query.limit.unwrap_or(PUBLIC_LIST_LIMIT).clamp(1, PUBLIC_LIST_MAX);
     let search = query
@@ -77,11 +88,13 @@ pub async fn list_public(State(state): State<Shared>, Query(query): Query<Public
     let sql = format!(
         "{SUMMARY_SQL} WHERE t.public AND t.expires_at > now()
            AND ($2::text IS NULL OR t.title ILIKE $2 ESCAPE '{LIKE_ESCAPE}')
+           AND ($3::bool IS NULL OR (t.note IS NOT NULL) = $3)
          GROUP BY t.id ORDER BY t.created_at DESC LIMIT $1"
     );
     let transfers = sqlx::query_as(&sql)
         .bind(limit)
         .bind(search)
+        .bind(query.kind.map(|kind| matches!(kind, Kind::Text)))
         .fetch_all(&state.db)
         .await?;
     Ok(Json(transfers))

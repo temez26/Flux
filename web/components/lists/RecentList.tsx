@@ -4,8 +4,8 @@ import { useSyncExternalStore } from "react";
 import { getReceived } from "@/lib/storage/received";
 import { clearRecent, forgetRecent, listRecent, recentVersion, subscribeRecent } from "@/lib/storage/recent";
 import { formatBytes, formatRemaining, plural } from "@/lib/util/format";
-import { CheckIcon, DownloadIcon, FileTypeIcon, FolderIcon, TextIcon } from "../../ui/icons";
-import { Badge, Card, SectionTitle } from "../../ui/ui";
+import { CheckIcon, DownloadIcon, FileTypeIcon, FolderIcon, TextIcon } from "../ui/icons";
+import { Badge, Card, SectionTitle } from "../ui/ui";
 import { TransferRow } from "./TransferRow";
 import { useSummaries } from "./useSummaries";
 
@@ -40,7 +40,7 @@ export function RecentList() {
             icon={
               r.note ? (
                 <TextIcon className="size-4.5" />
-              ) : r.collect || files > 1 ? (
+              ) : files > 1 ? (
                 <FolderIcon className="size-4.5" />
               ) : (
                 <FileTypeIcon path={r.title} className="size-4.5" />
@@ -51,16 +51,20 @@ export function RecentList() {
               r.note ? "Text" : plural(files, "file"),
               formatBytes(size),
               // How long a device keeps sharing is its sender's business, not the code's expiry.
-              r.hosted ? "From the sender's device" : formatRemaining(summary?.expiresAt ?? r.expiresAt),
+              r.hosted
+                ? "From the sender's device"
+                : formatRemaining(
+                    summary?.expiresAt ?? r.expiresAt,
+                    undefined,
+                    summary && !summary.complete ? summary.lifetime : null,
+                  ),
             ].join(" · ")}
             badge={
               saved ? (
                 <Badge tone="ok" icon={<CheckIcon />}>
                   Saved
                 </Badge>
-              ) : (
-                summary?.collect && <Badge icon={<FolderIcon />}>{summary.closed ? "Closed" : "Collection"}</Badge>
-              )
+              ) : undefined
             }
           />
         );

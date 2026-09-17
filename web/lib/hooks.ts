@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getTransfer, type TransferMeta } from "./api";
 import { notify } from "./alerts/notify";
-import { getOwned, ownedVersion, subscribeOwned } from "./storage/owned";
+import { getOwned, ownedVersion, saveOwned, subscribeOwned } from "./storage/owned";
+import type { SocketLike } from "./nearby/nearby";
+import { NoteLive } from "./transfer/live";
 
 const noSubscribe = () => () => {};
 
@@ -134,6 +136,25 @@ export function reloadTransfer(code: string) {
   for (const reload of reloads.get(code) ?? []) reload();
 }
 
+/**
+ * Follows an open text as it changes, loading it again the moment anyone saves or its owner
+ * changes it, and returns how many pages have it open (0 while that isn't known).
+ */
+export function useNoteLive(code: string): number {
+  const [viewers, setViewers] = useState(0);
+  useEffect(() => {
+    const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const url = `${scheme}://${window.location.host}/api/transfers/${code}/note/live`;
+    const live = new NoteLive(
+      () => new WebSocket(url) as unknown as SocketLike,
+      () => reloadTransfer(code),
+      setViewers,
+    );
+    return () => live.close();
+  }, [code]);
+  return viewers;
+}
+
 export function useMounted(): boolean {
   return useSyncExternalStore(
     noSubscribe,
@@ -216,8 +237,9 @@ export function useTitle(title: string | undefined) {
 /**
  * Runs `load` now and then every `intervalMs`. Hidden tabs skip refreshes (but still load
  * once) and refresh as soon as they become visible again. Failures keep the last state.
+ * A change of `key` (what is being loaded, such as a search) loads again at once.
  */
-export function usePolling(load: () => Promise<void>, intervalMs: number) {
+export function usePolling(load: () => Promise<void>, intervalMs: number, key?: string) {
   const latest = useRef(load);
   useEffect(() => {
     latest.current = load;
@@ -251,7 +273,7 @@ export function usePolling(load: () => Promise<void>, intervalMs: number) {
       window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [intervalMs]);
+  }, [intervalMs, key]);
 }
 
 const UPLOADING_POLL_MS = 2000;
@@ -285,11 +307,17 @@ export function useTransferMeta(code: string, enabled: boolean) {
         setMeta(next);
         setOffline(false);
         if (!next) return;
-        // A collection can gain files at any moment, however finished it looks. A transfer
+        // The server moves the expiry when an upload completes, and this device's record of the
+        // transfer is forgotten at the expiry it holds, so it has to follow.
+        const owned = getOwned(code);
+        if (owned && (owned.expiresAt !== next.expiresAt || (owned.lifetime ?? null) !== next.lifetime)) {
+          saveOwned(code, { ...owned, expiresAt: next.expiresAt, lifetime: next.lifetime ?? undefined });
+        }
+        // An open share can gain files at any moment, however finished it looks. A transfer
         // served from a device never gets hashes, which would otherwise read as always uploading.
         // Text can change under the reader at any moment too — its owner can always edit it.
         const changing =
-          next.collect || next.note !== undefined || (!next.hosted && next.files.some((f) => f.hash === null));
+          next.open || next.note !== undefined || (!next.hosted && next.files.some((f) => f.hash === null));
         const interval = changing ? UPLOADING_POLL_MS : READY_POLL_MS;
         const untilExpiry = Date.parse(next.expiresAt) - Date.now() + 1000;
         timer = window.setTimeout(load, Math.max(0, Math.min(interval, untilExpiry)));

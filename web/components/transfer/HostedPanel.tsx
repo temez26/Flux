@@ -1,7 +1,8 @@
 "use client";
 
+import { offerTitle } from "@/lib/nearby/nearby";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { formatBytes, formatCode, plural } from "@/lib/util/format";
+import { formatBytes, plural } from "@/lib/util/format";
 import { useLeaveGuard, useNotifyWhen, useNow, useTitle, useTransferMeta, useWakeLock } from "@/lib/hooks";
 import type { Session } from "@/lib/transfer/session";
 import { FileBrowser, FileRow } from "../files/FileList";
@@ -16,7 +17,7 @@ function hostedStatus(serving: number, sent: number, expired: boolean): StatusPr
       tone: "err",
       icon: <AlertIcon />,
       title: "Link expired",
-      subtitle: "The code no longer works. Send the files again to share them.",
+      subtitle: "The link no longer works. Send the files again to share them.",
     };
   if (serving > 0) {
     return {
@@ -51,8 +52,8 @@ export function HostedPanel({ session, expiresAt }: { session: Session; expiresA
   useWakeLock(!expired);
   // Closing this page is the only thing that can end the transfer, so always ask.
   useLeaveGuard(!expired);
-  useNotifyWhen(serving > 0, "A device is downloading", `${formatCode(code)}, straight from this device`);
-  useTitle(pageTitle(code));
+  useNotifyWhen(serving > 0, "A device is downloading", "Straight from this device");
+  useTitle(pageTitle(offerTitle(paths)));
 
   useEffect(() => {
     if (expired) host.close();
@@ -73,7 +74,7 @@ export function HostedPanel({ session, expiresAt }: { session: Session; expiresA
         {serving > 0 && (
           <div className="mt-4">
             <Badge tone="ok" icon={<ZapIcon />}>
-              Direct from this device · {formatCode(code)}
+              Direct from this device
             </Badge>
           </div>
         )}

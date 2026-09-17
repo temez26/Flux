@@ -1,49 +1,61 @@
 "use client";
 
 import { useState } from "react";
-import { EXPIRY_OPTIONS } from "@/lib/api";
-import { DownloadIcon } from "../ui/icons";
-import { Card, SectionTitle } from "../ui/ui";
-import { CollectForm } from "./CollectForm";
-import { OwnedList } from "./lists/OwnedList";
-import { PublicList } from "./lists/PublicList";
-import { RecentList } from "./lists/RecentList";
-import { ReceiveForm } from "./ReceiveForm";
-import { SendCard } from "./send/SendCard";
+import { useTitle } from "@/lib/hooks";
+import type { Picked } from "@/lib/platform/files";
+import { navigate } from "@/lib/platform/router";
+import { OwnedList } from "../lists/OwnedList";
+import { PublicShares } from "../lists/PublicShares";
+import { RecentList } from "../lists/RecentList";
+import { DropOverlay } from "../share/files/DropZone";
+import { handOff, type Handoffs, type Target } from "../share/handoff";
+import { usePaste, useSharedFromApps, useWindowDrop } from "../share/incoming";
+import { tabById, type ShareTab } from "../share/tabs";
+import { Card } from "../ui/ui";
+import { IncomingChooser } from "./IncomingChooser";
+import { ShareTabs } from "./ShareTabs";
 
-const EXPIRY_KEY = "flux.expiry";
+/** The start page: the ways to share on top, what is shared publicly below, then this device's own. */
+export default function Home({ tab }: { tab: ShareTab }) {
+  useTitle(tab.id === "public" ? "Flux" : `${tab.name} · Flux`);
+  /** Files from another app's Share sheet, or dropped on the text tab, asking where to go. */
+  const [incoming, setIncoming] = useState<Picked[] | null>(null);
+  // The file tabs take what is dropped or pasted on them themselves.
+  const sendsFiles = tab.id === "public" || tab.id === "device";
 
-function storedExpiry(): number {
-  try {
-    const value = Number(localStorage.getItem(EXPIRY_KEY));
-    return EXPIRY_OPTIONS.some((e) => e.value === value) ? value : 86_400;
-  } catch {
-    return 86_400;
+  function goTo<T extends Target>(id: T, payload: NonNullable<Handoffs[T]>) {
+    handOff(id, payload);
+    if (tab.id !== id) navigate(tabById(id).path);
   }
-}
 
-export default function Home() {
-  // Shared by sending and collecting, and remembered between visits.
-  const [expiresIn, setExpiresIn] = useState(storedExpiry);
-
-  function chooseExpiry(seconds: number) {
-    setExpiresIn(seconds);
-    try {
-      localStorage.setItem(EXPIRY_KEY, String(seconds));
-    } catch {}
-  }
+  const receive = (files: Picked[]) => {
+    if (files.length) setIncoming(files);
+  };
+  const dragging = useWindowDrop(sendsFiles ? undefined : (picked) => void picked.then(receive));
+  usePaste({
+    files: sendsFiles ? undefined : receive,
+    text: tab.id === "text" ? undefined : (text) => goTo("text", text),
+  });
+  useSharedFromApps(receive, (text) => goTo("text", text));
 
   return (
     <div className="space-y-4">
-      <SendCard expiresIn={expiresIn} onExpiresIn={chooseExpiry} />
-
+      <h1 className="sr-only">Flux</h1>
+      {dragging && !sendsFiles && <DropOverlay label="Drop to choose how to share" />}
+      {incoming && (
+        <IncomingChooser
+          files={incoming}
+          onChoose={(target) => {
+            setIncoming(null);
+            goTo(target, incoming);
+          }}
+          onCancel={() => setIncoming(null)}
+        />
+      )}
+      <ShareTabs tab={tab} />
       <Card>
-        <SectionTitle icon={<DownloadIcon className="size-4.5" />}>Receive</SectionTitle>
-        <ReceiveForm />
-        <CollectForm expiresIn={expiresIn} />
-        <PublicList />
+        <PublicShares />
       </Card>
-
       <OwnedList />
       <RecentList />
     </div>

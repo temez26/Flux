@@ -1,6 +1,16 @@
 "use client";
 
-import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  type AnchorHTMLAttributes,
+  type ButtonHTMLAttributes,
+  type ComponentProps,
+  type HTMLAttributes,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import { navigate } from "@/lib/platform/router";
 import { SpinnerIcon } from "./icons";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
@@ -25,11 +35,7 @@ export function Button({ variant, className, ...props }: ButtonProps) {
   return <button type="button" className={buttonClass(variant, className)} {...props} />;
 }
 
-export function IconButton({
-  label,
-  className = "",
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+export function IconButton({ label, className = "", ...props }: ComponentProps<"button"> & { label: string }) {
   return (
     <button type="button" aria-label={label} title={label} className={`${iconButtonClass} ${className}`} {...props} />
   );
@@ -142,11 +148,32 @@ export function Notice({
   );
 }
 
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
+/** A section of a page. Its contents lay out by the card's own width, which differs by where it's shown. */
+export function Card({ className = "", ...props }: HTMLAttributes<HTMLElement>) {
   return (
-    <section className={`rounded-2xl border border-line bg-surface p-4 shadow-sm sm:p-5 ${className}`}>
-      {children}
-    </section>
+    <section
+      className={`@container rounded-2xl border border-line bg-surface p-4 shadow-sm sm:p-5 ${className}`}
+      {...props}
+    />
+  );
+}
+
+/**
+ * A link to a view of this app, followed without reloading the page so running transfers carry
+ * on. Opening it elsewhere (new tab, modifier keys) is left to the browser.
+ */
+export function Link({ href, onClick, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) {
+  return (
+    <a
+      href={href}
+      onClick={(e) => {
+        onClick?.(e);
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        navigate(href);
+      }}
+      {...props}
+    />
   );
 }
 
@@ -172,6 +199,40 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   );
 }
 
+/** An on/off setting, named and explained by the elements whose ids it is given. */
+export function Switch({
+  checked,
+  onChange,
+  labelledBy,
+  describedBy,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  labelledBy: string;
+  describedBy?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition disabled:opacity-50 ${
+        checked ? "bg-accent-solid" : "bg-line"
+      }`}
+    >
+      <span
+        className={`inline-block size-5 rounded-full bg-white shadow-sm transition ${checked ? "translate-x-6" : "translate-x-1"}`}
+      />
+    </button>
+  );
+}
+
 export function Segmented<T extends string | number>({
   label,
   value,
@@ -183,13 +244,27 @@ export function Segmented<T extends string | number>({
   options: { value: T; label: string; icon?: ReactNode }[];
   onChange: (value: T) => void;
 }) {
+  // Arrow keys move the choice within the group, and Tab moves past it, as for native radio buttons.
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    const at = options.findIndex((o) => o.value === value);
+    let next = step === undefined ? -1 : (at + step + options.length) % options.length;
+    if (e.key === "Home") next = 0;
+    if (e.key === "End") next = options.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    onChange(options[next].value);
+    e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]')[next]?.focus();
+  }
+
   return (
     <div
       role="radiogroup"
       aria-label={label}
+      onKeyDown={onKeyDown}
       className="grid auto-cols-fr grid-flow-col gap-1 rounded-xl border border-line bg-bg p-1"
     >
-      {options.map((option) => {
+      {options.map((option, i) => {
         const active = option.value === value;
         return (
           <button
@@ -197,6 +272,7 @@ export function Segmented<T extends string | number>({
             type="button"
             role="radio"
             aria-checked={active}
+            tabIndex={active || (i === 0 && !options.some((o) => o.value === value)) ? 0 : -1}
             onClick={() => onChange(option.value)}
             className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition ${
               active ? "bg-surface text-fg shadow-sm ring-1 ring-line" : "text-muted hover:text-fg"

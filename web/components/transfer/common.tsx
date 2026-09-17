@@ -30,16 +30,16 @@ export const versionZero = () => 0;
 
 /** Lists a transfer someone else made among this device's recently received, kept up to date as it changes. */
 export function useRememberRecent(meta: TransferMeta, enabled = true) {
-  const { code, title, expiresAt, hosted, collect } = meta;
+  const { code, title, expiresAt, hosted } = meta;
   const note = meta.note !== undefined;
   const files = meta.files.length;
   const size = note ? new TextEncoder().encode(meta.note).length : meta.files.reduce((sum, f) => sum + f.size, 0);
   useEffect(() => {
-    if (enabled) rememberRecent(code, { title, files, size, expiresAt, hosted, collect, note });
-  }, [enabled, code, title, files, size, expiresAt, hosted, collect, note]);
+    if (enabled) rememberRecent(code, { title, files, size, expiresAt, hosted, note });
+  }, [enabled, code, title, files, size, expiresAt, hosted, note]);
 }
 
-export const pageTitle = (code: string) => `${formatCode(code)} · Flux`;
+export const pageTitle = (title: string) => `${title} · Flux`;
 
 export const percent = (part: number, whole: number) => (whole ? Math.floor((part / whole) * 100) : 100);
 
@@ -89,12 +89,15 @@ export function summarize(files: FileMeta[]) {
   let size = 0;
   let received = 0;
   let complete = 0;
+  let pendingOwn = 0;
   for (const f of files) {
     size += f.size;
     received += f.received;
     if (f.hash) complete++;
+    else if (!f.added) pendingOwn++;
   }
-  return { size, received, complete, ready: complete === files.length };
+  // `ownReady`: everything the owner sent is up, whatever others are still adding.
+  return { size, received, complete, ready: complete === files.length, ownReady: pendingOwn === 0 };
 }
 
 /** In long lists the files in flight are rarely on screen, so they are pinned above the list. */
@@ -123,10 +126,9 @@ export function TransferHeading({ meta, badges }: { meta: TransferMeta; badges?:
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge>
-          <span className="font-mono">{formatCode(meta.code)}</span>
+        <Badge icon={<ClockIcon />}>
+          {formatRemaining(meta.expiresAt, now, meta.files.some((f) => f.hash === null) ? meta.lifetime : null)}
         </Badge>
-        <Badge icon={<ClockIcon />}>{formatRemaining(meta.expiresAt, now)}</Badge>
         {badges}
       </div>
       <div className="mt-4 flex items-center gap-3">

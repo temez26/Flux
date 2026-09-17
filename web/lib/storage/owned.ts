@@ -8,10 +8,10 @@ export interface Owned {
   public?: boolean;
   /** Served from this device; nothing was uploaded. */
   hosted?: boolean;
-  /** A collection this device opened for others to send files into. */
-  collect?: boolean;
   /** Text rather than files. */
   note?: boolean;
+  /** Seconds uploaded files last once their upload completes. */
+  lifetime?: number;
   count: number;
   size: number;
   createdAt: number;

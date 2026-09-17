@@ -7,6 +7,8 @@ export interface FileMeta {
   /** BLAKE3 hex digest; present once the file is fully uploaded and verified. */
   hash: string | null;
   received: number;
+  /** Added by someone other than the owner, to a share open to that. */
+  added: boolean;
 }
 
 export interface TransferMeta {
@@ -18,16 +20,18 @@ export interface TransferMeta {
   editable: boolean;
   /** Moves on with every saved edit, so a save can say which text it was edited from. */
   noteVersion: number;
-  /** A collection: anyone with the code may add files, not only whoever created it. */
-  collect: boolean;
+  /** A public share its owner lets anyone who opens it add files to. */
+  open: boolean;
   /** Downloads started from a page, of all or part of the transfer. */
   downloads: number;
-  /** A collection its owner stopped: nothing more can be added. */
-  closed: boolean;
   createdAt: string;
   expiresAt: string;
   /** Served from the sender's device: the server has the file list but none of the bytes. */
   hosted: boolean;
+  /** Listed for everyone who opens Flux. */
+  public: boolean;
+  /** Seconds it lasts once its upload completes; null when it counts from creation. */
+  lifetime: number | null;
   files: FileMeta[];
 }
 
@@ -50,10 +54,11 @@ export interface Summary {
   title: string;
   createdAt: string;
   expiresAt: string;
+  /** Seconds it lasts once its upload completes; null when it counts from creation. */
+  lifetime: number | null;
   hosted: boolean;
-  collect: boolean;
+  open: boolean;
   downloads: number;
-  closed: boolean;
   /** A text transfer rather than files. */
   note: boolean;
   files: number;
@@ -72,8 +77,13 @@ export class ApiError extends Error {
 
 /** How long a transfer can be kept, the only lengths the server accepts. */
 export const EXPIRY_OPTIONS = [
+  { label: "5 minutes", value: 300 },
+  { label: "15 minutes", value: 900 },
+  { label: "30 minutes", value: 1800 },
   { label: "1 hour", value: 3600 },
+  { label: "6 hours", value: 21_600 },
   { label: "1 day", value: 86_400 },
+  { label: "3 days", value: 259_200 },
   { label: "7 days", value: 604_800 },
 ];
 
@@ -177,25 +187,20 @@ export async function saveNote(
   throw new ApiError(res.status, body?.error ?? `Request failed (${res.status})`);
 }
 
-/** An empty transfer for other people to send files into. */
-export function createCollection(expiresIn: number, title?: string) {
-  return request<Created>("/api/transfers", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ files: [], expiresIn, collect: true, title }),
-  });
-}
-
 /** Where this deployment's STUN responder listens, so peers can find each other. */
 export function getConfig() {
   return request<{ stunPort: number | null }>("/api/config");
 }
 
-/** Public transfers, newest first. `q` narrows by title; `limit` is how many to ask for. */
-export function listPublic(options: { q?: string; limit?: number } = {}) {
+/**
+ * Public transfers, newest first. `q` narrows by title and `kind` to files or text; `limit` is how
+ * many to ask for.
+ */
+export function listPublic(options: { q?: string; limit?: number; kind?: "files" | "text" } = {}) {
   const params = new URLSearchParams();
   if (options.q) params.set("q", options.q);
   if (options.limit) params.set("limit", String(options.limit));
+  if (options.kind) params.set("kind", options.kind);
   const query = params.toString();
   return request<Summary[]>(`/api/public${query ? `?${query}` : ""}`);
 }
@@ -209,7 +214,7 @@ export interface AddedFile {
 
 /**
  * Adds files to a transfer, answering with the index and final path of each, in order. The
- * owner's token adds to any transfer; to a collection anyone may add, under a folder named by
+ * owner's token adds to any transfer; to an open share anyone may add, under a folder named by
  * `from`, and gets back a token for uploading what they added — to send again with more.
  */
 export function appendFiles(code: string, token: string | undefined, files: NewFile[], from?: string) {
@@ -237,13 +242,16 @@ export function countDownload(code: string) {
 export function updateTransfer(
   code: string,
   token: string,
-  changes: { expiresIn?: number; closed?: boolean; editable?: boolean },
+  changes: { expiresIn?: number; open?: boolean; editable?: boolean; public?: boolean },
 ) {
-  return request<{ expiresAt: string; closed: boolean; editable: boolean }>(transferUrl(code), {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...auth(token) },
-    body: JSON.stringify(changes),
-  });
+  return request<{ expiresAt: string; open: boolean; editable: boolean; public: boolean; lifetime: number | null }>(
+    transferUrl(code),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...auth(token) },
+      body: JSON.stringify(changes),
+    },
+  );
 }
 
 export function deleteTransfer(code: string, token: string) {

@@ -62,6 +62,7 @@ pub async fn save_note(
     .fetch_optional(&state.db)
     .await?;
     if let Some(version) = saved {
+        state.notes.changed(transfer.id);
         return Ok(Json(NoteState {
             text: req.text,
             version,

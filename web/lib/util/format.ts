@@ -22,7 +22,19 @@ export function formatDuration(seconds: number): string {
   return `${Math.floor(h / 24)}d ${h % 24}h`;
 }
 
-export function formatRemaining(expiresAt: string, now = Date.now()): string {
+/** A length of time as a setting reads, e.g. "5 minutes" or "1 day". */
+function formatLength(seconds: number): string {
+  if (seconds < 3600) return plural(Math.round(seconds / 60), "minute");
+  if (seconds < 86_400) return plural(Math.round(seconds / 3600), "hour");
+  return plural(Math.round(seconds / 86_400), "day");
+}
+
+/**
+ * How long until a transfer expires. `afterUpload` is its lifetime while its upload is still
+ * running, which only starts counting once the upload completes.
+ */
+export function formatRemaining(expiresAt: string, now = Date.now(), afterUpload?: number | null): string {
+  if (afterUpload) return `Expires ${formatLength(afterUpload)} after upload`;
   const s = (Date.parse(expiresAt) - now) / 1000;
   if (s <= 0) return "Expired";
   if (s < 3600) return `Expires in ${Math.ceil(s / 60)} min`;
@@ -37,8 +49,14 @@ export function formatRemaining(expiresAt: string, now = Date.now()): string {
  * code is reserved: the transfer itself ends with the tab serving it. Reporting the expiry
  * would promise days for something that may already be over.
  */
-export function formatLifetime(expiresAt: string, hosted: boolean, serving: boolean, now = Date.now()): string {
-  if (!hosted) return formatRemaining(expiresAt, now);
+export function formatLifetime(
+  expiresAt: string,
+  hosted: boolean,
+  serving: boolean,
+  now = Date.now(),
+  afterUpload?: number | null,
+): string {
+  if (!hosted) return formatRemaining(expiresAt, now, afterUpload);
   return serving ? "While this page is open" : "Ended when the page closed";
 }
 

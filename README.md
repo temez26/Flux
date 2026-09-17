@@ -1,16 +1,23 @@
 # Flux
 
-Self-hosted file transfer for your home network. Drop files or folders, share a code, link or QR
-code. Receivers take single files or the lot as one zip.
+Self-hosted file transfer for your home network. Drop files or folders, share a link or QR code.
+Receivers take single files or the lot as one zip.
+
+The home page has a tab for each way to share, with everything shared publicly listed below:
+
+- **Public** — upload files anyone who opens Flux can see and download, and optionally let them
+  add their own
+- **Device** — pick a nearby device and send files straight to it; nothing is uploaded
+- **Text** — a note, link or password, listed publicly or reachable by link only, read only or
+  edited together; edits save as you type and reach everyone who has it open. Can be sent to a
+  nearby device too
+
+And throughout:
 
 - Very large files and thousands of them, resumable (pause, retry, cancel)
 - BLAKE3 integrity check end to end
-- Upload to the server, or send straight from your device
-- Send to another device on your network without a code
-- Collect files from others: hand out a code people add files to
-- Optional public listing on the home page
-- Expires after 1 hour, 1 day or 7 days
-- Installable, mobile-first web app
+- Expires after 5 minutes to 7 days, set once in Settings; uploads count from when they finish
+- Installable, mobile-first, keyboard and screen reader friendly web app
 
 ## Run
 
@@ -88,11 +95,11 @@ Before a PR, `npm run lint` and `npm run format` in `web/`, `cargo clippy --all-
 `cargo fmt` in `server/`.
 
 `server/` — Rust API (axum, sqlx, PostgreSQL), also serves the web app. A module per concern:
-`upload`, `download`, `zip`, `thumbs`, `signal`, `nearby`, `stun`, `cleanup`.
+`upload`, `download`, `zip`, `thumbs`, `signal`, `nearby`, `notes` (live text), `stun`, `cleanup`.
 
 `web/` — Next.js, static export. `lib/` is the transfer engine and never imports a component:
 `transfer/` uploads, downloads and direct sends, `nearby/` device discovery, `save/` writing to
 disk, `storage/` what the browser remembers, `preview/`, `platform/` browser integrations,
-`alerts/` toasts and notifications, `util/`. `components/` renders it: `home/` the start page, `transfer/` a file per
-panel, `preview/` a file per viewer family, `files/` the file browser and pickers, `ui/` the
+`alerts/` toasts and notifications, `util/`. `components/` renders it: `home/` the start page and its tabs, `share/` what each tab
+shares, `lists/` the transfer listings, `transfer/` a file per panel, `preview/` a file per viewer family, `files/` the file browser and pickers, `ui/` the
 shared primitives.

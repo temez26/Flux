@@ -26,7 +26,10 @@ pub use listing::{list_public, summary};
 pub use manage::{count_download, delete, update};
 pub use note::save_note;
 
-const EXPIRY_CHOICES: [i64; 3] = [3600, 86_400, 604_800];
+/// 5, 15 and 30 minutes, 1 and 6 hours, 1, 3 and 7 days.
+const EXPIRY_CHOICES: [i64; 8] = [300, 900, 1800, 3600, 21_600, 86_400, 259_200, 604_800];
+/// How long an unfinished upload is kept after it was last added to, whatever its lifetime.
+const UPLOAD_GRACE: i32 = 86_400;
 const MAX_FILES: usize = 100_000;
 /// A text transfer is a message, not a document: generous for that, and small enough to send
 /// whole on every save.
@@ -41,17 +44,19 @@ pub struct Transfer {
     pub expires_at: DateTime<Utc>,
     /// Served from the sender's device; the server never holds the bytes.
     pub hosted: bool,
-    /// Open to files from anyone with the code, not only from its owner.
-    pub collect: bool,
+    /// Listed for everyone who opens Flux.
+    pub public: bool,
+    /// A public share its owner opened to files from anyone who opens it.
+    pub open: bool,
     pub title: String,
     pub downloads: i32,
-    /// A collection no longer taking files.
-    pub closed: bool,
     /// The text of a text transfer, which has no files.
     pub note: Option<String>,
     /// Whether anyone with the code may edit the text, not only its owner.
     pub editable: bool,
     pub note_version: i32,
+    /// Seconds an uploaded transfer lasts once its upload completes; None when it counts from creation.
+    pub lifetime: Option<i32>,
 }
 
 pub fn normalize_code(raw: &str) -> String {
@@ -60,13 +65,44 @@ pub fn normalize_code(raw: &str) -> String {
 
 pub async fn find(db: &sqlx::PgPool, code: &str) -> Result<Transfer> {
     sqlx::query_as(
-        "SELECT id, code, token_hash, created_at, expires_at, hosted, collect, title, downloads, closed, note, editable, note_version FROM transfers
+        "SELECT id, code, token_hash, created_at, expires_at, hosted, public, open, title, downloads, note, editable, note_version, lifetime FROM transfers
          WHERE code = $1 AND expires_at > now()",
     )
     .bind(normalize_code(code))
     .fetch_optional(db)
     .await?
     .ok_or(AppError::NOT_FOUND)
+}
+
+/// Keeps an unfinished upload from expiring while it is still being added to. Only writes once the
+/// expiry has fallen a minute behind, so a stream of chunks costs an update now and then.
+pub async fn keep_uploading(db: &sqlx::PgPool, id: Uuid) -> Result<()> {
+    sqlx::query(
+        "UPDATE transfers SET expires_at = now() + make_interval(secs => GREATEST(lifetime, $2))
+         WHERE id = $1 AND lifetime IS NOT NULL
+           AND expires_at < now() + make_interval(secs => GREATEST(lifetime, $2) - 60)",
+    )
+    .bind(id)
+    .bind(UPLOAD_GRACE)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+/// Starts an uploaded transfer's lifetime once the last of its owner's files has arrived. It starts
+/// once: what others add to an open share later never keeps the share going longer.
+pub async fn start_lifetime(db: &sqlx::PgPool, id: Uuid) -> Result<()> {
+    sqlx::query(
+        "UPDATE transfers SET expires_at = now() + make_interval(secs => lifetime), lifetime = NULL
+         WHERE id = $1 AND lifetime IS NOT NULL
+           AND NOT EXISTS (
+             SELECT 1 FROM files WHERE transfer_id = $1 AND hash IS NULL AND upload_token_hash IS NULL
+           )",
+    )
+    .bind(id)
+    .execute(db)
+    .await?;
+    Ok(())
 }
 
 pub fn file_path(state: &Shared, transfer: Uuid, idx: i32) -> PathBuf {

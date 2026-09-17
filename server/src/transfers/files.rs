@@ -35,7 +35,7 @@ pub struct NewFile {
 #[derive(Deserialize)]
 pub struct NewFiles {
     files: Vec<NewFile>,
-    /// Who is adding to a collection; their files go into a folder by that name.
+    /// Who is adding to an open share; their files go into a folder by that name.
     #[serde(default)]
     from: Option<String>,
 }
@@ -50,7 +50,7 @@ pub struct AddedFile {
 #[derive(Serialize)]
 pub struct Added {
     files: Vec<AddedFile>,
-    /// For someone adding to a collection: what lets them upload, or cancel, what they added.
+    /// For someone adding to an open share: what lets them upload, or cancel, what they added.
     #[serde(skip_serializing_if = "Option::is_none")]
     token: Option<String>,
 }
@@ -135,8 +135,8 @@ pub(super) async fn insert_files(
 }
 
 /// Adds files to a transfer: one its owner created earlier, so a file forgotten the first time
-/// doesn't mean a new code for everyone it was already shared with, or a collection anyone with
-/// the code may add to. The files come back in the order asked for, with the index each was given.
+/// doesn't mean a new link for everyone it was already shared with, or an open share anyone who
+/// opens it may add to. The files come back in the order asked for, with the index each was given.
 pub async fn add_files(
     State(state): State<Shared>,
     Path(code): Path<String>,
@@ -145,16 +145,18 @@ pub async fn add_files(
 ) -> Result<Json<Added>> {
     let transfer = find(&state.db, &code).await?;
     let owner = bearer(&headers).is_some_and(|token| token_matches(token, &transfer));
-    // Someone adding to a collection gets a token of their own — or keeps the one they hold,
-    // coming back to add more — so the uploads they can finish or cancel are only theirs.
-    let contributor = match (owner, transfer.collect) {
+    // Someone adding to an open share gets a token of their own — or keeps the one they hold,
+    // coming back to add more — so the uploads they can finish or cancel are only theirs. Files
+    // they already added may still finish uploading once it closes; only new ones are refused.
+    let contributor = match (owner, transfer.open) {
         (true, _) => None,
-        // Files a contributor already added may still finish uploading; only new ones are refused.
-        (false, true) if transfer.closed => {
-            return Err(AppError(StatusCode::FORBIDDEN, "this collection is closed"));
-        }
         (false, true) => Some(bearer(&headers).map_or_else(|| hex(&rand::random::<[u8; 32]>()), str::to_owned)),
-        (false, false) => return Err(AppError::UNAUTHORIZED),
+        (false, false) => {
+            return Err(AppError(
+                StatusCode::FORBIDDEN,
+                "this share doesn't take files from others",
+            ));
+        }
     };
     if let Some(folder) = contributor
         .as_ref()

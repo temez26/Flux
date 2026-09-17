@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { countDownload, errorMessage, fileUrl, zipUrl, type FileMeta, type TransferMeta } from "@/lib/api";
 import { DirectClient } from "@/lib/transfer/direct";
 import { basename } from "@/lib/platform/files";
-import { formatBytes, formatCode, formatDuration, plural } from "@/lib/util/format";
+import { formatBytes, formatDuration, plural } from "@/lib/util/format";
 import { useLeaveGuard, useNotifyWhen, useTitle, useWakeLock } from "@/lib/hooks";
 import { canPreview } from "@/lib/preview/preview";
 import { Receiver, type ReceiveItem } from "@/lib/transfer/receive";
@@ -60,7 +60,8 @@ function checksumsUrl(meta: TransferMeta): string {
 }
 
 /** What someone who opened a code sees before they start downloading. */
-export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
+/** `children` go right below the heading card: what else can be done with the transfer. */
+export function ReceiverPanel({ meta, children }: { meta: TransferMeta; children?: ReactNode }) {
   const { size, received, complete, ready } = summarize(meta.files);
   const [initial] = useState({ ready: ready && !meta.hosted, size });
   /** How the whole transfer could be saved at once; null when it is too big to be. */
@@ -76,7 +77,7 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
   const [previewing, setPreviewing] = useState<number | null>(null);
   const paths = useMemo(() => meta.files.map((f) => f.path), [meta]);
   useSyncExternalStore(direct?.subscribe ?? subscribeNothing, direct?.getVersion ?? versionZero, versionZero);
-  useTitle(pageTitle(meta.code));
+  useTitle(pageTitle(meta.title));
   useRememberRecent(meta);
 
   useEffect(() => () => direct?.close(), [direct]);
@@ -262,6 +263,7 @@ export function ReceiverPanel({ meta }: { meta: TransferMeta }) {
           <InlinePreview code={meta.code} file={single} onExpand={() => setPreviewing(single.idx)} />
         )}
       </Card>
+      {children}
       {!single &&
         (meta.hosted ? (
           <FileBrowser
@@ -398,7 +400,7 @@ function ReceivingPanel({ receiver, meta, onBack }: { receiver: Receiver; meta: 
         {receiver.items.some((item) => item.source === "direct") && (
           <div className="mt-4">
             <Badge tone="ok" icon={<ZapIcon />}>
-              Direct from the sender · {formatCode(meta.code)}
+              Direct from the sender
             </Badge>
           </div>
         )}

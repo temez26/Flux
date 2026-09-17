@@ -25,6 +25,8 @@ struct FileInfo {
     modified: Option<i64>,
     hash: Option<String>,
     received: u64,
+    /// Added by someone other than the owner.
+    added: bool,
 }
 
 #[derive(Serialize)]
@@ -37,12 +39,14 @@ pub struct TransferInfo {
     note: Option<String>,
     editable: bool,
     note_version: i32,
-    collect: bool,
+    open: bool,
     downloads: i32,
-    closed: bool,
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
     hosted: bool,
+    public: bool,
+    /// Seconds it lasts once its upload completes; absent when it counts from creation.
+    lifetime: Option<i32>,
     files: Vec<FileInfo>,
 }
 
@@ -63,13 +67,13 @@ fn sizes_on_disk(dir: &std::path::Path, wanted: &HashSet<i32>) -> HashMap<i32, u
         .collect()
 }
 
-/// idx, path, size, mime, modified, hash
-type FileRow = (i32, String, i64, String, Option<i64>, Option<Vec<u8>>);
+/// idx, path, size, mime, modified, hash, added by someone other than the owner
+type FileRow = (i32, String, i64, String, Option<i64>, Option<Vec<u8>>, bool);
 
 pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers: HeaderMap) -> Result<Response> {
     let transfer = find(&state.db, &code).await?;
     let rows: Vec<FileRow> =
-        sqlx::query_as("SELECT idx, path, size, mime, modified, hash FROM files WHERE transfer_id = $1 ORDER BY idx")
+        sqlx::query_as("SELECT idx, path, size, mime, modified, hash, upload_token_hash IS NOT NULL FROM files WHERE transfer_id = $1 ORDER BY idx")
             .bind(transfer.id)
             .fetch_all(&state.db)
             .await?;
@@ -91,7 +95,7 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
 
     let files = rows
         .into_iter()
-        .map(|(idx, path, size, mime, modified, hash)| {
+        .map(|(idx, path, size, mime, modified, hash, added)| {
             let received = if hash.is_some() {
                 size as u64
             } else {
@@ -105,6 +109,7 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
                 modified,
                 hash: hash.as_deref().map(hex),
                 received,
+                added,
             }
         })
         .collect();
@@ -115,12 +120,13 @@ pub async fn get(State(state): State<Shared>, Path(code): Path<String>, headers:
         note: transfer.note,
         editable: transfer.editable,
         note_version: transfer.note_version,
-        collect: transfer.collect,
+        open: transfer.open,
         downloads: transfer.downloads,
-        closed: transfer.closed,
         created_at: transfer.created_at,
         expires_at: transfer.expires_at,
         hosted: transfer.hosted,
+        public: transfer.public,
+        lifetime: transfer.lifetime,
         files,
     })
     .map_err(|_| AppError::INTERNAL)?;

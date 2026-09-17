@@ -3,6 +3,7 @@ mod download;
 mod error;
 mod health;
 mod nearby;
+mod notes;
 mod signal;
 mod stun;
 mod thumbs;
@@ -33,6 +34,7 @@ pub struct AppState {
     pub uploads: upload::Registry,
     pub rooms: signal::Rooms,
     pub nearby: nearby::Presence,
+    pub notes: notes::Notes,
     /// Where pages should look for this server's STUN responder, if it started.
     pub stun_port: Option<u16>,
 }
@@ -87,6 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         uploads: Default::default(),
         rooms: Default::default(),
         nearby: Default::default(),
+        notes: Default::default(),
         stun_port: stun,
     });
     cleanup::remove_orphans(&state).await?;
@@ -132,6 +135,7 @@ fn app(state: Shared, web_dir: &std::path::Path) -> Router {
             "/transfers/{code}/note",
             put(transfers::save_note).layer(DefaultBodyLimit::max(8 << 20)),
         )
+        .route("/transfers/{code}/note/live", get(notes::connect))
         .route("/transfers/{code}/downloads", post(transfers::count_download))
         .route("/transfers/{code}/signal", get(signal::connect))
         .route("/nearby", get(nearby::connect))

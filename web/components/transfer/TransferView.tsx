@@ -6,14 +6,12 @@ import { removeOwned } from "@/lib/storage/owned";
 import { live } from "@/lib/transfer/session";
 import { AlertIcon, ClockIcon } from "../ui/icons";
 import { Message, Notice, Spinner } from "../ui/ui";
-import { CollectPanel } from "./CollectPanel";
-import { ContributePanel } from "./ContributePanel";
+import { AddFilesCard } from "./AddFilesCard";
 import { HostedPanel } from "./HostedPanel";
-import { NotePanel } from "./NotePanel";
+import { NotePanel } from "./note/NotePanel";
 import { OwnerPanel } from "./OwnerPanel";
 import { ReceiverPanel } from "./ReceiverPanel";
 import { SenderPanel } from "./SenderPanel";
-import { pageTitle } from "./common";
 
 /**
  * One transfer, seen from wherever this device stands in it: the tab that is sending,
@@ -25,7 +23,7 @@ export default function TransferView({ code }: { code: string }) {
   const owned = useOwned(code);
   const { meta, offline } = useTransferMeta(code, !session);
   // Panels set their own title (with progress); this covers the loading and error screens.
-  useTitle(session || meta ? undefined : pageTitle(code));
+  useTitle(session || meta ? undefined : "Flux");
 
   useEffect(() => {
     if (meta === null) removeOwned(code);
@@ -65,16 +63,10 @@ export default function TransferView({ code }: { code: string }) {
       )}
       {meta.note !== undefined ? (
         <NotePanel meta={meta} token={owned?.token} />
-      ) : meta.collect ? (
-        owned ? (
-          <CollectPanel meta={meta} token={owned.token} />
-        ) : (
-          <ContributePanel meta={meta} />
-        )
       ) : owned ? (
         <OwnerPanel meta={meta} token={owned.token} onResume={setSession} />
       ) : (
-        <ReceiverPanel meta={meta} />
+        <ReceiverPanel meta={meta}>{meta.open && <AddFilesCard meta={meta} />}</ReceiverPanel>
       )}
     </>
   );

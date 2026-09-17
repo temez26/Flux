@@ -21,3 +21,9 @@ test("and says so plainly once the tab has gone", () => {
     "rather than promising a week for something already over",
   );
 });
+
+test("an upload still under way counts its lifetime from when it completes", () => {
+  // The server keeps it for a day while it uploads; that is not how long it will last.
+  assert.equal(formatLifetime(inDays(1), false, true, Date.now(), 300), "Expires 5 minutes after upload");
+  assert.equal(formatLifetime(inDays(1), false, true, Date.now(), 86_400), "Expires 1 day after upload");
+});

@@ -1,8 +1,9 @@
 "use client";
 
+import { offerTitle } from "@/lib/nearby/nearby";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { errorMessage } from "@/lib/api";
-import { formatBytes, formatCode, formatDuration, plural } from "@/lib/util/format";
+import { formatBytes, formatDuration, plural } from "@/lib/util/format";
 import { useLeaveGuard, useNotifyWhen, useNow, useTitle, useTransferMeta, useWakeLock } from "@/lib/hooks";
 import { canPreview } from "@/lib/preview/preview";
 import type { Item, Uploader } from "@/lib/transfer/upload";
@@ -126,15 +127,18 @@ export function SenderPanel({
   });
   useWakeLock(running || serving);
   useLeaveGuard(!finished || serving);
-  const code = formatCode(uploader.code);
-  useNotifyWhen(finished && !counts.failed && !uploader.gone, "Upload finished", `${code} is ready to receive`);
+  useNotifyWhen(finished && !counts.failed && !uploader.gone, "Upload finished", "Your files are ready to receive");
   useNotifyWhen(
     finished && counts.failed > 0 && !uploader.gone,
     "Upload stopped",
-    `${plural(counts.failed, "file")} in ${code} failed`,
+    `${plural(counts.failed, "file")} failed to upload`,
   );
-  useNotifyWhen(serving, "A device is downloading", `${code}, straight from this device`);
-  useTitle(running ? `${percent(sent, total)}% uploaded · Flux` : pageTitle(uploader.code));
+  useNotifyWhen(serving, "A device is downloading", "Straight from this device");
+  useTitle(
+    running
+      ? `${percent(sent, total)}% uploaded · Flux`
+      : pageTitle(offerTitle(uploader.items.map((item) => item.path))),
+  );
 
   // The server deletes expired transfers, so stop uploading and serving at the same moment.
   useEffect(() => {
@@ -159,7 +163,12 @@ export function SenderPanel({
 
   return (
     <div className="space-y-4">
-      <ShareCard code={uploader.code} expiresAt={expiresAt} />
+      <ShareCard
+        code={uploader.code}
+        expiresAt={expiresAt}
+        uploading={!finished}
+        open={meta?.public ? meta.open : undefined}
+      />
       <StatusCard
         {...senderStatus(session, uploader)}
         percent={percent(sent, total)}

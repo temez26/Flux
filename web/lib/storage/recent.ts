@@ -10,7 +10,6 @@ export interface Recent {
   size: number;
   expiresAt: string;
   hosted?: boolean;
-  collect?: boolean;
   note?: boolean;
   openedAt: number;
 }
