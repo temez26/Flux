@@ -5,7 +5,7 @@ import { useMediaQuery } from "@/lib/hooks";
 import type { Picked } from "@/lib/platform/files";
 import { navigate } from "@/lib/platform/router";
 import { OwnedList } from "../lists/OwnedList";
-import { PublicList } from "../lists/PublicList";
+import { PublicShares } from "../lists/PublicShares";
 import { RecentList } from "../lists/RecentList";
 import { DropOverlay } from "../rooms/files/DropZone";
 import { handOff, type Handoffs, type Target } from "../rooms/handoff";
@@ -69,7 +69,7 @@ export default function Home() {
           </div>
         </div>
         <Card>
-          <PublicList kind="files" heading="h2" variant="full" />
+          <PublicShares heading="h2" variant="full" />
         </Card>
         <div className="grid grid-cols-2 items-start gap-4">
           <OwnedList />
@@ -89,7 +89,7 @@ export default function Home() {
         <ReceiveForm />
       </Card>
       <Card>
-        <PublicList kind="files" heading="h2" variant="preview" />
+        <PublicShares heading="h2" variant="preview" />
       </Card>
       <OwnedList />
       <RecentList />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
-import { EXPIRY_OPTIONS, errorMessage } from "@/lib/api";
+import { errorMessage } from "@/lib/api";
 import type { Peer } from "@/lib/nearby/nearby";
 import { navigate } from "@/lib/platform/router";
 import { sendNote } from "@/lib/transfer/session";
@@ -9,7 +9,8 @@ import { formatCode } from "@/lib/util/format";
 import { NearbyDevices } from "../../nearby";
 import { AlertIcon, DeviceIcon, GlobeIcon, LinkIcon, LockIcon, TextIcon, UsersIcon } from "../../ui/icons";
 import { Button, Field, Notice, Segmented, Spinner } from "../../ui/ui";
-import { useExpiry } from "../expiry";
+import { ExpiryNote } from "../../settings/ExpiryNote";
+import { useExpiry } from "../../settings/expiry";
 import { useHandoff } from "../handoff";
 import { usePaste } from "../incoming";
 import { offerTo } from "../offer";
@@ -33,7 +34,7 @@ export function TextComposer({ global }: { global: boolean }) {
   // Neither is remembered: publishing and handing out editing should always be conscious choices.
   const [isPublic, setIsPublic] = useState(false);
   const [editable, setEditable] = useState(false);
-  const [expiresIn, setExpiresIn] = useExpiry();
+  const [expiresIn] = useExpiry();
   const [target, setTarget] = useState<Peer | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +84,11 @@ export function TextComposer({ global }: { global: boolean }) {
       <div className="mt-4 grid gap-4 @xl:grid-cols-2">
         <Field
           label="Who can find it"
-          hint={isPublic ? "Listed in Text for anyone who opens Flux." : "Only people with the code, link or QR code."}
+          hint={
+            isPublic
+              ? "Listed in Public shares for anyone who opens Flux."
+              : "Only people with the code, link or QR code."
+          }
         >
           <Segmented
             label="Who can find it"
@@ -104,11 +109,7 @@ export function TextComposer({ global }: { global: boolean }) {
           />
         </Field>
       </div>
-      <div className="mt-4">
-        <Field label="Delete after" hint="You can change all of these after sharing.">
-          <Segmented label="Delete after" value={expiresIn} options={EXPIRY_OPTIONS} onChange={setExpiresIn} />
-        </Field>
-      </div>
+      <ExpiryNote className="mt-2" />
 
       <NearbyDevices target={target} onChoose={(peer) => setTarget(target?.device === peer.device ? null : peer)} />
 

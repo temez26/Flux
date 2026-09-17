@@ -5,6 +5,7 @@ import {
   useState,
   type AnchorHTMLAttributes,
   type ButtonHTMLAttributes,
+  type ComponentProps,
   type HTMLAttributes,
   type KeyboardEvent,
   type ReactNode,
@@ -34,11 +35,7 @@ export function Button({ variant, className, ...props }: ButtonProps) {
   return <button type="button" className={buttonClass(variant, className)} {...props} />;
 }
 
-export function IconButton({
-  label,
-  className = "",
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+export function IconButton({ label, className = "", ...props }: ComponentProps<"button"> & { label: string }) {
   return (
     <button type="button" aria-label={label} title={label} className={`${iconButtonClass} ${className}`} {...props} />
   );

@@ -10,7 +10,7 @@ import { RoomPage } from "./rooms/RoomViews";
 import { roomAt, WIDE_QUERY } from "./rooms/rooms";
 import { AlertIcon, BackIcon, LogoIcon } from "./ui/icons";
 import { IncomingOffers } from "./nearby";
-import { NotificationToggle } from "./notifications";
+import { SettingsMenu } from "./settings/SettingsMenu";
 import Toaster from "./ui/Toaster";
 import TransferView from "./transfer/TransferView";
 import { Badge, IconButton, Link, Message } from "./ui/ui";
@@ -105,7 +105,7 @@ export default function App() {
               Offline
             </Badge>
           )}
-          {mounted && <NotificationToggle />}
+          {mounted && <SettingsMenu />}
         </div>
       </header>
       <main id="main" ref={main} tabIndex={-1} className="flex-1 pt-4 outline-none">

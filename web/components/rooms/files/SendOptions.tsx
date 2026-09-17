@@ -1,7 +1,7 @@
 "use client";
 
-import { EXPIRY_OPTIONS } from "@/lib/api";
 import { DeviceIcon, UploadIcon } from "../../ui/icons";
+import { ExpiryNote } from "../../settings/ExpiryNote";
 import { Field, Segmented } from "../../ui/ui";
 
 const DELIVERY = [
@@ -10,19 +10,9 @@ const DELIVERY = [
 ];
 
 /** Where the files live, and for how long. */
-export function SendOptions({
-  hosted,
-  expiresIn,
-  onHosted,
-  onExpiresIn,
-}: {
-  hosted: boolean;
-  expiresIn: number;
-  onHosted: (hosted: boolean) => void;
-  onExpiresIn: (seconds: number) => void;
-}) {
+export function SendOptions({ hosted, onHosted }: { hosted: boolean; onHosted: (hosted: boolean) => void }) {
   return (
-    <div className="mt-5 grid gap-4 @md:grid-cols-2">
+    <div className="mt-5">
       <Field
         label="Where the files live"
         hint={
@@ -38,11 +28,7 @@ export function SendOptions({
           onChange={(v) => onHosted(v === "device")}
         />
       </Field>
-      {!hosted && (
-        <Field label="Delete after" hint="Files are removed automatically.">
-          <Segmented label="Delete after" value={expiresIn} options={EXPIRY_OPTIONS} onChange={onExpiresIn} />
-        </Field>
-      )}
+      {!hosted && <ExpiryNote className="mt-2" />}
     </div>
   );
 }

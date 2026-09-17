@@ -12,7 +12,7 @@ import { useFilePickers } from "../../files/picker";
 import { NearbyDevices } from "../../nearby";
 import { AlertIcon, DeviceIcon } from "../../ui/icons";
 import { Notice } from "../../ui/ui";
-import { useExpiry } from "../expiry";
+import { useExpiry } from "../../settings/expiry";
 import { useHandoff } from "../handoff";
 import { usePaste, useWindowDrop } from "../incoming";
 import { offerTo } from "../offer";
@@ -29,7 +29,7 @@ const HOSTED_EXPIRY = 604_800;
  * the page, which only the one sender on a page may do.
  */
 export function FileSender({ isPublic, global }: { isPublic: boolean; global: boolean }) {
-  const [expiresIn, setExpiresIn] = useExpiry();
+  const [expiresIn] = useExpiry();
   // Deliberately not remembered: sharing from this device only lasts as long as the page stays open.
   const [hosted, setHosted] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -118,7 +118,7 @@ export function FileSender({ isPublic, global }: { isPublic: boolean; global: bo
       )}
       {!isPublic && <NearbyDevices target={target} onChoose={chooseDevice} />}
 
-      <SendOptions hosted={hosted} expiresIn={expiresIn} onHosted={setHosted} onExpiresIn={setExpiresIn} />
+      <SendOptions hosted={hosted} onHosted={setHosted} />
 
       {error && (
         <Notice tone="err" role="alert" icon={<AlertIcon />} className="mt-4">

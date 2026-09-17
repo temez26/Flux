@@ -7,10 +7,12 @@ Sharing is split into rooms, each on its own page. On a phone the home page link
 wide screen it shows them side by side.
 
 - **Private share** — files for whoever has the code, link or QR code
-- **Public share** — files listed for everyone who opens Flux, browsed and searched from the home page
+- **Public share** — files listed for everyone who opens Flux
 - **Text** — a note, link or password, listed publicly or reachable by link only, read only or
   edited together; edits save as you type and reach everyone who has it open
 - **Collect files** — hand out a code people add files to
+
+Public files and texts are browsed and searched together from the home page, each in its own group.
 
 And throughout:
 
@@ -18,7 +20,7 @@ And throughout:
 - BLAKE3 integrity check end to end
 - Upload to the server, or send straight from your device
 - Send to another device on your network without a code
-- Expires after 1 hour, 1 day or 7 days
+- Expires after 5 minutes to 7 days, set once in Settings for everything you share
 - Installable, mobile-first, keyboard and screen reader friendly web app
 
 ## Run

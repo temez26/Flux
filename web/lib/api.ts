@@ -74,8 +74,13 @@ export class ApiError extends Error {
 
 /** How long a transfer can be kept, the only lengths the server accepts. */
 export const EXPIRY_OPTIONS = [
+  { label: "5 minutes", value: 300 },
+  { label: "15 minutes", value: 900 },
+  { label: "30 minutes", value: 1800 },
   { label: "1 hour", value: 3600 },
+  { label: "6 hours", value: 21_600 },
   { label: "1 day", value: 86_400 },
+  { label: "3 days", value: 259_200 },
   { label: "7 days", value: 604_800 },
 ];
 

@@ -26,7 +26,8 @@ pub use listing::{list_public, summary};
 pub use manage::{count_download, delete, update};
 pub use note::save_note;
 
-const EXPIRY_CHOICES: [i64; 3] = [3600, 86_400, 604_800];
+/// 5, 15 and 30 minutes, 1 and 6 hours, 1, 3 and 7 days.
+const EXPIRY_CHOICES: [i64; 8] = [300, 900, 1800, 3600, 21_600, 86_400, 259_200, 604_800];
 const MAX_FILES: usize = 100_000;
 /// A text transfer is a message, not a document: generous for that, and small enough to send
 /// whole on every save.

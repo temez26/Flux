@@ -1,18 +1,19 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
-import { EXPIRY_OPTIONS, errorMessage } from "@/lib/api";
+import { errorMessage } from "@/lib/api";
 import { navigate } from "@/lib/platform/router";
 import { collect } from "@/lib/transfer/session";
 import { formatCode } from "@/lib/util/format";
 import { AlertIcon, FolderIcon } from "../../ui/icons";
-import { Button, Field, Notice, Segmented, Spinner } from "../../ui/ui";
-import { useExpiry } from "../expiry";
+import { Button, Notice, Spinner } from "../../ui/ui";
+import { ExpiryNote } from "../../settings/ExpiryNote";
+import { useExpiry } from "../../settings/expiry";
 
 /** Opens a collection: a code other people use to send files here, rather than to receive them. */
 export function CollectForm() {
   const [name, setName] = useState("");
-  const [expiresIn, setExpiresIn] = useExpiry();
+  const [expiresIn] = useExpiry();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nameId = useId();
@@ -50,9 +51,7 @@ export function CollectForm() {
           Optional. Anyone you give the code to can add files, and download what&apos;s there.
         </p>
       </div>
-      <Field label="Delete after" hint="Collected files are removed automatically.">
-        <Segmented label="Delete after" value={expiresIn} options={EXPIRY_OPTIONS} onChange={setExpiresIn} />
-      </Field>
+      <ExpiryNote />
       {error && (
         <Notice tone="err" role="alert" icon={<AlertIcon />}>
           {error}

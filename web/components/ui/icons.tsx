@@ -60,6 +60,9 @@ export const GridIcon = (p: IconProps) => <Icon d="M4 4h7v7H4zM13 4h7v7h-7zM4 13
 export const BellIcon = (p: IconProps) => (
   <Icon d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" {...p} />
 );
+export const SettingsIcon = (p: IconProps) => (
+  <Icon d="M20 5h-7M9 5H4M20 12h-9M7 12H4M20 19h-5M11 19H4M11 3v4M7 10v4M15 17v4" {...p} />
+);
 export const TrashIcon = (p: IconProps) => <Icon d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3" {...p} />;
 export const PlusIcon = (p: IconProps) => <Icon d="M12 5v14M5 12h14" {...p} />;
 export const TextIcon = (p: IconProps) => <Icon d="M4 6h16M4 12h16M4 18h10" {...p} />;

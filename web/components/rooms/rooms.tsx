@@ -9,8 +9,6 @@ export interface Room {
   name: string;
   summary: string;
   Icon: ComponentType<IconProps>;
-  /** Lists what others shared publicly of the kind the room shares. */
-  lists?: "text";
 }
 
 export const ROOMS: Room[] = [
@@ -34,7 +32,6 @@ export const ROOMS: Room[] = [
     name: "Text",
     summary: "Share a note, link or password, to read or to edit together.",
     Icon: TextIcon,
-    lists: "text",
   },
   {
     id: "collect",

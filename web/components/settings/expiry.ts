@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { EXPIRY_OPTIONS } from "@/lib/api";
 
 const KEY = "flux.expiry";
-const DEFAULT = 86_400;
+const DEFAULT = 3600;
 const listeners = new Set<() => void>();
 /** Kept here too, so a choice holds for the visit where storage is refused. */
 let current: number | undefined;
@@ -32,9 +32,13 @@ function choose(seconds: number) {
 }
 
 /**
- * How long new shares last, remembered between visits and shared by every room, so rooms shown
- * side by side never disagree about it.
+ * How long new shares last, set in Settings, remembered between visits and used by every room, so
+ * rooms shown side by side never disagree about it.
  */
 export function useExpiry(): [number, (seconds: number) => void] {
   return [useSyncExternalStore(subscribe, read, () => DEFAULT), choose];
 }
+
+/** How a length shares last is written, e.g. "1 hour". */
+export const expiryLabel = (seconds: number) =>
+  EXPIRY_OPTIONS.find((option) => option.value === seconds)?.label ?? `${Math.round(seconds / 60)} minutes`;

@@ -31,7 +31,11 @@ export function NoteSettings({ meta, token }: { meta: TransferMeta; token: strin
     <div className="mt-5 grid gap-4 border-t border-line pt-5 @xl:grid-cols-2">
       <Field
         label="Who can find it"
-        hint={meta.public ? "Listed in Text for anyone who opens Flux." : "Only people with the code, link or QR code."}
+        hint={
+          meta.public
+            ? "Listed in Public shares for anyone who opens Flux."
+            : "Only people with the code, link or QR code."
+        }
       >
         <Segmented
           label="Who can find it"

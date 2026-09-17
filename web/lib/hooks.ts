@@ -249,8 +249,9 @@ export function useTitle(title: string | undefined) {
 /**
  * Runs `load` now and then every `intervalMs`. Hidden tabs skip refreshes (but still load
  * once) and refresh as soon as they become visible again. Failures keep the last state.
+ * A change of `key` (what is being loaded, such as a search) loads again at once.
  */
-export function usePolling(load: () => Promise<void>, intervalMs: number) {
+export function usePolling(load: () => Promise<void>, intervalMs: number, key?: string) {
   const latest = useRef(load);
   useEffect(() => {
     latest.current = load;
@@ -284,7 +285,7 @@ export function usePolling(load: () => Promise<void>, intervalMs: number) {
       window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [intervalMs]);
+  }, [intervalMs, key]);
 }
 
 const UPLOADING_POLL_MS = 2000;
