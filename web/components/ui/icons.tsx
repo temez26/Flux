@@ -86,7 +86,7 @@ export const QrIcon = (p: IconProps) => (
 const FileIcon = (p: IconProps) => (
   <Icon d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5" {...p} />
 );
-const ImageIcon = (p: IconProps) => <Icon d="M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15.5 9.5h.01" {...p} />;
+export const ImageIcon = (p: IconProps) => <Icon d="M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15.5 9.5h.01" {...p} />;
 const VideoIcon = (p: IconProps) => <Icon d="M3 6h12v12H3zM15 10l6-3.5v11L15 14" {...p} />;
 const AudioIcon = (p: IconProps) => (
   <Icon d="M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" {...p} />
