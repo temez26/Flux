@@ -9,8 +9,8 @@ export interface Room {
   name: string;
   summary: string;
   Icon: ComponentType<IconProps>;
-  /** What of other people's public shares the room lists. */
-  lists?: "files" | "text";
+  /** Lists what others shared publicly of the kind the room shares. */
+  lists?: "text";
 }
 
 export const ROOMS: Room[] = [
@@ -25,9 +25,8 @@ export const ROOMS: Room[] = [
     id: "public",
     path: "/public",
     name: "Public share",
-    summary: "Share files everyone on Flux can see, and browse what others shared.",
+    summary: "Share files everyone who opens Flux can see and download.",
     Icon: GlobeIcon,
-    lists: "files",
   },
   {
     id: "text",

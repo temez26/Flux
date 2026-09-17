@@ -56,19 +56,24 @@ export default function Home() {
         <h1 className="sr-only">Flux</h1>
         {chooser}
         <div className="grid grid-cols-2 items-start gap-4">
-          <div className="space-y-4">
-            <RoomPanel id="private" />
-            <RoomPanel id="public" />
-          </div>
+          <RoomPanel id="private" />
+          <RoomPanel id="public" />
+        </div>
+        <div className="grid grid-cols-2 items-start gap-4">
+          <RoomPanel id="text" />
           <div className="space-y-4">
             <Card aria-label="Open a share">
               <ReceiveForm />
             </Card>
-            <RoomPanel id="text" />
             <RoomPanel id="collect" />
-            <OwnedList />
-            <RecentList />
           </div>
+        </div>
+        <Card>
+          <PublicList kind="files" heading="h2" variant="full" />
+        </Card>
+        <div className="grid grid-cols-2 items-start gap-4">
+          <OwnedList />
+          <RecentList />
         </div>
       </div>
     );
@@ -83,8 +88,8 @@ export default function Home() {
       <Card aria-label="Open a share">
         <ReceiveForm />
       </Card>
-      <Card aria-label="Public files">
-        <PublicList kind="files" heading="h2" preview />
+      <Card>
+        <PublicList kind="files" heading="h2" variant="preview" />
       </Card>
       <OwnedList />
       <RecentList />

@@ -5,6 +5,7 @@ import { normalizeCode } from "@/lib/util/format";
 import { useMediaQuery, useMounted, useOnline } from "@/lib/hooks";
 import { navigate, usePath } from "@/lib/platform/router";
 import Home from "./home/Home";
+import { BrowsePage } from "./lists/BrowsePage";
 import { RoomPage } from "./rooms/RoomViews";
 import { roomAt, WIDE_QUERY } from "./rooms/rooms";
 import { AlertIcon, BackIcon, LogoIcon } from "./ui/icons";
@@ -67,6 +68,7 @@ export default function App() {
     if (code) view = <TransferView key={code} code={code} />;
     else if (path === "/") view = <Home />;
     else if (room) view = <RoomPage key={room.id} room={room} />;
+    else if (path === "/browse") view = <BrowsePage />;
     else
       view = (
         <Message icon={<AlertIcon />} title="Nothing here">

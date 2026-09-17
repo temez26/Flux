@@ -2,7 +2,7 @@
 
 import { useTitle } from "@/lib/hooks";
 import { PublicList } from "../lists/PublicList";
-import { ExpandIcon } from "../ui/icons";
+import { ArrowIcon, ExpandIcon, GlobeIcon } from "../ui/icons";
 import { Card, Link, SectionTitle, iconButtonClass } from "../ui/ui";
 import { CollectForm } from "./collect/CollectForm";
 import { FileSender } from "./files/FileSender";
@@ -45,8 +45,18 @@ export function RoomPage({ room }: { room: Room }) {
       </Card>
       {room.lists && (
         <Card>
-          <PublicList kind={room.lists} heading="h2" />
+          <PublicList kind={room.lists} heading="h2" variant="full" />
         </Card>
+      )}
+      {room.id === "public" && (
+        <Link
+          href="/browse"
+          className="flex min-h-12 items-center gap-2 rounded-xl px-1 text-sm font-medium text-accent transition hover:underline"
+        >
+          <GlobeIcon className="size-4" />
+          Browse what others shared publicly
+          <ArrowIcon className="size-4" />
+        </Link>
       )}
     </div>
   );
@@ -70,7 +80,7 @@ export function RoomPanel({ id }: { id: RoomId }) {
       <RoomBody id={id} standalone={false} />
       {room.lists && (
         <div className="mt-6 border-t border-line pt-5">
-          <PublicList kind={room.lists} heading="h3" />
+          <PublicList kind={room.lists} heading="h3" variant="compact" />
         </div>
       )}
     </Card>

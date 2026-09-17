@@ -7,7 +7,7 @@ Sharing is split into rooms, each on its own page. On a phone the home page link
 wide screen it shows them side by side.
 
 - **Private share** — files for whoever has the code, link or QR code
-- **Public share** — files listed for everyone who opens Flux, and a searchable listing of them
+- **Public share** — files listed for everyone who opens Flux, browsed and searched from the home page
 - **Text** — a note, link or password, listed publicly or reachable by link only, read only or
   edited together; edits save as you type and reach everyone who has it open
 - **Collect files** — hand out a code people add files to
