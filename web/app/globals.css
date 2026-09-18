@@ -232,6 +232,15 @@ body {
     }
   }
 
+  /* Menus and toasts sit over content that has to stay unreadable beneath them. The blur alone
+     can't promise that: a browser may drop it while a theme change cross-fades the page, and
+     the page then shows through. */
+  :root[data-theme="glass"] .floating {
+    background: linear-gradient(var(--surface), var(--surface)), var(--page);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
   /* A list's header, pinned while its rows scroll beneath. */
   .list-header {
     top: 0;
