@@ -6,6 +6,7 @@ mod nearby;
 mod notes;
 mod signal;
 mod stun;
+mod tags;
 mod thumbs;
 mod transfers;
 mod upload;
@@ -133,6 +134,7 @@ fn app(state: Shared, web_dir: &std::path::Path) -> Router {
                 .delete(transfers::delete_file),
         )
         .route("/transfers/{code}/files/{idx}/thumb", get(thumbs::thumb))
+        .route("/transfers/{code}/files/{idx}/tags", get(tags::tags))
         .route("/transfers/{code}/zip", get(download::zip))
         .route("/transfers/{code}/summary", get(transfers::summary))
         .route(

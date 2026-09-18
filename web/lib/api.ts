@@ -35,6 +35,29 @@ export interface TransferMeta {
   files: FileMeta[];
 }
 
+/** An audio file's tags, each null where the file doesn't say, and how it is encoded. */
+export interface AudioTags {
+  title?: string | null;
+  artist?: string | null;
+  album?: string | null;
+  albumArtist?: string | null;
+  genre?: string | null;
+  year?: number | null;
+  track?: number | null;
+  trackTotal?: number | null;
+  disc?: number | null;
+  discTotal?: number | null;
+  /** Seconds. */
+  duration: number;
+  /** Kilobits a second. */
+  bitrate?: number | null;
+  sampleRate?: number | null;
+  bitDepth?: number | null;
+  channels?: number | null;
+  /** Whether the file has cover art embedded, served as its thumbnail. */
+  cover: boolean;
+}
+
 export interface NewFile {
   path: string;
   size: number;
@@ -93,6 +116,8 @@ export const fileUrl = (code: string, idx: number) => `${transferUrl(code)}/file
 export const thumbUrl = (code: string, idx: number) => `${fileUrl(code, idx)}/thumb`;
 /** A bigger server-rendered copy, for showing an image the browser can't decode itself. */
 export const renderUrl = (code: string, idx: number) => `${thumbUrl(code, idx)}?full`;
+/** What an audio file's tags and encoding say about it; its cover art is its thumbnail. */
+export const tagsUrl = (code: string, idx: number) => `${fileUrl(code, idx)}/tags`;
 /** Served inline for the browser's PDF viewer; the server only allows this for PDFs. */
 export const inlineUrl = (code: string, idx: number) => `${fileUrl(code, idx)}?inline`;
 /**
@@ -232,6 +257,10 @@ export function getTransfer(code: string): Promise<TransferMeta | null> {
 
 export function getSummary(code: string): Promise<Summary | null> {
   return orNull(request<Summary>(`${transferUrl(code)}/summary`));
+}
+
+export function loadTags(url: string, signal: AbortSignal): Promise<AudioTags> {
+  return request<AudioTags>(url, { signal });
 }
 
 /** Records that a download of this transfer started. Best effort: it never holds a download up. */

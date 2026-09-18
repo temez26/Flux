@@ -105,6 +105,26 @@ pub async fn start_lifetime(db: &sqlx::PgPool, id: Uuid) -> Result<()> {
     Ok(())
 }
 
+/// A file's path within its transfer and its hash, once it has been uploaded in full.
+pub async fn complete_file(db: &sqlx::PgPool, transfer: Uuid, idx: i32) -> Result<(String, Vec<u8>)> {
+    sqlx::query_as("SELECT path, hash FROM files WHERE transfer_id = $1 AND idx = $2 AND hash IS NOT NULL")
+        .bind(transfer)
+        .bind(idx)
+        .fetch_optional(db)
+        .await?
+        .ok_or(AppError::NOT_FOUND)
+}
+
+/// A file's extension, lowercased; empty when it has none.
+pub fn extension(path: &str) -> String {
+    path.rsplit('/')
+        .next()
+        .unwrap_or(path)
+        .rsplit_once('.')
+        .map(|(_, ext)| ext.to_ascii_lowercase())
+        .unwrap_or_default()
+}
+
 pub fn file_path(state: &Shared, transfer: Uuid, idx: i32) -> PathBuf {
     state.data_dir.join(transfer.to_string()).join(idx.to_string())
 }

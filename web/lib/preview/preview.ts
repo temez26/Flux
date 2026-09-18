@@ -31,13 +31,20 @@ const SERVER_THUMBNAIL = /\.(jpe?g|png|gif|webp|bmp|tiff?|ico|hei[cf]|hif|avif)$
 // The rest only the browser can draw, and only by loading the whole file — so a listing
 // does that for small ones and gives up after.
 const SELF_THUMBNAIL_BYTES = 8e6;
+// Audio the server reads tags from, whose embedded cover art it serves as the thumbnail.
+const SERVER_COVER = /\.(mp3|m4a|aac|flac|wav|ogg|oga|opus)$/i;
 
 /** Where a listing should get this file's small preview, if it can have one at all. */
 export function thumbnailSource(file: FileMeta): "server" | "file" | null {
-  if (!canPreview(file) || previewKind(file.path) !== "image") return null;
+  const kind = previewKind(file.path);
+  if (kind === "audio") return hasTags(file) ? "server" : null;
+  if (!canPreview(file) || kind !== "image") return null;
   if (SERVER_THUMBNAIL.test(file.path)) return "server";
   return file.size <= SELF_THUMBNAIL_BYTES ? "file" : null;
 }
+
+/** Whether the server can read this audio file's tags and cover art. */
+export const hasTags = (file: FileMeta) => canPreview(file) && SERVER_COVER.test(file.path);
 
 export const TEXT_PREVIEW_BYTES = 512 * 1024;
 /** Office files are parsed in memory, so very large ones are left to a download. */

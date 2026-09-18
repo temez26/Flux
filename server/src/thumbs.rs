@@ -1,6 +1,6 @@
-//! Server-rendered views of an uploaded image, cached beside the file they came from: a
-//! tile for a listing, and a larger one for the viewer to fall back on when the browser
-//! can't decode the original itself.
+//! Server-rendered views of an uploaded image, or of an audio file's cover art, cached
+//! beside the file they came from: a tile for a listing, and a larger one for the viewer to
+//! fall back on when the browser can't decode the original itself.
 
 use std::{
     io::Cursor,
@@ -22,6 +22,7 @@ use crate::{
     Shared,
     download::{Part, respond},
     error::{AppError, Result},
+    tags,
     transfers::{self, hex},
 };
 
@@ -51,13 +52,28 @@ static DECODERS: LazyLock<Semaphore> = LazyLock::new(|| {
     Semaphore::new(permits)
 });
 
-fn extension(path: &str) -> String {
-    path.rsplit('/')
-        .next()
-        .unwrap_or(path)
-        .rsplit_once('.')
-        .map(|(_, ext)| ext.to_ascii_lowercase())
-        .unwrap_or_default()
+/// What the picture is decoded from.
+#[derive(Clone, Copy)]
+enum Source {
+    Image,
+    Heif,
+    /// The cover art embedded in an audio file.
+    Cover,
+}
+
+impl Source {
+    fn of(path: &str) -> Option<Self> {
+        let ext = transfers::extension(path);
+        if DECODABLE.contains(&ext.as_str()) {
+            Some(Self::Image)
+        } else if HEIF.contains(&ext.as_str()) {
+            Some(Self::Heif)
+        } else if tags::is_audio(&ext) {
+            Some(Self::Cover)
+        } else {
+            None
+        }
+    }
 }
 
 fn cache_dir(state: &Shared, transfer: Uuid) -> PathBuf {
@@ -126,23 +142,28 @@ fn decode_heif(source: &FsPath) -> Result<DynamicImage> {
     ))
 }
 
-fn decode_image(source: &FsPath) -> Result<DynamicImage> {
-    let mut reader = ImageReader::open(source)
-        .map_err(|_| AppError::NOT_FOUND)?
-        .with_guessed_format()
-        .map_err(|_| AppError::NOT_FOUND)?;
+fn decode<R: std::io::BufRead + std::io::Seek>(reader: ImageReader<R>) -> Result<DynamicImage> {
+    let mut reader = reader.with_guessed_format().map_err(|_| UNREADABLE)?;
     let mut limits = image::Limits::default();
     limits.max_alloc = Some(MAX_DECODED_BYTES);
     reader.limits(limits);
     reader.decode().map_err(|_| UNREADABLE)
 }
 
+fn decode_image(source: &FsPath) -> Result<DynamicImage> {
+    decode(ImageReader::open(source).map_err(|_| AppError::NOT_FOUND)?)
+}
+
+fn decode_cover(source: &FsPath) -> Result<DynamicImage> {
+    decode(ImageReader::new(Cursor::new(tags::cover(source)?)))
+}
+
 /// Shrinks `source` to fit `size`, keeping alpha by falling back to PNG when there is any.
-fn encode(source: &FsPath, size: Size, heif: bool) -> Result<(Vec<u8>, &'static str)> {
-    let image = if heif {
-        decode_heif(source)?
-    } else {
-        decode_image(source)?
+fn encode(path: &FsPath, size: Size, source: Source) -> Result<(Vec<u8>, &'static str)> {
+    let image = match source {
+        Source::Image => decode_image(path)?,
+        Source::Heif => decode_heif(path)?,
+        Source::Cover => decode_cover(path)?,
     };
     let edge = size.edge();
     // `thumbnail` fits the image to the box in both directions, so an image already smaller
@@ -209,22 +230,11 @@ pub async fn thumb(
 ) -> Result<Response> {
     let size = if query.full.is_some() { Size::Full } else { Size::Tile };
     let transfer = transfers::find(&state.db, &code).await?;
-    let (path, hash): (String, Vec<u8>) =
-        sqlx::query_as("SELECT path, hash FROM files WHERE transfer_id = $1 AND idx = $2 AND hash IS NOT NULL")
-            .bind(transfer.id)
-            .bind(idx)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or(AppError::NOT_FOUND)?;
-
-    let ext = extension(&path);
-    let heif = HEIF.contains(&ext.as_str());
-    if !heif && !DECODABLE.contains(&ext.as_str()) {
-        return Err(AppError(
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            "no preview for this file type",
-        ));
-    }
+    let (path, hash) = transfers::complete_file(&state.db, transfer.id, idx).await?;
+    let source = Source::of(&path).ok_or(AppError(
+        StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        "no preview for this file type",
+    ))?;
 
     let etag = format!("\"t{}{}\"", if size == Size::Full { "f" } else { "" }, hex(&hash));
     let name = size.stem(idx);
@@ -241,9 +251,9 @@ pub async fn thumb(
         }
     }
 
-    let source = transfers::file_path(&state, transfer.id, idx);
+    let file = transfers::file_path(&state, transfer.id, idx);
     let _permit = DECODERS.acquire().await.map_err(|_| AppError::INTERNAL)?;
-    let (bytes, mime) = tokio::task::spawn_blocking(move || encode(&source, size, heif))
+    let (bytes, mime) = tokio::task::spawn_blocking(move || encode(&file, size, source))
         .await
         .map_err(|_| AppError::INTERNAL)??;
 
@@ -292,11 +302,20 @@ mod tests {
     #[test]
     fn never_enlarges_an_image_that_already_fits() {
         for size in [Size::Tile, Size::Full] {
-            let (bytes, mime) = encode(FsPath::new(SAMPLE), size, true).expect("encodes");
+            let (bytes, mime) = encode(FsPath::new(SAMPLE), size, Source::Heif).expect("encodes");
             assert_eq!(mime, "image/jpeg", "no alpha, so JPEG");
             let decoded = image::load_from_memory(&bytes).expect("a readable image");
             assert_eq!((decoded.width(), decoded.height()), (64, 48), "left at its own size");
         }
+    }
+
+    #[test]
+    fn draws_an_audio_file_by_its_cover_art() {
+        let sample = tags::stored_sample("thumb");
+        let (bytes, _) = encode(&sample, Size::Tile, Source::Cover).expect("encodes");
+        let decoded = image::load_from_memory(&bytes).expect("a readable image").to_rgb8();
+        assert_eq!(decoded.dimensions(), (64, 64));
+        assert!(decoded.get_pixel(32, 32).0[0] > 200, "the red cover");
     }
 
     #[test]
