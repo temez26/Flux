@@ -29,14 +29,32 @@ function apply(theme: Theme) {
   for (const listener of listeners) listener();
 }
 
+let switching = false;
+
+/**
+ * Whether a theme change is cross-fading the page. Meanwhile the browser shows snapshots over
+ * the page and hands every click to the root element, whatever was under the pointer.
+ */
+export const isSwitchingTheme = () => switching;
+
 function choose(theme: Theme) {
   try {
     localStorage.setItem(KEY, theme);
   } catch {}
   // A cross-fade where the browser can do one cheaply; otherwise the change is instant.
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (!reduced && document.startViewTransition) document.startViewTransition(() => apply(theme));
-  else apply(theme);
+  if (!reduced && document.startViewTransition) {
+    const root = document.documentElement;
+    switching = true;
+    // Marked before the old page is captured, so both sides of the fade carry it.
+    root.dataset.switching = "";
+    document
+      .startViewTransition(() => apply(theme))
+      .finished.finally(() => {
+        switching = false;
+        delete root.dataset.switching;
+      });
+  } else apply(theme);
 }
 
 function subscribe(listener: () => void) {

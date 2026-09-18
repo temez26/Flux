@@ -25,7 +25,9 @@ const SUMMARY_SQL: &str =
         -- Nothing is pending for a hosted transfer: its bytes were never coming here. What others
         -- are still adding to an open share doesn't make the owner's share incomplete.
         t.hosted OR count(f.idx) FILTER (WHERE f.upload_token_hash IS NULL)
-          = count(f.hash) FILTER (WHERE f.upload_token_hash IS NULL) AS complete
+          = count(f.hash) FILTER (WHERE f.upload_token_hash IS NULL) AS complete,
+        CASE WHEN t.note IS NULL AND NOT t.hosted AND count(f.idx) = 1
+          THEN min(f.idx) FILTER (WHERE f.hash IS NOT NULL) END AS thumb
      FROM transfers t LEFT JOIN files f ON f.transfer_id = t.id";
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -44,6 +46,8 @@ pub struct Summary {
     files: i64,
     size: i64,
     complete: bool,
+    /// The only file, once it is here in full: a listing can show its thumbnail.
+    thumb: Option<i32>,
 }
 
 /// Wraps text as a LIKE pattern with its own wildcards demoted to ordinary characters.

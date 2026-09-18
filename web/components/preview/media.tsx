@@ -1,15 +1,24 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
-import { inlineUrl, renderUrl } from "@/lib/api";
+import { Fragment, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
+import { inlineUrl, renderUrl, tagsUrl, type AudioTags } from "@/lib/api";
 import { basename } from "@/lib/platform/files";
-import { thumbnailSource } from "@/lib/preview/preview";
+import { audioDetails, knownTags, loadKnownTags } from "@/lib/preview/audio";
+import { hasTags, thumbnailSource } from "@/lib/preview/preview";
 import { ExpandIcon, ExternalIcon, FileTypeIcon } from "../ui/icons";
 import { Spinner } from "../ui/ui";
-import { InlineFrame, Loading, Unavailable, overlayTextButton, type Status, type ViewProps } from "./chrome";
+import {
+  InlineFrame,
+  Loading,
+  Unavailable,
+  overlayTextButton,
+  useImageStatus,
+  useLoad,
+  type ViewProps,
+} from "./chrome";
 
 export function ImageView({ code, file, url, inline, onExpand }: ViewProps) {
-  const [status, setStatus] = useState<Status>("loading");
+  const { status, setStatus, ref: imageRef } = useImageStatus();
   /** Showing the server's rendering because the browser couldn't read the original. */
   const [rendered, setRendered] = useState(false);
   const [zoomable, setZoomable] = useState(false);
@@ -49,6 +58,7 @@ export function ImageView({ code, file, url, inline, onExpand }: ViewProps) {
     // eslint-disable-next-line @next/next/no-img-element -- served by the API, not a static asset
     <img
       key={rendered ? "rendered" : "original"}
+      ref={imageRef}
       src={rendered ? renderUrl(code, file.idx) : url}
       alt={name}
       draggable={false}
@@ -142,8 +152,75 @@ export function VideoView({ code, file, url, inline }: ViewProps) {
   );
 }
 
+// Stands in for `loadKnownTags` where the server can't read the file's tags, so nothing is fetched.
+const noTags = (): Promise<AudioTags> => Promise.reject(new Error("No tags to read"));
+
+/**
+ * Cover art. Until the tags say whether there is any, only a quiet placeholder shows; the
+ * file-type icon is for a track that has none.
+ */
+function Artwork({
+  src,
+  pending,
+  path,
+  className,
+  placeholder,
+  iconClassName,
+}: {
+  src?: string;
+  pending: boolean;
+  path: string;
+  className: string;
+  placeholder: string;
+  iconClassName: string;
+}) {
+  const { status, ref: imageRef, onLoad, onError } = useImageStatus();
+  const bare = !pending && (!src || status === "failed");
+  return (
+    <span
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden ${bare ? "bg-accent-solid text-accent-fg" : placeholder} ${className}`}
+    >
+      {bare && <FileTypeIcon path={path} className={iconClassName} />}
+      {src && status !== "failed" && (
+        // eslint-disable-next-line @next/next/no-img-element -- served by the API, not a static asset
+        <img
+          ref={imageRef}
+          src={src}
+          alt=""
+          onLoad={onLoad}
+          onError={onError}
+          className={`absolute inset-0 size-full object-cover transition-opacity duration-200 ${status === "ready" ? "opacity-100" : "opacity-0"}`}
+        />
+      )}
+    </span>
+  );
+}
+
+/** The cover, blurred to tint the viewer behind it; faded in rather than cut in. */
+function Backdrop({ src }: { src: string }) {
+  const { status, ref: imageRef, onLoad, onError } = useImageStatus();
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- served by the API, not a static asset
+    <img
+      ref={imageRef}
+      src={src}
+      alt=""
+      aria-hidden
+      onLoad={onLoad}
+      onError={onError}
+      className={`pointer-events-none fixed inset-0 size-full scale-110 object-cover blur-3xl transition-opacity duration-500 ${status === "ready" ? "opacity-30" : "opacity-0"}`}
+    />
+  );
+}
+
 export function AudioView({ code, file, url, inline }: ViewProps) {
   const [failed, setFailed] = useState(false);
+  const tagged = hasTags(file);
+  const source = tagsUrl(code, file.idx);
+  const loaded = useLoad(source, tagged ? loadKnownTags : noTags);
+  // Tags the viewer fetched ahead, for the track after this one, are there on the first render.
+  const tags = loaded.data ?? knownTags(source);
+  const pending = tagged && !tags && !loaded.failed;
   if (failed)
     return (
       <Unavailable
@@ -164,15 +241,67 @@ export function AudioView({ code, file, url, inline }: ViewProps) {
       className="w-full"
     />
   );
-  if (inline) return player;
+  const title = tags?.title ?? basename(file.path);
+  const byline = [tags?.artist, tags?.album].filter(Boolean).join(" · ");
+  const cover = tags?.cover ? renderUrl(code, file.idx) : undefined;
+
+  if (inline) {
+    // The same card from the start, so the player in it isn't replaced, and stopped, once the tags come.
+    if (!tagged) return player;
+    return (
+      <div className="rounded-xl border border-line bg-bg p-3">
+        <div className="mb-3 flex items-center gap-3">
+          <Artwork
+            src={cover}
+            pending={pending}
+            path={file.path}
+            className="size-14 rounded-lg"
+            placeholder="bg-hover"
+            iconClassName="size-6"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-medium">{title}</p>
+            {byline && <p className="truncate text-sm text-muted">{byline}</p>}
+          </div>
+        </div>
+        {player}
+      </div>
+    );
+  }
+
+  const details = tags ? audioDetails(tags) : [];
   return (
-    <div className="absolute inset-0 flex touch-pan-y items-center justify-center p-6">
-      <div className="flex w-full max-w-md flex-col items-center text-center">
-        <span className="flex size-40 items-center justify-center rounded-3xl bg-accent-solid text-accent-fg shadow-2xl shadow-accent-solid/30 sm:size-48">
-          <FileTypeIcon path={file.path} className="size-16" />
-        </span>
-        <p className="mt-6 w-full truncate font-semibold">{basename(file.path)}</p>
-        <div className="mt-6 w-full">{player}</div>
+    <div className="absolute inset-0 touch-pan-y overflow-y-auto overscroll-contain">
+      {cover && <Backdrop src={cover} />}
+      <div className="relative flex min-h-full items-center justify-center p-6">
+        {/* Shown whole once the tags are in, rather than laid out twice as they arrive. A track
+            the viewer fetched ahead has them from the start and never fades. */}
+        <div
+          className={`flex w-full max-w-md flex-col items-center text-center ${pending ? "opacity-0" : "opacity-100 transition-opacity duration-200"}`}
+        >
+          <Artwork
+            src={cover}
+            pending={pending}
+            path={file.path}
+            className="size-48 rounded-3xl shadow-2xl shadow-black/50 sm:size-64"
+            placeholder="bg-white/10"
+            iconClassName="size-16"
+          />
+          <p className="mt-6 w-full truncate text-lg font-semibold">{title}</p>
+          {/* Held open while the tags come, so the player below doesn't jump when they do. */}
+          <p className="w-full truncate text-sm text-white/70">{byline || " "}</p>
+          <div className="mt-6 w-full">{player}</div>
+          {details.length > 0 && (
+            <dl className="mt-6 grid w-full grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-2xl bg-white/5 p-4 text-left text-sm">
+              {details.map(([label, value]) => (
+                <Fragment key={label}>
+                  <dt className="text-white/50">{label}</dt>
+                  <dd className="min-w-0 truncate tabular-nums">{value}</dd>
+                </Fragment>
+              ))}
+            </dl>
+          )}
+        </div>
       </div>
     </div>
   );

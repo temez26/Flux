@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { getReceived } from "@/lib/storage/received";
 import { clearRecent, forgetRecent, listRecent, recentVersion, subscribeRecent } from "@/lib/storage/recent";
+import { summaryThumbUrl } from "@/lib/preview/preview";
 import { formatBytes, formatRemaining, plural } from "@/lib/util/format";
 import { CheckIcon, DownloadIcon, FileTypeIcon, FolderIcon, TextIcon } from "../ui/icons";
 import { Badge, Card, SectionTitle } from "../ui/ui";
@@ -46,6 +47,7 @@ export function RecentList() {
                 <FileTypeIcon path={r.title} className="size-4.5" />
               )
             }
+            thumb={summaryThumbUrl(summary)}
             title={summary?.title ?? r.title}
             detail={[
               r.note ? "Text" : plural(files, "file"),

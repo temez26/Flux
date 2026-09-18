@@ -104,9 +104,9 @@ export function ShareTabs({ tab }: { tab: ShareTab }) {
         role="tablist"
         aria-label="How to share"
         onKeyDown={onKeyDown}
-        className="relative grid grid-cols-3 gap-1 rounded-2xl border border-line bg-bg p-1"
+        className="relative grid grid-cols-3 gap-1 rounded-inset border border-line bg-bg p-1"
       >
-        <Thumb count={TABS.length} index={index} className="rounded-xl" />
+        <Thumb count={TABS.length} index={index} className="rounded-inset-inner" />
         {TABS.map((t) => {
           const selected = t.id === tab.id;
           return (
@@ -119,7 +119,7 @@ export function ShareTabs({ tab }: { tab: ShareTab }) {
               aria-controls={`${id}-panel`}
               tabIndex={selected ? 0 : -1}
               onClick={() => !selected && navigate(t.path)}
-              className={`relative flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl px-1 text-sm font-medium transition sm:min-h-12 sm:flex-row sm:gap-2 ${
+              className={`relative flex min-h-16 flex-col items-center justify-center gap-1 rounded-inset-inner px-1 text-sm font-medium transition sm:min-h-12 sm:flex-row sm:gap-2 ${
                 selected ? "text-accent" : "text-muted hover:bg-hover hover:text-fg"
               }`}
             >

@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { fileUrl, inlineUrl, thumbUrl, type FileMeta } from "@/lib/api";
+import { fileUrl, inlineUrl, renderUrl, tagsUrl, thumbUrl, type FileMeta } from "@/lib/api";
 import { basename } from "@/lib/platform/files";
 import { formatBytes } from "@/lib/util/format";
-import { canPreview, OFFICE_PREVIEW_BYTES, previewKind, thumbnailSource } from "@/lib/preview/preview";
+import { loadKnownTags } from "@/lib/preview/audio";
+import { canPreview, hasTags, OFFICE_PREVIEW_BYTES, previewKind, thumbnailSource } from "@/lib/preview/preview";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, DownloadIcon, ExternalIcon, FileTypeIcon } from "../ui/icons";
 import { ShareFilesButton } from "../transfer/ShareFiles";
 import { Unavailable, overlayButton, overlayTextButton, type Target, type ViewProps } from "./chrome";
@@ -62,6 +63,22 @@ export function PreviewDialog({
   const previewable = useMemo(() => files.filter(canPreview), [files]);
   const position = previewable.findIndex((f) => f.idx === idx);
   return position < 0 ? null : <Viewer code={code} files={previewable} position={position} onChange={onChange} />;
+}
+
+/**
+ * Loads the files either side of the one on show ahead of time, so stepping through photos, or
+ * an album's tracks with their tags and covers, shows each at once.
+ */
+function warm(code: string, file: FileMeta) {
+  const kind = previewKind(file.path);
+  if (kind === "image") new Image().src = fileUrl(code, file.idx);
+  if (kind !== "audio" || !hasTags(file)) return;
+  loadKnownTags(tagsUrl(code, file.idx)).then(
+    (tags) => {
+      if (tags.cover) new Image().src = renderUrl(code, file.idx);
+    },
+    () => {},
+  );
 }
 
 function Viewer({
@@ -128,11 +145,8 @@ function Viewer({
     return () => window.removeEventListener("keydown", onKey);
   }, [prev, next, onChange, close]);
 
-  // Warm the cache so stepping through photos feels instant.
   useEffect(() => {
-    for (const neighbour of [prev, next]) {
-      if (neighbour && previewKind(neighbour.path) === "image") new Image().src = fileUrl(code, neighbour.idx);
-    }
+    for (const neighbour of [prev, next]) if (neighbour) warm(code, neighbour);
   }, [code, prev, next]);
 
   function startSwipe(e: PointerEvent) {

@@ -79,7 +79,7 @@ export function TextComposer() {
         }}
         placeholder="Paste a link, a note, a password…"
         spellCheck={false}
-        className="block min-h-40 w-full resize-y rounded-2xl border-2 border-line bg-bg p-3 text-base outline-none! transition-colors placeholder:text-muted focus:border-accent"
+        className="block min-h-40 w-full resize-y rounded-inset border-2 border-line bg-bg p-3 text-base outline-none! transition-colors placeholder:text-muted focus:border-accent"
       />
       <p className="mt-1.5 hidden text-xs text-muted pointer-fine:block">Ctrl+Enter to share</p>
 
@@ -108,7 +108,7 @@ export function TextComposer() {
           {error}
         </Notice>
       )}
-      <div className="mt-5 rounded-2xl border border-line p-3">
+      <div className="mt-5 rounded-inset border border-line p-3">
         <div className="flex min-h-11 items-center gap-3">
           <p id={`${id}-device`} className="min-w-0 flex-1 text-sm font-medium">
             Send to a device too

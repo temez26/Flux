@@ -110,6 +110,12 @@
 }
 
 @theme {
+  /* A box set inside a card. Its corner follows the card's rather than repeating it, which
+     inset by the card's padding would look rounder than the card itself. */
+  --radius-inset: 1rem;
+  /* What sits in a box of that radius or of `xl`, padded 0.25rem: a segmented control's options. */
+  --radius-inset-inner: calc(var(--radius-inset) - 0.25rem);
+  --radius-xl-inner: calc(var(--radius-xl) - 0.25rem);
   --animate-panel-from-right: panel-from-right 0.32s var(--ease-out);
   --animate-panel-from-left: panel-from-left 0.32s var(--ease-out);
   --animate-view-in: view-in 0.35s var(--ease-out);
@@ -171,6 +177,7 @@ body {
 :root[data-theme="glass"] {
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
+  --radius-inset: calc(var(--radius-2xl) - 0.75rem);
 }
 
 /* One fixed layer rather than a fixed background, which repaints on every scroll. Static, so
@@ -198,6 +205,7 @@ body {
 :root[data-theme="studio"] {
   --radius-xl: 0.875rem;
   --radius-2xl: 1.375rem;
+  --radius-inset: calc(var(--radius-2xl) - 0.75rem);
   font-family:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   letter-spacing: -0.011em;
@@ -213,6 +221,8 @@ body {
   }
 
   .floating {
+    /* Holds the layer glass lays over it while themes change; utilities still place it. */
+    position: relative;
     --surface-shadow: var(--float-shadow);
   }
 
@@ -230,6 +240,26 @@ body {
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
     }
+  }
+
+  /* Firefox draws a theme change's cross-fade without backdrop blur, so a glass menu would
+     show the page through it until the fade ends. A solid layer covers it meanwhile, then
+     fades out rather than snapping back to glass. */
+  :root[data-theme="glass"] .floating::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: linear-gradient(var(--surface), var(--surface)), var(--page);
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    pointer-events: none;
+  }
+
+  :root[data-theme="glass"][data-switching] .floating::before {
+    opacity: 1;
+    transition: none;
   }
 
   /* A list's header, pinned while its rows scroll beneath. */

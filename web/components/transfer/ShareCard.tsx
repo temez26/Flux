@@ -140,22 +140,31 @@ export function ShareCard({
           <span className="text-muted">{uploading ? "after the upload" : "from now"}</span>
         </div>
       )}
-      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap gap-2">
-            <Button variant="primary" onClick={shareLink}>
+          <p className="text-xs font-medium text-muted">Code</p>
+          {/* Read out or typed after the address, so it is shown large and without mixed case. */}
+          <p className="mt-1 font-mono text-3xl font-semibold tracking-wider uppercase">{formatted}</p>
+          <div className="mt-4 flex items-center gap-1 rounded-inset border border-line bg-bg p-1 pl-3">
+            <span className="min-w-0 flex-1 truncate text-sm text-muted" title={link}>
+              {link.replace(/^https?:\/\//, "")}
+            </span>
+            <Button variant="primary" className="shrink-0 !rounded-inset-inner" onClick={shareLink}>
               <LinkIcon className="size-4" />
               {canShare ? "Share link" : "Copy link"}
             </Button>
-            <Button className="sm:hidden" onClick={() => setShowQr((v) => !v)} aria-pressed={showQr}>
-              <QrIcon className="size-4" />
-              {showQr ? "Hide QR code" : "Show QR code"}
-            </Button>
           </div>
+          <Button className="mt-2 w-full sm:hidden" onClick={() => setShowQr((v) => !v)} aria-pressed={showQr}>
+            <QrIcon className="size-4" />
+            {showQr ? "Hide QR code" : "Show QR code"}
+          </Button>
         </div>
-        <div className={`${showQr ? "block" : "hidden"} mx-auto size-52 shrink-0 sm:block sm:size-36`}>
-          <QrCode text={link} />
-        </div>
+        <figure className={`${showQr ? "flex" : "hidden"} shrink-0 flex-col items-center gap-2 sm:flex`}>
+          <div className="size-52 sm:size-36">
+            <QrCode text={link} />
+          </div>
+          <figcaption className="text-xs text-muted">Scan to open</figcaption>
+        </figure>
       </div>
       {owned && open !== undefined && (
         <div className="mt-4 flex items-center gap-3 border-t border-line pt-4">

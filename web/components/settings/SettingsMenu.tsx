@@ -7,7 +7,7 @@ import { IconButton, Segmented } from "../ui/ui";
 import { useExpiry } from "./expiry";
 import { InstallApp } from "./InstallApp";
 import { NotificationSwitch } from "./NotificationSwitch";
-import { useTheme } from "./theme";
+import { isSwitchingTheme, useTheme } from "./theme";
 import { THEMES } from "./themes";
 
 // Open from the header, or from any form's "Change" next to how long its share will last.
@@ -51,6 +51,8 @@ export function SettingsMenu() {
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && close(true);
     const onPointer = (e: PointerEvent) => {
+      // Mid theme change a click inside the panel arrives as one on the root, outside it.
+      if (isSwitchingTheme()) return;
       const target = e.target as Node;
       if (!panel.current?.contains(target) && !button.current?.contains(target)) close(false);
     };
