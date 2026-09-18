@@ -261,7 +261,7 @@ export function getSummary(code: string): Promise<Summary | null> {
   return orNull(request<Summary>(`${transferUrl(code)}/summary`));
 }
 
-export function loadTags(url: string, signal: AbortSignal): Promise<AudioTags> {
+export function loadTags(url: string, signal?: AbortSignal): Promise<AudioTags> {
   return request<AudioTags>(url, { signal });
 }
 

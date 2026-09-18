@@ -1,4 +1,19 @@
-import type { AudioTags } from "../api";
+import { loadTags, type AudioTags } from "../api";
+
+// A file's tags never change, and stepping through an album comes back to the same ones.
+const known = new Map<string, AudioTags>();
+
+/** Tags already fetched from `url`, so a track can be drawn in full on its first render. */
+export const knownTags = (url: string) => known.get(url);
+
+/** Fetches a file's tags once; later calls, such as the viewer warming a neighbour, reuse them. */
+export async function loadKnownTags(url: string, signal?: AbortSignal): Promise<AudioTags> {
+  const cached = known.get(url);
+  if (cached) return cached;
+  const tags = await loadTags(url, signal);
+  known.set(url, tags);
+  return tags;
+}
 
 /** A running time as a player shows it, e.g. "3:07" or "1:02:03". */
 export function formatPlaytime(seconds: number): string {

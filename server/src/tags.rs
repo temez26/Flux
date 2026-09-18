@@ -9,6 +9,7 @@ use axum::{
     http::StatusCode,
 };
 use lofty::{
+    config::ParseOptions,
     file::{AudioFile, TaggedFile, TaggedFileExt},
     picture::PictureType,
     probe::Probe,
@@ -30,10 +31,16 @@ pub fn is_audio(ext: &str) -> bool {
     AUDIO.contains(&ext)
 }
 
-/// Uploads are stored without their names, so the format is told from the content.
-fn read(source: &FsPath) -> Result<TaggedFile> {
+/// Uploads are stored without their names, so the format is told from the content. Working
+/// out how it is encoded can mean scanning the audio itself, so that is skipped where only the
+/// tags are wanted.
+fn read(source: &FsPath, properties: bool) -> Result<TaggedFile> {
     let probe = Probe::open(source).map_err(|_| AppError::NOT_FOUND)?;
-    probe.guess_file_type()?.read().map_err(|_| UNREADABLE)
+    probe
+        .options(ParseOptions::new().read_properties(properties))
+        .guess_file_type()?
+        .read()
+        .map_err(|_| UNREADABLE)
 }
 
 /// The tag a player would show: the format's own kind first, then whichever else it carries.
@@ -43,7 +50,7 @@ fn main_tag(file: &TaggedFile) -> Option<&Tag> {
 
 /// The embedded front cover, or failing that the first picture of any kind.
 pub fn cover(source: &FsPath) -> Result<Vec<u8>> {
-    let file = read(source)?;
+    let file = read(source, false)?;
     let pictures = file.tags().iter().flat_map(Tag::pictures);
     let picture = pictures
         .clone()
@@ -122,7 +129,7 @@ pub async fn tags(State(state): State<Shared>, Path((code, idx)): Path<(String, 
         return Err(AppError(StatusCode::UNSUPPORTED_MEDIA_TYPE, "not an audio file"));
     }
     let source = transfers::file_path(&state, transfer.id, idx);
-    let tags = tokio::task::spawn_blocking(move || read(&source).map(|file| describe(&file)))
+    let tags = tokio::task::spawn_blocking(move || read(&source, true).map(|file| describe(&file)))
         .await
         .map_err(|_| AppError::INTERNAL)??;
     Ok(Json(tags))
@@ -143,7 +150,7 @@ mod tests {
 
     #[test]
     fn reads_the_tags_a_player_shows() {
-        let tags = describe(&read(&stored_sample("tags")).expect("lofty reads it"));
+        let tags = describe(&read(&stored_sample("tags"), true).expect("lofty reads it"));
         assert_eq!(tags.title.as_deref(), Some("Test Song"));
         assert_eq!(tags.artist.as_deref(), Some("Test Artist"));
         assert_eq!(tags.album.as_deref(), Some("Test Album"));

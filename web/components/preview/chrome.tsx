@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { fileUrl, type FileMeta } from "@/lib/api";
 import { copyText } from "@/lib/platform/clipboard";
 import { toast } from "@/lib/alerts/toast";
@@ -26,6 +26,25 @@ export interface ViewProps extends Target {
 }
 
 export type Status = "loading" | "ready" | "failed";
+
+/**
+ * An image's loading state, for fading it in. One the browser already holds, as a neighbour
+ * warmed by the viewer, is found ready before its first paint, so it is shown at once rather
+ * than flashing in from nothing. Pass `ref` to the <img>, and `onLoad`/`onError` with it.
+ */
+export function useImageStatus() {
+  const [status, setStatus] = useState<Status>("loading");
+  const ref = useCallback((img: HTMLImageElement | null) => {
+    if (img?.complete && img.naturalWidth) setStatus((s) => (s === "loading" ? "ready" : s));
+  }, []);
+  return {
+    status,
+    setStatus,
+    ref,
+    onLoad: () => setStatus("ready"),
+    onError: () => setStatus("failed"),
+  };
+}
 
 export function useLoad<T>(url: string, load: (url: string, signal: AbortSignal) => Promise<T>) {
   const [result, setResult] = useState<{ data?: T; failed?: boolean }>({});
