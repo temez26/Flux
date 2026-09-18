@@ -38,4 +38,6 @@ test("lists only what the file says", () => {
 test("names the album artist only where it differs from the track's", () => {
   const details = audioDetails({ duration: 0, cover: false, artist: "Band", albumArtist: "Various Artists" });
   assert.deepEqual(details, [["Album artist", "Various Artists"]]);
+  const sameArtist = audioDetails({ duration: 0, cover: false, artist: "ABBA", albumArtist: "Abba" });
+  assert.deepEqual(sameArtist, [], "tagged in a different case is still the same artist");
 });

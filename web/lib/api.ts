@@ -87,6 +87,8 @@ export interface Summary {
   files: number;
   size: number;
   complete: boolean;
+  /** The only file, once it is on the server in full; absent from an older server. */
+  thumb?: number | null;
 }
 
 export class ApiError extends Error {

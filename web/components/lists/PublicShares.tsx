@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { listPublic, type Summary } from "@/lib/api";
 import { useNow, usePolling } from "@/lib/hooks";
+import { summaryThumbUrl } from "@/lib/preview/preview";
 import { formatBytes, formatRemaining, plural } from "@/lib/util/format";
 import { DeviceIcon, FileTypeIcon, FolderIcon, GlobeIcon, SearchIcon, TextIcon } from "../ui/icons";
 import { Badge, Button, SectionTitle, Spinner } from "../ui/ui";
@@ -118,6 +119,7 @@ function PublicRow({ transfer: t, now }: { transfer: Summary; now: number }) {
           <FileTypeIcon path={t.title} className="size-4.5" />
         )
       }
+      thumb={summaryThumbUrl(t)}
       title={t.title}
       detail={`${t.note ? "Text" : plural(t.files, "file")} · ${formatBytes(t.size)} · ${formatRemaining(t.expiresAt, now, t.complete ? null : t.lifetime)}`}
       badge={

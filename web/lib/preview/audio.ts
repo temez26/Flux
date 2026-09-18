@@ -29,7 +29,7 @@ export function audioQuality(tags: AudioTags): string {
 export function audioDetails(tags: AudioTags): [label: string, value: string][] {
   const rows: [string, string | null | undefined][] = [
     // Only worth a line where it says something the artist doesn't, as on a compilation.
-    ["Album artist", tags.albumArtist !== tags.artist ? tags.albumArtist : undefined],
+    ["Album artist", tags.albumArtist?.toLowerCase() !== tags.artist?.toLowerCase() ? tags.albumArtist : undefined],
     ["Year", tags.year ? String(tags.year) : undefined],
     ["Track", position(tags.track, tags.trackTotal)],
     ["Disc", position(tags.disc, tags.discTotal)],

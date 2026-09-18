@@ -1,4 +1,4 @@
-import type { FileMeta } from "../api";
+import { thumbUrl, type FileMeta, type Summary } from "../api";
 
 export type PreviewKind = "image" | "video" | "audio" | "pdf" | "text" | "docx" | "xlsx" | "pptx";
 
@@ -41,6 +41,16 @@ export function thumbnailSource(file: FileMeta): "server" | "file" | null {
   if (!canPreview(file) || kind !== "image") return null;
   if (SERVER_THUMBNAIL.test(file.path)) return "server";
   return file.size <= SELF_THUMBNAIL_BYTES ? "file" : null;
+}
+
+/**
+ * A single-file transfer's thumbnail for a listing, where the server draws one: the photo
+ * itself, or an audio file's cover art. Its title is that file's name.
+ */
+export function summaryThumbUrl(summary: Summary | undefined): string | undefined {
+  if (summary?.thumb == null) return undefined;
+  const { title } = summary;
+  return SERVER_THUMBNAIL.test(title) || SERVER_COVER.test(title) ? thumbUrl(summary.code, summary.thumb) : undefined;
 }
 
 /** Whether the server can read this audio file's tags and cover art. */
