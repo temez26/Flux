@@ -213,6 +213,8 @@ body {
   }
 
   .floating {
+    /* Holds the layer glass lays over it while themes change; utilities still place it. */
+    position: relative;
     --surface-shadow: var(--float-shadow);
   }
 
@@ -233,9 +235,23 @@ body {
   }
 
   /* Firefox draws a theme change's cross-fade without backdrop blur, so a glass menu would
-     show the page through it until the fade ends. */
-  :root[data-theme="glass"][data-switching] .floating {
+     show the page through it until the fade ends. A solid layer covers it meanwhile, then
+     fades out rather than snapping back to glass. */
+  :root[data-theme="glass"] .floating::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
     background: linear-gradient(var(--surface), var(--surface)), var(--page);
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    pointer-events: none;
+  }
+
+  :root[data-theme="glass"][data-switching] .floating::before {
+    opacity: 1;
+    transition: none;
   }
 
   /* A list's header, pinned while its rows scroll beneath. */
