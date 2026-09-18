@@ -9,7 +9,8 @@ import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, DownloadIcon, ExternalIco
 import { ShareFilesButton } from "../transfer/ShareFiles";
 import { Unavailable, overlayButton, overlayTextButton, type Target, type ViewProps } from "./chrome";
 import { DocxView, SheetView, SlidesView, TextView } from "./documents";
-import { AudioView, ImageView, PdfView, VideoView } from "./media";
+import { AudioView } from "./audio";
+import { ImageView, PdfView, VideoView } from "./media";
 
 const HISTORY_KEY = "fluxPreview";
 const SWIPE_DISTANCE = 60;
@@ -118,7 +119,9 @@ function Viewer({
         e.preventDefault();
         return close();
       }
+      // A player's own controls (a slider, a media element) take the arrow keys for themselves.
       if (e.altKey || e.ctrlKey || e.metaKey || e.target instanceof HTMLMediaElement) return;
+      if (e.target instanceof HTMLInputElement) return;
       const target = e.key === "ArrowLeft" ? prev : e.key === "ArrowRight" ? next : undefined;
       if (!target) return;
       e.preventDefault();
@@ -200,7 +203,7 @@ function Viewer({
         onPointerUp={endSwipe}
         onPointerCancel={() => (swipe.current = null)}
       >
-        <PreviewContent key={file.idx} code={code} file={file} />
+        <PreviewContent key={file.idx} code={code} file={file} {...steps(prev, next, onChange)} />
         {prev && (
           <button
             type="button"
@@ -251,14 +254,19 @@ function Viewer({
   );
 }
 
-function PreviewContent({
-  code,
-  file,
-  inline = false,
-  onExpand,
-}: Target & { inline?: boolean; onExpand?: () => void }) {
+/** What lets a player step through the viewer's files itself, as a music player steps through an album. */
+function steps(prev: FileMeta | undefined, next: FileMeta | undefined, onChange: (idx: number) => void) {
+  return {
+    onPrevious: prev && (() => onChange(prev.idx)),
+    onNext: next && (() => onChange(next.idx)),
+    nextIsAudio: !!next && previewKind(next.path) === "audio",
+  };
+}
+
+function PreviewContent({ inline = false, ...props }: Target & Partial<Omit<ViewProps, "url">>) {
+  const { code, file } = props;
   const kind = previewKind(file.path);
-  const view: ViewProps = { code, file, inline, onExpand, url: fileUrl(code, file.idx) };
+  const view: ViewProps = { ...props, inline, url: fileUrl(code, file.idx) };
   if ((kind === "docx" || kind === "xlsx" || kind === "pptx") && file.size > OFFICE_PREVIEW_BYTES) {
     return <Unavailable {...view} message="This file is too large to preview" />;
   }

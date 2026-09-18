@@ -291,6 +291,51 @@ body {
     }
   }
 
+  /* A range drawn as a music player draws one: a thin bar without a knob, thicker while it is
+     pointed at or held. The element sets --value as a percentage, and --played and --rest. */
+  .scrubber {
+    --track: 0.25rem;
+    display: block;
+    width: 100%;
+    height: 1.25rem;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 9999px;
+  }
+
+  .scrubber:hover,
+  .scrubber:active {
+    --track: 0.5rem;
+  }
+
+  .scrubber::-webkit-slider-runnable-track {
+    height: var(--track);
+    border-radius: 9999px;
+    background: linear-gradient(to right, var(--played) var(--value), var(--rest) var(--value));
+    transition: height 0.15s var(--ease-out);
+  }
+
+  .scrubber::-webkit-slider-thumb {
+    width: 0;
+    height: var(--track);
+    appearance: none;
+  }
+
+  .scrubber::-moz-range-track {
+    height: var(--track);
+    border-radius: 9999px;
+    background: linear-gradient(to right, var(--played) var(--value), var(--rest) var(--value));
+    transition: height 0.15s var(--ease-out);
+  }
+
+  .scrubber::-moz-range-thumb {
+    width: 0;
+    height: 0;
+    border: 0;
+    background: transparent;
+  }
+
   /* The chosen option of a tab list or segmented control, sliding between its equal columns.
      Its parent sets --count and --index and is padded and spaced by 0.25rem. */
   .thumb {
