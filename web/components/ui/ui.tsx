@@ -20,7 +20,7 @@ const variants: Record<Variant, string> = {
   primary: "bg-accent-solid text-accent-fg shadow-sm hover:brightness-110",
   secondary: "border border-line bg-surface hover:bg-hover",
   ghost: "text-muted hover:bg-hover hover:text-fg",
-  danger: "text-err hover:bg-err/10",
+  danger: "bg-err/10 text-err hover:bg-err/15",
 };
 
 export function buttonClass(variant: Variant = "secondary", extra = "") {
