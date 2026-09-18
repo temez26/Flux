@@ -113,6 +113,9 @@
   /* A box set inside a card. Its corner follows the card's rather than repeating it, which
      inset by the card's padding would look rounder than the card itself. */
   --radius-inset: 1rem;
+  /* What sits in a box of that radius or of `xl`, padded 0.25rem: a segmented control's options. */
+  --radius-inset-inner: calc(var(--radius-inset) - 0.25rem);
+  --radius-xl-inner: calc(var(--radius-xl) - 0.25rem);
   --animate-panel-from-right: panel-from-right 0.32s var(--ease-out);
   --animate-panel-from-left: panel-from-left 0.32s var(--ease-out);
   --animate-view-in: view-in 0.35s var(--ease-out);

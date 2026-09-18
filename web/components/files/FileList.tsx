@@ -314,7 +314,7 @@ export function FileBrowser({
                   aria-label={label}
                   title={label}
                   onClick={() => choose(value)}
-                  className={`flex size-9 items-center justify-center rounded-lg transition ${
+                  className={`flex size-9 items-center justify-center rounded-xl-inner transition ${
                     view === value ? "bg-surface text-fg shadow-sm ring-1 ring-line" : "text-muted hover:text-fg"
                   }`}
                 >
