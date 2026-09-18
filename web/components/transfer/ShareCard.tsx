@@ -149,7 +149,7 @@ export function ShareCard({
             <span className="min-w-0 flex-1 truncate text-sm text-muted" title={link}>
               {link.replace(/^https?:\/\//, "")}
             </span>
-            <Button variant="primary" className="shrink-0 rounded-inset-inner" onClick={shareLink}>
+            <Button variant="primary" className="shrink-0 !rounded-inset-inner" onClick={shareLink}>
               <LinkIcon className="size-4" />
               {canShare ? "Share link" : "Copy link"}
             </Button>
