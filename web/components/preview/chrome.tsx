@@ -23,11 +23,6 @@ export interface ViewProps extends Target {
   url: string;
   inline: boolean;
   onExpand?: () => void;
-  /** In the viewer, steps to the file before or after this one, where there is one. */
-  onPrevious?: () => void;
-  onNext?: () => void;
-  /** The next file is audio as well, so playback carries on into it, as through an album. */
-  nextIsAudio?: boolean;
 }
 
 export type Status = "loading" | "ready" | "failed";

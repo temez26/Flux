@@ -1,12 +1,13 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
-import { inlineUrl, renderUrl } from "@/lib/api";
+import { Fragment, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
+import { inlineUrl, loadTags, renderUrl, tagsUrl, type AudioTags } from "@/lib/api";
 import { basename } from "@/lib/platform/files";
-import { thumbnailSource } from "@/lib/preview/preview";
-import { ExpandIcon, ExternalIcon } from "../ui/icons";
+import { audioDetails } from "@/lib/preview/audio";
+import { hasTags, thumbnailSource } from "@/lib/preview/preview";
+import { ExpandIcon, ExternalIcon, FileTypeIcon } from "../ui/icons";
 import { Spinner } from "../ui/ui";
-import { InlineFrame, Loading, Unavailable, overlayTextButton, type Status, type ViewProps } from "./chrome";
+import { InlineFrame, Loading, Unavailable, overlayTextButton, useLoad, type Status, type ViewProps } from "./chrome";
 
 export function ImageView({ code, file, url, inline, onExpand }: ViewProps) {
   const [status, setStatus] = useState<Status>("loading");
@@ -138,6 +139,123 @@ export function VideoView({ code, file, url, inline }: ViewProps) {
         onError={() => setFailed(true)}
         className="max-h-full max-w-full"
       />
+    </div>
+  );
+}
+
+// Stands in for `loadTags` where the server can't read the file's tags, so nothing is fetched.
+const noTags = (): Promise<AudioTags> => Promise.reject(new Error("No tags to read"));
+
+/** Cover art over the file-type icon, which shows until the art loads and stays if there is none. */
+function Artwork({
+  src,
+  path,
+  className,
+  iconClassName,
+}: {
+  src?: string;
+  path: string;
+  className: string;
+  iconClassName: string;
+}) {
+  const [status, setStatus] = useState<Status>("loading");
+  return (
+    <span
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden bg-accent-solid text-accent-fg ${className}`}
+    >
+      <FileTypeIcon path={path} className={iconClassName} />
+      {src && status !== "failed" && (
+        // eslint-disable-next-line @next/next/no-img-element -- served by the API, not a static asset
+        <img
+          src={src}
+          alt=""
+          onLoad={() => setStatus("ready")}
+          onError={() => setStatus("failed")}
+          className={`absolute inset-0 size-full object-cover transition-opacity duration-200 ${status === "ready" ? "opacity-100" : "opacity-0"}`}
+        />
+      )}
+    </span>
+  );
+}
+
+export function AudioView({ code, file, url, inline }: ViewProps) {
+  const [failed, setFailed] = useState(false);
+  const { data: tags } = useLoad(tagsUrl(code, file.idx), hasTags(file) ? loadTags : noTags);
+  if (failed)
+    return (
+      <Unavailable
+        code={code}
+        file={file}
+        url={url}
+        inline={inline}
+        message="This audio format can't be played in the browser"
+      />
+    );
+  const player = (
+    <audio
+      src={url}
+      controls
+      autoPlay={!inline}
+      preload="metadata"
+      onError={() => setFailed(true)}
+      className="w-full"
+    />
+  );
+  const title = tags?.title ?? basename(file.path);
+  const byline = [tags?.artist, tags?.album].filter(Boolean).join(" · ");
+  const cover = tags?.cover ? renderUrl(code, file.idx) : undefined;
+
+  if (inline) {
+    if (!tags || (!cover && !byline && !tags.title)) return player;
+    return (
+      <div className="rounded-xl border border-line bg-bg p-3">
+        <div className="mb-3 flex items-center gap-3">
+          <Artwork src={cover} path={file.path} className="size-14 rounded-lg" iconClassName="size-6" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-medium">{title}</p>
+            {byline && <p className="truncate text-sm text-muted">{byline}</p>}
+          </div>
+        </div>
+        {player}
+      </div>
+    );
+  }
+
+  const details = tags ? audioDetails(tags) : [];
+  return (
+    <div className="absolute inset-0 touch-pan-y overflow-y-auto overscroll-contain">
+      {cover && (
+        // eslint-disable-next-line @next/next/no-img-element -- served by the API, not a static asset
+        <img
+          src={cover}
+          alt=""
+          aria-hidden
+          className="pointer-events-none fixed inset-0 size-full scale-110 object-cover opacity-30 blur-3xl"
+        />
+      )}
+      <div className="relative flex min-h-full items-center justify-center p-6">
+        <div className="flex w-full max-w-md flex-col items-center text-center">
+          <Artwork
+            src={cover}
+            path={file.path}
+            className="size-48 rounded-3xl shadow-2xl shadow-black/50 sm:size-64"
+            iconClassName="size-16"
+          />
+          <p className="mt-6 w-full truncate text-lg font-semibold">{title}</p>
+          {byline && <p className="w-full truncate text-sm text-white/70">{byline}</p>}
+          <div className="mt-6 w-full">{player}</div>
+          {details.length > 0 && (
+            <dl className="mt-6 grid w-full grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-2xl bg-white/5 p-4 text-left text-sm">
+              {details.map(([label, value]) => (
+                <Fragment key={label}>
+                  <dt className="text-white/50">{label}</dt>
+                  <dd className="min-w-0 truncate tabular-nums">{value}</dd>
+                </Fragment>
+              ))}
+            </dl>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

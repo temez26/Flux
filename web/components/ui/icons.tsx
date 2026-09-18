@@ -83,41 +83,6 @@ export const QrIcon = (p: IconProps) => (
   <Icon d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2" {...p} />
 );
 
-/** Solid shapes, for transport controls that are read at a glance like a music player's. */
-function Glyph({ d, className = "size-5" }: IconProps & { d: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d={d} />
-    </svg>
-  );
-}
-
-export const PlayFillIcon = (p: IconProps) => (
-  <Glyph d="M7 4.6v14.8a1 1 0 0 0 1.5.86l12.2-7.4a1 1 0 0 0 0-1.72L8.5 3.74A1 1 0 0 0 7 4.6z" {...p} />
-);
-export const PauseFillIcon = (p: IconProps) => (
-  <Glyph
-    d="M6.5 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm8 0h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"
-    {...p}
-  />
-);
-export const PreviousIcon = (p: IconProps) => (
-  <Glyph
-    d="M11.5 6.2v11.6a.8.8 0 0 1-1.24.66L1.9 12.66a.8.8 0 0 1 0-1.32l8.36-5.8a.8.8 0 0 1 1.24.66zm10 0v11.6a.8.8 0 0 1-1.24.66l-8.36-5.8a.8.8 0 0 1 0-1.32l8.36-5.8a.8.8 0 0 1 1.24.66z"
-    {...p}
-  />
-);
-export const NextIcon = (p: IconProps) => (
-  <Glyph
-    d="M12.5 6.2v11.6a.8.8 0 0 0 1.24.66l8.36-5.8a.8.8 0 0 0 0-1.32l-8.36-5.8a.8.8 0 0 0-1.24.66zm-10 0v11.6a.8.8 0 0 0 1.24.66l8.36-5.8a.8.8 0 0 0 0-1.32L3.74 5.54a.8.8 0 0 0-1.24.66z"
-    {...p}
-  />
-);
-export const VolumeLowIcon = (p: IconProps) => <Icon d="M4 9.5h3.5L12 6v12l-4.5-3.5H4zM15.5 10a3 3 0 0 1 0 4" {...p} />;
-export const VolumeHighIcon = (p: IconProps) => (
-  <Icon d="M4 9.5h3.5L12 6v12l-4.5-3.5H4zM15.5 10a3 3 0 0 1 0 4M18.5 7.5a6.5 6.5 0 0 1 0 9" {...p} />
-);
-
 const FileIcon = (p: IconProps) => (
   <Icon d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5" {...p} />
 );
