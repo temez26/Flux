@@ -37,7 +37,7 @@ export function DropZone({
     <div
       onClick={() => idle && onPick("files")}
       {...dropTarget((picked) => !status && onDrop(picked))}
-      className={`flex min-h-44 flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-6 text-center transition ${
+      className={`flex min-h-44 flex-col items-center justify-center gap-4 rounded-inset border-2 border-dashed p-6 text-center transition ${
         idle ? "cursor-pointer border-line hover:border-accent/60 hover:bg-hover/50" : "border-line"
       }`}
     >
