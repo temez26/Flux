@@ -44,8 +44,16 @@ function choose(theme: Theme) {
   // A cross-fade where the browser can do one cheaply; otherwise the change is instant.
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (!reduced && document.startViewTransition) {
+    const root = document.documentElement;
     switching = true;
-    document.startViewTransition(() => apply(theme)).finished.finally(() => (switching = false));
+    // Marked before the old page is captured, so both sides of the fade carry it.
+    root.dataset.switching = "";
+    document
+      .startViewTransition(() => apply(theme))
+      .finished.finally(() => {
+        switching = false;
+        delete root.dataset.switching;
+      });
   } else apply(theme);
 }
 

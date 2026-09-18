@@ -232,6 +232,12 @@ body {
     }
   }
 
+  /* Firefox draws a theme change's cross-fade without backdrop blur, so a glass menu would
+     show the page through it until the fade ends. */
+  :root[data-theme="glass"][data-switching] .floating {
+    background: linear-gradient(var(--surface), var(--surface)), var(--page);
+  }
+
   /* A list's header, pinned while its rows scroll beneath. */
   .list-header {
     top: 0;
